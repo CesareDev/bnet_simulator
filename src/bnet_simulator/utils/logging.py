@@ -1,13 +1,38 @@
-def log_info(message: str, level: str = "INFO") -> None:
-    """
-    Log a message with a specified log level.
+import sys
+from datetime import datetime
+from pathlib import Path
 
-    Args:
-        message (str): The message to log.
-        level (str): The log level. Can be "INFO", "WARNING", "ERROR", or "DEBUG". Defaults to "INFO".
-    """
-    levels = ["INFO", "WARNING", "ERROR", "DEBUG"]
-    if level not in levels:
-        raise ValueError(f"Invalid log level: {level}. Must be one of {levels}.")
+COLORS = {
+    'INFO': '\033[92m',     # Green
+    'DEBUG': '\033[94m',    # Blue
+    'WARNING': '\033[93m',  # Yellow
+    'ERROR': '\033[91m',    # Red
+    'CRITICAL': '\033[95m', # Magenta
+    'RESET': '\033[0m',
+}
 
-    print(f"[{level}] {message}")
+# Default log file path
+LOG_FILE = Path("simulator.log")
+
+def _log(level: str, message: str, to_console: bool = True, to_file: bool = False):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    color = COLORS.get(level, '')
+    reset = COLORS['RESET']
+    
+    formatted = f"[{timestamp}] [{level}] {message}"
+
+    # Print to console with color
+    output = f"{color}{formatted}{reset}"
+    if to_console:
+        print(output, file=sys.stderr if level in ["ERROR", "CRITICAL"] else sys.stdout)
+
+    # Optionally write to file
+    if to_file:
+        with LOG_FILE.open("a") as f:
+            f.write(formatted + "\n")
+
+def log_info(msg: str, to_console: bool = True, to_file: bool = False): _log("INFO", msg, to_console, to_file)
+def log_debug(msg: str, to_console: bool = True, to_file: bool = False): _log("DEBUG", msg, to_console, to_file)
+def log_warning(msg: str, to_console: bool = True, to_file: bool = False): _log("WARNING", msg, to_console, to_file)
+def log_error(msg: str, to_console: bool = True, to_file: bool = False): _log("ERROR", msg, to_console, to_file)
+def log_critical(msg: str, to_console: bool = True, to_file: bool = False): _log("CRITICAL", msg, to_console, to_file)
