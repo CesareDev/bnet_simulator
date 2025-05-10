@@ -11,7 +11,7 @@ COLORS = {
     'RESET': '\033[0m',
 }
 
-# Default log file path
+# Default log file path, root of the project
 LOG_FILE = Path("simulator.log")
 
 def _log(level: str, message: str, to_console: bool = True, to_file: bool = False):

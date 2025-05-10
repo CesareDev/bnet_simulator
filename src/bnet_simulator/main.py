@@ -1,11 +1,21 @@
-from bnet_simulator.utils import logging
+from bnet_simulator.core import simulator
 
-def main() -> None:
-    logging.log_info("Hello from bnet_simulator!")
-    logging.log_debug("Debugging information")
-    logging.log_warning("This is a warning")
-    logging.log_error("An error occurred")
-    logging.log_critical("Critical error! Immediate attention needed")
+def main():
+    # Instantiate 3 buoys
+    buoys = [
+        simulator.Buoy(),
+        simulator.Buoy(),
+        simulator.Buoy()
+    ]
+
+    # Create a simulator instance
+    sim = simulator.Simulator(buoys=buoys)
+
+    # Log the initial state of the buoys
+    sim.log_buoys()
+
+    # Start the simulation (simulation time is defined in the config file)
+    sim.start()
 
 if __name__ == "__main__":
     main()
