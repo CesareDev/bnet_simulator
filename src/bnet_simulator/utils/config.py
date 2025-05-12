@@ -12,3 +12,7 @@ COMMUNICATION_RANGE = 100.0  # meters or units
 # Simulation settings
 TARGET_FPS = 60
 SIMULATION_DURATION = 5.0  # seconds
+
+# World settings
+WORLD_WIDTH = 200.0  # meters or units
+WORLD_HEIGHT = 200.0  # meters or units

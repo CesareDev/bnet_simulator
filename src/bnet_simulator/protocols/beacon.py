@@ -8,5 +8,5 @@ class Beacon:
     mobile: bool  # "mobile" or "fixed"
     position: Tuple[float, float]
     battery: float
-    neighbors: List[uuid.UUID, str] # list of known neighbors IDs with a timestamp (last seen)
+    neighbors: List[Tuple[uuid.UUID, str]] # list of known neighbors IDs with a timestamp (last seen)
     timestamp: float  # in simulation time
