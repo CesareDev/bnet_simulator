@@ -1,7 +1,9 @@
 import uuid
 from typing import List, Tuple
 from bnet_simulator.protocols.scheduler import BeaconScheduler
+from bnet_simulator.protocols.beacon import Beacon
 from bnet_simulator.core.channel import Channel
+from bnet_simulator.utils import config, logging
 
 class Buoy:
     def __init__(
@@ -21,6 +23,10 @@ class Buoy:
         self.scheduler = BeaconScheduler()
         self.channel = channel
 
+        # Temporary initial random timeout
+        import random
+        self.timeout = random.uniform(0.0, 1.0)
+
     def update_position(self, dt: float):
         if not self.is_mobile:
             return
@@ -28,21 +34,42 @@ class Buoy:
         dx, dy = self.velocity
         self.position = (x + dx * dt, y + dy * dt)
 
-    def update_neighbors(self):
-        pass # TODO: Implement the neighbor update logic (Based on received beacons)
-
-    def send_beacon(self):
-        pass # TODO: Implement the beacon sending logic (Sensing the channel and sending using the scheduler)
+    def send_beacon(self, dt: float, sim_time: float) -> bool:
+        if self.channel.is_busy():
+            return False
+        
+        # TODO: Implement the scheduler
+        self.timeout += dt
+        if (self.timeout > 1.0):
+            beacon = Beacon(
+                sender_id=self.id,
+                mobile=self.is_mobile,
+                position=self.position,
+                battery=self.battery,
+                neighbors=self.neighbors.copy(),
+                timestamp=sim_time
+            )
+            self.timeout = 0.0
+            result = self.channel.broadcast(beacon)
+            return result
+        
+        return False
 
     def receive_beacon(self):
-        pass # TODO: Implement the beacon receiving logic (Sensing the channel and updating neighbors)
+        beacons = self.channel.receive_all(self.id)
+        for beacon in beacons:
+            if beacon.sender_id == self.id:
+                continue
+            if self.euclidean_distance(self.position, beacon.position) < config.COMMUNICATION_RANGE:
+                self.neighbors.append((beacon.sender_id, beacon.timestamp))
 
-    def update(self, dt: float):
+
+    def update(self, dt: float, sim_time: float):
         self.update_position(dt)
-        self.send_beacon()
+        self.send_beacon(dt, sim_time=sim_time)
         self.receive_beacon()
 
-    def euclidean_distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
+    def euclidean_distance(self, p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
         return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2) ** 0.5
 
     def get_id(self) -> uuid.UUID:

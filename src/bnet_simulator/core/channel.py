@@ -8,6 +8,7 @@ class Channel:
         self.current_transmissions: Dict[uuid.UUID, Beacon] = {}
 
     def clear(self):
+        # TODO: Implement a more sophisticated clearing mechanism
         self.current_transmissions.clear()
 
     def is_busy(self) -> bool:

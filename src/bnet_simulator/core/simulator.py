@@ -7,21 +7,21 @@ class Simulator:
     def __init__(self, buoys: List[Buoy]):
         self.buoys = buoys
         self.running = False
+        self.simulated_time = 0.0
 
     def start(self):
         self.running = True
-        simulated_time = 0.0
         previous_time = time.time()
         dt = 1.0 / config.TARGET_FPS
         delta_real = dt
 
         logging.log_info("Starting simulation...")
 
-        while self.running and simulated_time < config.SIMULATION_DURATION:
+        while self.running and self.simulated_time < config.SIMULATION_DURATION:
             start_time = time.time()
             delta_real = start_time - previous_time
             previous_time = start_time
-            simulated_time += delta_real
+            self.simulated_time += delta_real
 
             self.update(delta_real)
 
@@ -33,7 +33,8 @@ class Simulator:
         logging.log_info("Simulation finished.")
 
     def update(self, dt: float):
-        pass # TODO: Implement buoys behavior
+        for buoy in self.buoys:
+            buoy.update(dt=dt, sim_time=self.simulated_time)
 
     def log_buoys(self):
         for buoy in self.buoys:
