@@ -19,12 +19,14 @@ class Simulator:
         dt = 1.0 / config.TARGET_FPS
         delta_real = dt
 
-        while self.running and self.simulated_time < config.SIMULATION_DURATION:
+        while self.running and self.simulated_time < config.SIMULATION_DURATION and not self.window.should_close():
+
+            self.window.poll_input()
+
             start_time = time.time()
             delta_real = start_time - previous_time
             previous_time = start_time
             self.simulated_time += delta_real
-
             self.update(delta_real)
             
             self.window.draw(self.buoys)
@@ -34,7 +36,7 @@ class Simulator:
             if sleep_time > 0.0:
                 time.sleep(sleep_time)
 
-        self.window.quit()
+        self.window.close()
 
     def update(self, dt: float):
         for buoy in self.buoys:
