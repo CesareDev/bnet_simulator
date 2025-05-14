@@ -2,6 +2,7 @@ import time
 from typing import List
 from bnet_simulator.buoys.buoy import Buoy
 from bnet_simulator.core.channel import Channel
+from bnet_simulator.gui.window import Window
 from bnet_simulator.utils import logging, config
 
 class Simulator:
@@ -10,6 +11,7 @@ class Simulator:
         self.channel = channel
         self.running = False
         self.simulated_time = 0.0
+        self.window = Window()
 
     def start(self):
         self.running = True
@@ -24,11 +26,15 @@ class Simulator:
             self.simulated_time += delta_real
 
             self.update(delta_real)
+            
+            self.window.draw(self.buoys)
 
             elapsed_time = time.time() - start_time
             sleep_time = dt - elapsed_time
             if sleep_time > 0.0:
                 time.sleep(sleep_time)
+
+        self.window.quit()
 
     def update(self, dt: float):
         for buoy in self.buoys:

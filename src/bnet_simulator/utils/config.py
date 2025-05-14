@@ -17,3 +17,10 @@ SIMULATION_DURATION = 10.0  # seconds
 # World settings
 WORLD_WIDTH = 200.0  # meters or units
 WORLD_HEIGHT = 200.0  # meters or units
+
+# GUI settings
+WINDOW_SIZE = (800.0, 600.0)
+BUOY_RADIUS = 6.0
+BG_COLOR = (30, 30, 30)
+MOBILE_COLOR = (0, 200, 255)
+FIXED_COLOR = (255, 255, 100)
