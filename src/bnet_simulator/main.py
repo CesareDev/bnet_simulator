@@ -3,6 +3,7 @@ from bnet_simulator.core.channel import Channel
 from bnet_simulator.buoys.buoy import Buoy
 from bnet_simulator.utils import config
 import random
+import time
 
 def random_position():
     return (
@@ -12,11 +13,13 @@ def random_position():
 
 def random_velocity():
     return (
-        random.uniform(-1, 1),
-        random.uniform(-1, 1)
+        random.uniform(-1, 1) * config.DEFAULT_VELOCITY,
+        random.uniform(-1, 1) * config.DEFAULT_VELOCITY
     )
 
 def main():
+    random.seed(time.time())    
+
     # Instantiate a channel
     channel = Channel()
 
@@ -29,10 +32,7 @@ def main():
     ]
 
     # Create a simulator instance
-    sim = Simulator(buoys=buoys)
-
-    # Log the initial state of the buoys
-    sim.log_buoys()
+    sim = Simulator(buoys, channel)
 
     # Start the simulation (simulation time is defined in the config file)
     sim.start()

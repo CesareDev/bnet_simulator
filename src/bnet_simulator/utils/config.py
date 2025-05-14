@@ -6,11 +6,13 @@ BEACON_MAX_INTERVAL = 10.0
 # Buoy settings
 DEFAULT_BATTERY = 100.0  # %
 DEFAULT_VELOCITY = (0.0, 0.0)
-COMMUNICATION_RANGE = 100.0  # meters or units
+COMMUNICATION_RANGE = 60.0  # meters or units
+NEIGHBOR_TIMEOUT = 5.0  # seconds
+DEFAULT_VELOCITY = 2.0 # m/s
 
 # Simulation settings
 TARGET_FPS = 60
-SIMULATION_DURATION = 5.0  # seconds
+SIMULATION_DURATION = 10.0  # seconds
 
 # World settings
 WORLD_WIDTH = 200.0  # meters or units

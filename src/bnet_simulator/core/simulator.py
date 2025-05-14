@@ -1,11 +1,13 @@
 import time
 from typing import List
 from bnet_simulator.buoys.buoy import Buoy
+from bnet_simulator.core.channel import Channel
 from bnet_simulator.utils import logging, config
 
 class Simulator:
-    def __init__(self, buoys: List[Buoy]):
+    def __init__(self, buoys: List[Buoy], channel: Channel):
         self.buoys = buoys
+        self.channel = channel
         self.running = False
         self.simulated_time = 0.0
 
@@ -14,8 +16,6 @@ class Simulator:
         previous_time = time.time()
         dt = 1.0 / config.TARGET_FPS
         delta_real = dt
-
-        logging.log_info("Starting simulation...")
 
         while self.running and self.simulated_time < config.SIMULATION_DURATION:
             start_time = time.time()
@@ -30,11 +30,10 @@ class Simulator:
             if sleep_time > 0.0:
                 time.sleep(sleep_time)
 
-        logging.log_info("Simulation finished.")
-
     def update(self, dt: float):
         for buoy in self.buoys:
             buoy.update(dt=dt, sim_time=self.simulated_time)
+        self.channel.clear()
 
     def log_buoys(self):
         for buoy in self.buoys:
