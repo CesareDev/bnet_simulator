@@ -7,7 +7,7 @@ class Window:
     def __init__(self):
         pygame.init()
         self.surface = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
-        pygame.display.set_caption("Buoy Network Simulation")
+        pygame.display.set_caption("BNet Simulation")
         self.running = True
         self.scale = min(config.WINDOW_WIDTH / config.WORLD_WIDTH, config.WINDOW_HEIGHT / config.WORLD_HEIGHT)
         self.font = pygame.font.SysFont("Arial", 14)

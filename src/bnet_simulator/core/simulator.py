@@ -1,5 +1,6 @@
 import time
 from typing import List
+import random
 from bnet_simulator.buoys.buoy import Buoy
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.gui.window import Window
@@ -27,7 +28,25 @@ class Simulator:
             delta_real = start_time - previous_time
             previous_time = start_time
             self.simulated_time += delta_real
-            self.update(delta_real)
+
+            # Shuffle buoys for random order
+            random.shuffle(self.buoys)
+
+            # Update buoys position
+            for buoy in self.buoys:
+                buoy.update_position(delta_real)
+
+            # Send beacons
+            for buoy in self.buoys:
+                buoy.send_beacon(delta_real, self.simulated_time)
+
+            # Receive beacons
+            for buoy in self.buoys:
+                buoy.receive_beacon(self.simulated_time)
+
+            # Cleanup neighbors
+            for buoy in self.buoys:
+                buoy.cleanup_neighbors(self.simulated_time)
             
             self.window.draw(self.buoys)
 

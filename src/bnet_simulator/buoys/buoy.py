@@ -35,23 +35,15 @@ class Buoy:
         self.position = (x + dx * dt, y + dy * dt)
 
     def cleanup_neighbors(self, sim_time: float):
-        before = len(self.neighbors)
         self.neighbors = [
             (nid, ts) for nid, ts in self.neighbors
             if sim_time - ts <= config.NEIGHBOR_TIMEOUT
         ]
-        after = len(self.neighbors)
-        if before != after:
-            logging.log_debug(f"Buoy {str(self.id)[:6]}... removed {before - after} stale neighbors")
-
 
     def send_beacon(self, dt: float, sim_time: float) -> bool:
         # TODO: Implement the scheduler
         self.timeout += dt
         if (self.timeout > 1.0):
-            if self.channel.is_busy():
-                logging.log_error(f"Buoy {self.id} tried to send a beacon but the channel is busy")
-                return False
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,
@@ -62,8 +54,7 @@ class Buoy:
             )
             self.timeout = 0.0
             result = self.channel.broadcast(beacon)
-            if result:
-                logging.log_info(f"Buoy {self.id} sent a beacon")
+            logging.log_info(f"Buoy {str(self.id)[:6]} try to send beacon")
             return result
         return False
 
@@ -81,13 +72,6 @@ class Buoy:
                 ]
             else:
                 self.neighbors.append((beacon.sender_id, sim_time))
-            logging.log_debug(f"Buoy {str(self.id)[:6]}... received beacon from {str(beacon.sender_id)[:6]}...")
-
-    def update(self, dt: float, sim_time: float):
-        self.update_position(dt)
-        self.send_beacon(dt, sim_time)
-        self.receive_beacon(sim_time)
-        self.cleanup_neighbors(sim_time)
 
     def get_id(self) -> uuid.UUID:
         return self.id
