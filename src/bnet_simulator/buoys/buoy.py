@@ -5,6 +5,8 @@ from bnet_simulator.protocols.beacon import Beacon
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.utils import config, logging
 
+import random
+
 class Buoy:
     def __init__(
         self,
@@ -22,10 +24,8 @@ class Buoy:
         self.neighbors: List[Tuple[uuid.UUID, float]] = []  # list of known neighbors IDs with a timestamp (last seen)
         self.scheduler = BeaconScheduler()
         self.channel = channel
-
-        # Temporary initial random timeout
-        import random
-        self.timeout = random.uniform(0.0, 1.0)
+        
+        self.timeout = 0.0
 
     def update_position(self, dt: float):
         if not self.is_mobile:
@@ -43,7 +43,7 @@ class Buoy:
     def send_beacon(self, dt: float, sim_time: float) -> bool:
         # TODO: Implement the scheduler
         self.timeout += dt
-        if (self.timeout > 1.0):
+        if self.timeout > random.uniform(1, 5):
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,

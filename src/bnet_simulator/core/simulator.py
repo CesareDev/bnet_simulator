@@ -28,26 +28,9 @@ class Simulator:
             delta_real = start_time - previous_time
             previous_time = start_time
             self.simulated_time += delta_real
-
-            # Shuffle buoys for random order
-            random.shuffle(self.buoys)
-
-            # Update buoys position
-            for buoy in self.buoys:
-                buoy.update_position(delta_real)
-
-            # Send beacons
-            for buoy in self.buoys:
-                buoy.send_beacon(delta_real, self.simulated_time)
-
-            # Receive beacons
-            for buoy in self.buoys:
-                buoy.receive_beacon(self.simulated_time)
-
-            # Cleanup neighbors
-            for buoy in self.buoys:
-                buoy.cleanup_neighbors(self.simulated_time)
             
+            self.update(delta_real)
+
             self.window.draw(self.buoys)
 
             elapsed_time = time.time() - start_time
@@ -58,8 +41,25 @@ class Simulator:
         self.window.close()
 
     def update(self, dt: float):
+        # Shuffle buoys for random order
+        random.shuffle(self.buoys)
+
+        # Update buoys position
         for buoy in self.buoys:
-            buoy.update(dt=dt, sim_time=self.simulated_time)
+            buoy.update_position(dt)
+
+        # Send beacons
+        for buoy in self.buoys:
+            buoy.send_beacon(dt, self.simulated_time)
+
+        # Receive beacons
+        for buoy in self.buoys:
+            buoy.receive_beacon(self.simulated_time)
+
+        # Cleanup neighbors
+        for buoy in self.buoys:
+            buoy.cleanup_neighbors(self.simulated_time)
+
         self.channel.clear()
 
     def log_buoys(self):

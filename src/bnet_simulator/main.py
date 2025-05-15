@@ -27,6 +27,8 @@ def main():
     buoys = [
         Buoy(channel=channel, position=random_position(), is_mobile=False),
         Buoy(channel=channel, position=random_position(), is_mobile=False),
+        Buoy(channel=channel, position=random_position(), is_mobile=False),
+        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity()),
         Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity()),
         Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity()),
     ]

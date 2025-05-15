@@ -12,7 +12,7 @@ DEFAULT_VELOCITY = 2.0 # m/s
 
 # Simulation settings
 TARGET_FPS = 60
-SIMULATION_DURATION = 10.0  # seconds
+SIMULATION_DURATION = 60.0  # seconds
 
 # World settings
 WORLD_WIDTH = 200.0  # meters or units
@@ -25,3 +25,4 @@ BUOY_RADIUS = 2.0
 BG_COLOR = (30, 30, 30)
 MOBILE_COLOR = (0, 200, 255)
 FIXED_COLOR = (255, 255, 100)
+MAX_NEIGHBORS_DISPLAYED = 5
