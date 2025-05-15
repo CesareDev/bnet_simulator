@@ -24,8 +24,9 @@ class Buoy:
         self.neighbors: List[Tuple[uuid.UUID, float]] = []  # list of known neighbors IDs with a timestamp (last seen)
         self.scheduler = BeaconScheduler()
         self.channel = channel
-        
-        self.timeout = 0.0
+
+
+        self.elapsed_time = 0.0
 
     def update_position(self, dt: float):
         if not self.is_mobile:
@@ -42,8 +43,8 @@ class Buoy:
 
     def send_beacon(self, dt: float, sim_time: float) -> bool:
         # TODO: Implement the scheduler
-        self.timeout += dt
-        if self.timeout > random.uniform(1, 5):
+        self.elapsed_time += dt
+        if self.elapsed_time > random.uniform(0, 5):
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,
@@ -52,7 +53,7 @@ class Buoy:
                 neighbors=self.neighbors.copy(),
                 timestamp=sim_time
             )
-            self.timeout = 0.0
+            self.elapsed_time = 0.0
             result = self.channel.broadcast(beacon)
             logging.log_info(f"Buoy {str(self.id)[:6]} try to send beacon")
             return result
