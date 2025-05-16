@@ -7,7 +7,9 @@ authors = [
     { name = "CesareDev", email = "corsicesare.lavoro@gmail.com" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pygame>=2.6.1",
+]
 
 [project.scripts]
 sim = "bnet_simulator.main:main"
