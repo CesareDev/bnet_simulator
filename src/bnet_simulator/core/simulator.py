@@ -13,6 +13,7 @@ class Simulator:
         self.running = False
         self.simulated_time = 0.0
         self.window = Window()
+        logging.LOG_CALLBACK = self.window.add_log
 
     def start(self):
         self.running = True
