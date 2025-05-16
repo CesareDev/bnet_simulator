@@ -11,6 +11,8 @@ class Window:
         self.running = True
         self.scale = min(config.WINDOW_WIDTH / config.WORLD_WIDTH, config.WINDOW_HEIGHT / config.WORLD_HEIGHT)
         self.font = pygame.font.SysFont("Arial", 14)
+        self.margin_x = (config.WINDOW_WIDTH - config.WORLD_WIDTH * self.scale) / 2
+        self.margin_y = (config.WINDOW_HEIGHT - config.WORLD_HEIGHT * self.scale) / 2
 
     def poll_input(self):
         for event in pygame.event.get():
@@ -22,8 +24,8 @@ class Window:
 
         for buoy in buoys:
             x, y = buoy.position
-            screen_x = int(x * self.scale)
-            screen_y = int(y * self.scale)
+            screen_x = int(x * self.scale + self.margin_x)
+            screen_y = int(y * self.scale + self.margin_y)
             screen_pos = (screen_x, screen_y)
             color = config.MOBILE_COLOR if buoy.is_mobile else config.FIXED_COLOR
             radius_px = int(config.COMMUNICATION_RANGE * self.scale)

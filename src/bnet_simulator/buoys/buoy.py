@@ -44,7 +44,7 @@ class Buoy:
     def send_beacon(self, dt: float, sim_time: float) -> bool:
         # TODO: Implement the scheduler
         self.elapsed_time += dt
-        if self.elapsed_time > random.uniform(0, 5):
+        if self.elapsed_time > random.uniform(1, 5):
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,
