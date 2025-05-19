@@ -25,9 +25,6 @@ class Buoy:
         self.scheduler = BeaconScheduler()
         self.channel = channel
 
-
-        self.elapsed_time = 0.0
-
     def update_position(self, dt: float):
         if not self.is_mobile:
             return
@@ -42,9 +39,7 @@ class Buoy:
         ]
 
     def send_beacon(self, dt: float, sim_time: float) -> bool:
-        # TODO: Implement the scheduler
-        self.elapsed_time += dt
-        if self.elapsed_time > random.uniform(1, 5):
+        if self.scheduler.should_send(dt, self.battery, self.velocity, len(self.neighbors)):
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,
@@ -53,7 +48,6 @@ class Buoy:
                 neighbors=self.neighbors.copy(),
                 timestamp=sim_time
             )
-            self.elapsed_time = 0.0
             result = self.channel.broadcast(beacon)
             logging.log_info(f"Buoy {str(self.id)[:6]} try to send beacon")
             return result

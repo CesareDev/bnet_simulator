@@ -19,8 +19,8 @@ WORLD_WIDTH = 200.0  # meters or units
 WORLD_HEIGHT = 200.0  # meters or units
 
 # GUI settings
-WINDOW_WIDTH = 1920.0  # meters or units
-WINDOW_HEIGHT = 1080.0  # meters or units
+WINDOW_WIDTH = 1280
+WINDOW_HEIGHT = 720
 BUOY_RADIUS = 2.0
 BG_COLOR = (30, 30, 30)
 MOBILE_COLOR = (0, 200, 255)
