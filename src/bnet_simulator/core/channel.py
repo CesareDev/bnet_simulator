@@ -3,7 +3,6 @@ from typing import List, Tuple
 import math
 import random
 from bnet_simulator.protocols.beacon import Beacon
-from bnet_simulator.utils.config import COMMUNICATION_RANGE
 from bnet_simulator.utils import logging, config
 
 class Channel:
@@ -18,7 +17,7 @@ class Channel:
         for existing in self.transmissions:
             if beacon.sender_id == existing.sender_id:
                 continue  # Ignore self-collisions
-            if self.in_range(beacon.position, existing.position):
+            if self.in_range(beacon.position, existing.position, beacon.range):
                 return False  # Collision with a different sender
         self.transmissions.append(beacon)
         return True  # Successful transmission
@@ -28,7 +27,7 @@ class Channel:
         # Collect beacons in range, excluding self
         candidates = [
             beacon for beacon in self.transmissions
-            if beacon.sender_id != receiver_id and self.in_range(receiver_position, beacon.position)
+            if beacon.sender_id != receiver_id and self.in_range(receiver_position, beacon.position, beacon.range)
         ]
         
         # Simulate packet loss
@@ -45,7 +44,7 @@ class Channel:
 
         return received
 
-    def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> bool:
+    def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float], range: float) -> bool:
         dx = pos1[0] - pos2[0]
         dy = pos1[1] - pos2[1]
-        return math.hypot(dx, dy) <= COMMUNICATION_RANGE
+        return math.hypot(dx, dy) <= range

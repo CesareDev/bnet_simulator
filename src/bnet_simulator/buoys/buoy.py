@@ -1,11 +1,10 @@
 import uuid
 from typing import List, Tuple
+import random
 from bnet_simulator.protocols.scheduler import BeaconScheduler
 from bnet_simulator.protocols.beacon import Beacon
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.utils import config, logging
-
-import random
 
 class Buoy:
     def __init__(
@@ -24,6 +23,7 @@ class Buoy:
         self.neighbors: List[Tuple[uuid.UUID, float]] = []  # list of known neighbors IDs with a timestamp (last seen)
         self.scheduler = BeaconScheduler()
         self.channel = channel
+        self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
 
     def update_position(self, dt: float):
         if not self.is_mobile:
@@ -40,13 +40,15 @@ class Buoy:
 
     def send_beacon(self, dt: float, sim_time: float) -> bool:
         if self.scheduler.should_send(dt, self.battery, self.velocity, len(self.neighbors)):
+            self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,
                 position=self.position,
                 battery=self.battery,
                 neighbors=self.neighbors.copy(),
-                timestamp=sim_time
+                timestamp=sim_time,
+                range=self.range,
             )
             result = self.channel.broadcast(beacon)
             if result:

@@ -7,7 +7,8 @@ BEACON_LOSS_PROB = 0.1
 # Buoy settings
 DEFAULT_BATTERY = 100.0  # %
 DEFAULT_VELOCITY = (0.0, 0.0)
-COMMUNICATION_RANGE = 60.0  # meters or units
+COMMUNICATION_RANGE_MAX = 60.0  # meters or units
+COMMUNICATION_RANGE_MIN = 40.0  # meters or units
 NEIGHBOR_TIMEOUT = 5.0  # seconds
 DEFAULT_VELOCITY = 2.0 # m/s
 

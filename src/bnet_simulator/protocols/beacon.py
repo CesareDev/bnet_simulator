@@ -10,3 +10,4 @@ class Beacon:
     battery: float
     neighbors: List[Tuple[uuid.UUID, str]] # list of known neighbors IDs with a timestamp (last seen)
     timestamp: float  # in simulation time
+    range: float

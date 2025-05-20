@@ -2,8 +2,7 @@
 
 ## Network Issues to simulate?
 
-- Ping
-- Jitter
-- Disconnections
-- Not costant range of communication
-- ...
+- [ ] Ping
+- [ ] Jitter
+- [ ] Disconnections
+- [x] Variable range of communication

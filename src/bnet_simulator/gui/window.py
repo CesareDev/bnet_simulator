@@ -28,7 +28,7 @@ class Window:
             screen_y = int(y * self.scale + self.margin_y)
             screen_pos = (screen_x, screen_y)
             color = config.MOBILE_COLOR if buoy.is_mobile else config.FIXED_COLOR
-            radius_px = int(config.COMMUNICATION_RANGE * self.scale)
+            radius_px = int(buoy.range * self.scale)
             
             first_digit = str(buoy.id)[:6]  # Get the first digit of the buoy's ID
             text_surface = self.font.render(first_digit, True, (255, 255, 255))  # White text
