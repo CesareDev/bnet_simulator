@@ -49,7 +49,10 @@ class Buoy:
                 timestamp=sim_time
             )
             result = self.channel.broadcast(beacon)
-            logging.log_info(f"Buoy {str(self.id)[:6]} try to send beacon")
+            if result:
+                logging.log_info(f"Buoy {str(self.id)[:6]} sent beacon.")
+            else:
+                logging.log_warning(f"Buoy {str(self.id)[:6]} failed to broadcast (collision or channel busy).")
             return result
         return False
 

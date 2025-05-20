@@ -7,10 +7,12 @@ class BeaconScheduler:
         self.min_interval = min_interval
         self.max_interval = max_interval
         self.elapsed_time = 0.0
+        # self.next_interval = random.uniform(self.min_interval, self.max_interval)
 
     def should_send(self, dt: float, battery: float, velocity: Tuple[float, float], neighbors: int) -> bool:
         self.elapsed_time += dt
         if self.elapsed_time >= random.uniform(self.min_interval, self.max_interval):
             self.elapsed_time = 0.0
+            # self.next_interval = random.uniform(self.min_interval, self.max_interval)
             return True
         return False
