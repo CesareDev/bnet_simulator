@@ -61,20 +61,16 @@ class Buoy:
     def receive_beacon(self, sim_time: float):
         beacons = self.channel.receive_all(self.id, self.position)
         for beacon in beacons:
-            if beacon.sender_id == self.id:
-                continue
-            # Update or add the neighbor
+            # Check if the sender of this beacon is already in the list of known neighbors 
             existing = next((n for n in self.neighbors if n[0] == beacon.sender_id), None)
             if existing:
+                # If the sender is already in the list of neighbors update its last_seen timestamp to the current sim_time
                 self.neighbors = [
                     (nid, sim_time) if nid == beacon.sender_id else (nid, ts)
                     for nid, ts in self.neighbors
                 ]
             else:
                 self.neighbors.append((beacon.sender_id, sim_time))
-
-    def get_id(self) -> uuid.UUID:
-        return self.id
 
     def __repr__(self):
         return f"<Buoy id={str(self.id)[:6]}... pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"

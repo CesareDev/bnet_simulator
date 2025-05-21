@@ -38,7 +38,7 @@ class Channel:
                 continue  # Drop this beacon
             received.append(beacon)
 
-        # If multiple are in range, local collision: nothing is received
+        # If more than one beacon reaches the receiver at the same time
         if len(received) > 1:
             return []
 
