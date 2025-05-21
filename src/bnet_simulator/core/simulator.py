@@ -41,26 +41,17 @@ class Simulator:
         self.window.close()
 
     def update(self, dt: float):
+        self.channel.update(self.simulated_time)
+
         # Shuffle buoys for random order
         random.shuffle(self.buoys)
 
-        # Update buoys position
+        # Update buoys
         for buoy in self.buoys:
             buoy.update_position(dt)
-
-        # Send beacons
-        for buoy in self.buoys:
             buoy.send_beacon(dt, self.simulated_time)
-
-        # Receive beacons
-        for buoy in self.buoys:
             buoy.receive_beacon(self.simulated_time)
-
-        # Cleanup neighbors
-        for buoy in self.buoys:
             buoy.cleanup_neighbors(self.simulated_time)
-
-        self.channel.clear()
 
     def log_buoys(self):
         for buoy in self.buoys:
