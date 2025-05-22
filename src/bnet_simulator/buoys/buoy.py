@@ -80,7 +80,6 @@ class Buoy:
         beacons = self.channel.receive_all(self.id, self.position, sim_time)
         for beacon in beacons:
             # Here the same beacon is received multiple times because of the channel that keeps it in the buffer until the trasmission is over
-            logging.log_info(f"Buoy {str(self.id)[:6]} received beacon from {str(beacon.sender_id)[:6]} at {sim_time:.2f}s")
             existing = next((n for n in self.neighbors if n[0] == beacon.sender_id), None)
             if existing:
                 self.neighbors = [

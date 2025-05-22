@@ -51,4 +51,4 @@ class Channel:
     def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float], range: float) -> bool:
         dx = pos1[0] - pos2[0]
         dy = pos1[1] - pos2[1]
-        return math.hypot(dx, dy) <= range
+        return math.sqrt(dx**2 + dy**2) <= range
