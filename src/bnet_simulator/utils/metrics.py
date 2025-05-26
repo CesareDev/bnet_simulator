@@ -1,0 +1,53 @@
+import csv
+from bnet_simulator.utils import logging
+
+class Metrics:
+    def __init__(self):
+        self.beacons_sent = 0
+        self.beacons_received = 0
+        self.beacons_lost = 0
+        self.beacons_collided = 0
+        self.total_latency = 0.0  # if you want to compute average delay
+        self.delivered_beacons = set()  # To avoid counting duplicates
+
+    def log_sent(self):
+        self.beacons_sent += 1
+
+    def log_received(self, sender_id, timestamp, receive_time):
+        key = (sender_id, timestamp)
+        if key not in self.delivered_beacons:
+            self.beacons_received += 1
+            self.delivered_beacons.add(key)
+            self.total_latency += receive_time - timestamp
+
+    def log_lost(self):
+        self.beacons_lost += 1
+
+    def log_collision(self):
+        self.beacons_collided += 1
+
+    def summary(self):
+        avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
+        return {
+            "Sent": self.beacons_sent,
+            "Received": self.beacons_received,
+            "Lost": self.beacons_lost,
+            "Collisions": self.beacons_collided,
+            "Avg Latency": avg_latency,
+            "Delivery Ratio": self.beacons_received / self.beacons_sent if self.beacons_sent else 0
+        }
+    
+    def export_metrics_to_csv(self, filename="simulation_metrics.csv"):
+        summary = self.summary()
+
+        with open(filename, mode="w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+
+            # Header row
+            writer.writerow(["Metric", "Value"])
+
+            # Write all metrics
+            for key, value in summary.items():
+                writer.writerow([key, value])
+
+        logging.log_info(f"Metrics exported to {filename}")

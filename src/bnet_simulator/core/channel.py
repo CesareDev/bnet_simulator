@@ -3,11 +3,13 @@ from typing import List, Tuple
 import math
 import random
 from bnet_simulator.protocols.beacon import Beacon
+from bnet_simulator.utils.metrics import Metrics
 from bnet_simulator.utils import logging, config
 
 class Channel:
-    def __init__(self):
+    def __init__(self, metrics: Metrics = None):
         self.active_transmissions: List[Tuple[Beacon, float, float]] = []
+        self.metrics = metrics
 
     def update(self, sim_time: float):
         # Removed expired transmissions
@@ -22,8 +24,7 @@ class Channel:
                 continue
             if start <= sim_time <= end and self.in_range(beacon.position, existing.position, beacon.range):
                 return False  # Collision or busy channel in range
-        duration = config.TRASMISSION_TIME  # e.g. 0.1
-        self.active_transmissions.append((beacon, sim_time, sim_time + duration))
+        self.active_transmissions.append((beacon, sim_time, sim_time + config.TRASMISSION_TIME))
         return True
 
     def is_busy(self, position: Tuple[float, float], sim_time: float) -> bool:
@@ -43,6 +44,8 @@ class Channel:
         for beacon in candidates:
             if random.random() < config.BEACON_LOSS_PROB:
                 logging.log_warning(f"Packet lost from {str(beacon.sender_id)[:6]} to {str(receiver_id)[:6]}")
+                # Metrics logging
+                if self.metrics: self.metrics.log_lost()
                 continue
             received.append(beacon)
 

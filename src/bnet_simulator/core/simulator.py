@@ -4,6 +4,7 @@ import random
 from bnet_simulator.buoys.buoy import Buoy
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.gui.window import Window
+from bnet_simulator.utils.metrics import Metrics
 from bnet_simulator.utils import logging, config
 
 class Simulator:

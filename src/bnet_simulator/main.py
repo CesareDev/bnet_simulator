@@ -2,6 +2,7 @@ from bnet_simulator.core.simulator import Simulator
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.buoys.buoy import Buoy
 from bnet_simulator.utils import config
+from bnet_simulator.utils.metrics import Metrics
 import random
 import time
 
@@ -18,19 +19,25 @@ def random_velocity():
     )
 
 def main():
-    random.seed(time.time())    
+    random.seed(time.time())
+
+    # Instantiate metrics if enabled in the config
+    if config.ENABLE_METRICS:
+        metrics = Metrics()
+    else:
+        metrics = None
 
     # Instantiate a channel
-    channel = Channel()
+    channel = Channel(metrics=metrics)
 
     # Instantiate 3 buoys
     buoys = [
-        Buoy(channel=channel, position=random_position(), is_mobile=False),
-        Buoy(channel=channel, position=random_position(), is_mobile=False),
-        Buoy(channel=channel, position=random_position(), is_mobile=False),
-        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity()),
-        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity()),
-        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity()),
+        Buoy(channel=channel, position=random_position(), is_mobile=False, metrics=metrics),
+        Buoy(channel=channel, position=random_position(), is_mobile=False, metrics=metrics),
+        Buoy(channel=channel, position=random_position(), is_mobile=False, metrics=metrics),
+        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity(), metrics=metrics),
+        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity(), metrics=metrics),
+        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity(), metrics=metrics),
     ]
 
     # Create a simulator instance
@@ -38,6 +45,10 @@ def main():
 
     # Start the simulation (simulation time is defined in the config file)
     sim.start()
+
+    # Export metrics to CSV
+    if metrics: metrics.export_metrics_to_csv(filename="simulation_metrics.csv")
+
 
 if __name__ == "__main__":
     main()

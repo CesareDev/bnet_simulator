@@ -5,6 +5,7 @@ import random
 from bnet_simulator.protocols.scheduler import BeaconScheduler
 from bnet_simulator.protocols.beacon import Beacon
 from bnet_simulator.core.channel import Channel
+from bnet_simulator.utils.metrics import Metrics
 from bnet_simulator.utils import config, logging
 
 class BuoyState(Enum):
@@ -19,6 +20,7 @@ class Buoy:
         is_mobile: bool = False,
         battery: float = 100.0,
         velocity: Tuple[float, float] = (0.0, 0.0),
+        metrics: Metrics = None
     ):
         self.id = uuid.uuid4()
         self.position = position  # (lat, lon)
@@ -31,6 +33,7 @@ class Buoy:
         self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
         self.state = BuoyState.RECEIVING
         self.sleep_timer = 0.0
+        self.metrics = metrics
 
     def update_position(self, dt: float):
         if not self.is_mobile:
@@ -70,8 +73,12 @@ class Buoy:
             success = self.channel.broadcast(beacon, sim_time)
             if success:
                 logging.log_info(f"Buoy {str(self.id)[:6]} sent beacon at {sim_time:.2f}s")
+                # Metrics logging
+                if self.metrics: self.metrics.log_sent()
             else:
                 logging.log_warning(f"Buoy {str(self.id)[:6]} failed to send beacon at {sim_time:.2f}s (collision)")
+                # Metrics logging
+                if self.metrics: self.metrics.log_collision()
             return success
 
         return False
@@ -88,6 +95,9 @@ class Buoy:
                 ]
             else:
                 self.neighbors.append((beacon.sender_id, sim_time))
+
+            # Metrics logging
+            if self.metrics: self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time)
 
     def __repr__(self):
         return f"<Buoy id={str(self.id)[:6]}... pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"
