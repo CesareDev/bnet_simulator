@@ -30,7 +30,8 @@ class Buoy:
         self.neighbors: List[Tuple[uuid.UUID, float]] = []  # list of known neighbors IDs with a timestamp (last seen)
         self.scheduler = BeaconScheduler()
         self.channel = channel
-        self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
+        # self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
+        self.range = 50.0
         self.state = BuoyState.RECEIVING
         self.sleep_timer = 0.0
         self.metrics = metrics
@@ -60,7 +61,7 @@ class Buoy:
                 return False  # Channel became busy during DIFS
 
             # Step 3: Transmit
-            self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
+            # self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,

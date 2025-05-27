@@ -43,7 +43,7 @@ class Channel:
         received = []
         for beacon in candidates:
             if random.random() < config.BEACON_LOSS_PROB:
-                logging.log_warning(f"Packet lost from {str(beacon.sender_id)[:6]} to {str(receiver_id)[:6]}")
+                logging.log_error(f"Packet lost from {str(beacon.sender_id)[:6]} to {str(receiver_id)[:6]}")
                 # Metrics logging
                 if self.metrics: self.metrics.log_lost()
                 continue

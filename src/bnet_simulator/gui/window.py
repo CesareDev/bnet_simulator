@@ -13,11 +13,48 @@ class Window:
         self.font = pygame.font.SysFont("Arial", 14)
         self.margin_x = (config.WINDOW_WIDTH - config.WORLD_WIDTH * self.scale) / 2
         self.margin_y = (config.WINDOW_HEIGHT - config.WORLD_HEIGHT * self.scale) / 2
+        self.dragging = False
+        self.last_mouse_pos = None
+        self.zoom_factor = 1.1
+        self.min_scale = 0.1
+        self.max_scale = 10.0
+
 
     def poll_input(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    self.dragging = True
+                    self.last_mouse_pos = pygame.mouse.get_pos()
+
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    self.dragging = False
+                    self.last_mouse_pos = None
+
+            elif event.type == pygame.MOUSEMOTION:
+                if self.dragging and self.last_mouse_pos is not None:
+                    current_mouse_pos = pygame.mouse.get_pos()
+                    dx = current_mouse_pos[0] - self.last_mouse_pos[0]
+                    dy = current_mouse_pos[1] - self.last_mouse_pos[1]
+                    self.margin_x += dx
+                    self.margin_y += dy
+                    self.last_mouse_pos = current_mouse_pos
+
+            elif event.type == pygame.MOUSEWHEEL:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                world_x = (mouse_x - self.margin_x) / self.scale
+                world_y = (mouse_y - self.margin_y) / self.scale
+                if event.y > 0:
+                    new_scale = min(self.scale * self.zoom_factor, self.max_scale)
+                else:
+                    new_scale = max(self.scale / self.zoom_factor, self.min_scale)
+                self.margin_x = mouse_x - world_x * new_scale
+                self.margin_y = mouse_y - world_y * new_scale
+                self.scale = new_scale
 
     def draw(self, buoys: List[Buoy]):
         self.surface.fill(config.BG_COLOR)

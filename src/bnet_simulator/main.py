@@ -32,12 +32,22 @@ def main():
 
     # Instantiate 3 buoys
     buoys = [
-        Buoy(channel=channel, position=random_position(), is_mobile=False, metrics=metrics),
-        Buoy(channel=channel, position=random_position(), is_mobile=False, metrics=metrics),
-        Buoy(channel=channel, position=random_position(), is_mobile=False, metrics=metrics),
-        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity(), metrics=metrics),
-        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity(), metrics=metrics),
-        Buoy(channel=channel, position=random_position(), is_mobile=True, velocity=random_velocity(), metrics=metrics),
+        Buoy(
+            channel=channel,
+            position=random_position(),
+            is_mobile=True,
+            battery=config.DEFAULT_BATTERY,
+            velocity=random_velocity(),
+            metrics=metrics
+        ) for _ in range(config.MOBILE_BUOY_COUNT)
+    ] + [
+        Buoy(
+            channel=channel,
+            position=random_position(),
+            is_mobile=False,
+            battery=config.DEFAULT_BATTERY,
+            metrics=metrics
+        ) for _ in range(config.FIXED_BUOY_COUNT)
     ]
 
     # Create a simulator instance
@@ -48,7 +58,6 @@ def main():
 
     # Export metrics to CSV
     if metrics: metrics.export_metrics_to_csv(filename="simulation_metrics.csv")
-
 
 if __name__ == "__main__":
     main()

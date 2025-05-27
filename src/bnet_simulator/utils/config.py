@@ -18,6 +18,8 @@ DIFS_TIME = 0.048
 TARGET_FPS = 60
 SIMULATION_DURATION = 60.0  # seconds
 ENABLE_METRICS = False  # Set to False to disable metrics collection
+MOBILE_BUOY_COUNT = 5  # Number of mobile buoys
+FIXED_BUOY_COUNT = 5  # Number of fixed buoys
 
 # World settings
 WORLD_WIDTH = 200.0  # meters or units
@@ -26,7 +28,7 @@ WORLD_HEIGHT = 200.0  # meters or units
 # GUI settings
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 720
-BUOY_RADIUS = 5.0
+BUOY_RADIUS = 2.0
 BG_COLOR = (30, 30, 30)
 MOBILE_COLOR = (0, 200, 255)
 FIXED_COLOR = (255, 255, 100)
