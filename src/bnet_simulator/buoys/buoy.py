@@ -30,8 +30,6 @@ class Buoy:
         self.neighbors: List[Tuple[uuid.UUID, float]] = []  # list of known neighbors IDs with a timestamp (last seen)
         self.scheduler = BeaconScheduler()
         self.channel = channel
-        # self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
-        self.range = 50.0
         self.state = BuoyState.RECEIVING
         self.sleep_timer = 0.0
         self.metrics = metrics
@@ -50,7 +48,7 @@ class Buoy:
         ]
 
     def send_beacon(self, dt: float, sim_time: float) -> bool:
-        if self.scheduler.should_send(dt, self.battery, self.velocity, len(self.neighbors)):
+        if self.scheduler.should_send_dynamic(dt, self.battery, self.velocity, self.neighbors, sim_time):
             # Step 1: Carrier sense
             if self.channel.is_busy(self.position, sim_time):
                 logging.log_warning(f"Buoy {str(self.id)[:6]} senses busy channel at {sim_time:.2f}s")
@@ -61,15 +59,13 @@ class Buoy:
                 return False  # Channel became busy during DIFS
 
             # Step 3: Transmit
-            # self.range = random.uniform(config.COMMUNICATION_RANGE_MIN, config.COMMUNICATION_RANGE_MAX)
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,
                 position=self.position,
                 battery=self.battery,
                 neighbors=self.neighbors.copy(),
-                timestamp=sim_time,
-                range=self.range,
+                timestamp=sim_time
             )
             success = self.channel.broadcast(beacon, sim_time)
             if success:
@@ -98,7 +94,7 @@ class Buoy:
                 self.neighbors.append((beacon.sender_id, sim_time))
 
             # Metrics logging
-            if self.metrics: self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time)
+            if self.metrics: self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, self.id)
 
     def __repr__(self):
         return f"<Buoy id={str(self.id)[:6]}... pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"
