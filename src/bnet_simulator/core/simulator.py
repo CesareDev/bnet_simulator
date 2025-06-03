@@ -47,6 +47,12 @@ class Simulator:
         # Shuffle buoys for random order
         random.shuffle(self.buoys)
 
+        # Check if any buoy is outside the world bounds
+        self.buoys = [
+            buoy for buoy in self.buoys
+            if not self.is_outside_world(buoy)
+        ]
+
         # Update buoys
         for buoy in self.buoys:
             buoy.update_position(dt)
@@ -54,9 +60,13 @@ class Simulator:
             buoy.receive_beacon(self.simulated_time)
             buoy.cleanup_neighbors(self.simulated_time)
 
-    def log_buoys(self):
-        for buoy in self.buoys:
-            logging.log_info(buoy)
+    def is_outside_world(self, buoy: Buoy) -> bool:
+        x, y = buoy.position
+        margin = config.COMMUNICATION_RANGE_MAX
+        can_remove = x < -margin or x > config.WORLD_WIDTH + margin or y < -margin or y > config.WORLD_HEIGHT + margin
+        if can_remove:
+            logging.log_info(f"Removing buoy {str(buoy.id)[:6]} because it is outside world bounds")
+        return can_remove
 
     def __repr__(self):
         return f"<Simulator buoys={self.buoys}>"

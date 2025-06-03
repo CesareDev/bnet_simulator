@@ -12,7 +12,9 @@ dependencies = [
 ]
 
 [project.scripts]
-sim = "bnet_simulator.main:main"
+static = "bnet_simulator.static_runner:main_wrapper"
+dynamic = "bnet_simulator.dynamic_runner:main_wrapper"
+all = "bnet_simulator.all_runner:main_wrapper"
 
 [build-system]
 requires = ["hatchling"]

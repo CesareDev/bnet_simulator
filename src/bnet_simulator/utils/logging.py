@@ -2,6 +2,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from bnet_simulator.utils import config
+
 COLORS = {
     'INFO': '\033[92m',     # Green
     'DEBUG': '\033[94m',    # Blue
@@ -19,7 +21,7 @@ def _log(level: str, message: str, to_console: bool = True, to_file: bool = Fals
     color = COLORS.get(level, '')
     reset = COLORS['RESET']
     
-    formatted = f"[{timestamp}] [{level}] {message}"
+    formatted = f"[{config.SCHEDULER_TYPE}] [{timestamp}] [{level}] {message}"
 
     # Print to console with color
     output = f"{color}{formatted}{reset}"

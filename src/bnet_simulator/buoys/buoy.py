@@ -1,7 +1,7 @@
 import uuid
+import random
 from enum import Enum
 from typing import List, Tuple
-import random
 from bnet_simulator.protocols.scheduler import BeaconScheduler
 from bnet_simulator.protocols.beacon import Beacon
 from bnet_simulator.core.channel import Channel
@@ -11,6 +11,8 @@ from bnet_simulator.utils import config, logging
 class BuoyState(Enum):
     SLEEPING = 0
     RECEIVING = 1
+    WAITING_DIFS = 2
+    BACKOFF = 3
 
 class Buoy:
     def __init__(
@@ -23,23 +25,29 @@ class Buoy:
         metrics: Metrics = None
     ):
         self.id = uuid.uuid4()
-        self.position = position  # (lat, lon)
+        self.position = position
         self.is_mobile = is_mobile
-        self.battery = battery  # percentage
-        self.velocity = velocity  # (dx, dy) if mobile
-        self.neighbors: List[Tuple[uuid.UUID, float]] = []  # list of known neighbors IDs with a timestamp (last seen)
+        self.battery = battery
+        self.velocity = velocity
+        self.neighbors: List[Tuple[uuid.UUID, float]] = []
         self.scheduler = BeaconScheduler()
         self.channel = channel
         self.state = BuoyState.RECEIVING
         self.sleep_timer = 0.0
         self.metrics = metrics
 
+        # Internal transmission state
+        self.backoff_time = 0.0
+        self.backoff_remaining = 0.0
+        self.next_try_time = 0.0
+        self.want_to_send = False
+        self.scheduler_decision_time = 0.0
+
     def update_position(self, dt: float):
-        if not self.is_mobile:
-            return
-        x, y = self.position
-        dx, dy = self.velocity
-        self.position = (x + dx * dt, y + dy * dt)
+        if self.is_mobile:
+            x, y = self.position
+            dx, dy = self.velocity
+            self.position = (x + dx * dt, y + dy * dt)
 
     def cleanup_neighbors(self, sim_time: float):
         self.neighbors = [
@@ -48,17 +56,55 @@ class Buoy:
         ]
 
     def send_beacon(self, dt: float, sim_time: float) -> bool:
-        if self.scheduler.should_send_dynamic(dt, self.battery, self.velocity, self.neighbors, sim_time):
-            # Step 1: Carrier sense
-            if self.channel.is_busy(self.position, sim_time):
-                logging.log_warning(f"Buoy {str(self.id)[:6]} senses busy channel at {sim_time:.2f}s")
-                return False  # Wait
-            # Step 2: Wait DIFS
-            if self.channel.is_busy(self.position, sim_time + config.DIFS_TIME):
-                logging.log_warning(f"Buoy {str(self.id)[:6]} senses busy channel after DIFS at {sim_time + config.DIFS_TIME:.2f}s")
-                return False  # Channel became busy during DIFS
+        # Determine if we should initiate transmission
+        if not self.want_to_send:
+            if self.scheduler.should_send(dt, self.battery, self.velocity, self.neighbors, sim_time):
+                self.want_to_send = True
+                self.state = BuoyState.RECEIVING
+                self.scheduler_decision_time = sim_time
+            else:
+                self.state = BuoyState.RECEIVING
+                return False
 
-            # Step 3: Transmit
+        # State: RECEIVING (channel sensing before DIFS)
+        if self.state == BuoyState.RECEIVING:
+            if self.channel.is_busy(self.position, sim_time):
+                return False
+            logging.log_info(f"Buoy {str(self.id)[:6]} channel free, waiting DIFS")
+            self.state = BuoyState.WAITING_DIFS
+            self.next_try_time = sim_time + config.DIFS_TIME
+            return False
+
+        # State: WAITING_DIFS
+        if self.state == BuoyState.WAITING_DIFS:
+            if self.channel.is_busy(self.position, sim_time):
+                logging.log_info(f"Buoy {str(self.id)[:6]} channel became busy during DIFS")
+                self.state = BuoyState.RECEIVING
+                return False
+            if sim_time < self.next_try_time:
+                return False
+            logging.log_info(f"Buoy {str(self.id)[:6]} DIFS complete, starting backoff")
+            self.backoff_time = random.uniform(config.BACKOFF_TIME_MIN, config.BACKOFF_TIME_MAX)
+            self.backoff_remaining = self.backoff_time
+            self.state = BuoyState.BACKOFF
+            self.next_try_time = sim_time + self.backoff_remaining
+            return False
+
+        # State: BACKOFF
+        if self.state == BuoyState.BACKOFF:
+            if self.channel.is_busy(self.position, sim_time):
+                waited = sim_time - (self.next_try_time - self.backoff_remaining)
+                self.backoff_remaining -= waited
+                if self.backoff_remaining < 0:
+                    self.backoff_remaining = 0.0
+                logging.log_info(f"Buoy {str(self.id)[:6]} interrupted during backoff, remaining: {self.backoff_remaining:.2f}s")
+                self.state = BuoyState.RECEIVING
+                return False
+
+            if sim_time < self.next_try_time:
+                return False
+
+            # Attempt to transmit
             beacon = Beacon(
                 sender_id=self.id,
                 mobile=self.is_mobile,
@@ -68,14 +114,15 @@ class Buoy:
                 timestamp=sim_time
             )
             success = self.channel.broadcast(beacon, sim_time)
-            if success:
-                logging.log_info(f"Buoy {str(self.id)[:6]} sent beacon at {sim_time:.2f}s")
-                # Metrics logging
-                if self.metrics: self.metrics.log_sent()
-            else:
-                logging.log_warning(f"Buoy {str(self.id)[:6]} failed to send beacon at {sim_time:.2f}s (collision)")
-                # Metrics logging
-                if self.metrics: self.metrics.log_collision()
+            logging.log_info(f"Buoy {str(self.id)[:6]} sent beacon at {sim_time:.2f}s: {'SUCCESS' if success else 'FAIL'}")
+
+            if success and self.metrics:
+                latency = sim_time - self.scheduler_decision_time
+                self.metrics.record_scheduler_latency(latency)
+
+            # Reset transmission attempt state
+            self.want_to_send = False
+            self.state = BuoyState.RECEIVING
             return success
 
         return False
@@ -83,18 +130,14 @@ class Buoy:
     def receive_beacon(self, sim_time: float):
         beacons = self.channel.receive_all(self.id, self.position, sim_time)
         for beacon in beacons:
-            # Here the same beacon is received multiple times because of the channel that keeps it in the buffer until the trasmission is over
-            existing = next((n for n in self.neighbors if n[0] == beacon.sender_id), None)
-            if existing:
-                self.neighbors = [
-                    (nid, sim_time) if nid == beacon.sender_id else (nid, ts)
-                    for nid, ts in self.neighbors
-                ]
-            else:
+            updated = False
+            for i, (nid, _) in enumerate(self.neighbors):
+                if nid == beacon.sender_id:
+                    self.neighbors[i] = (nid, sim_time)
+                    updated = True
+                    break
+            if not updated:
                 self.neighbors.append((beacon.sender_id, sim_time))
 
-            # Metrics logging
-            if self.metrics: self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, self.id)
-
     def __repr__(self):
-        return f"<Buoy id={str(self.id)[:6]}... pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"
+        return f"<Buoy id={str(self.id)[:6]} pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"

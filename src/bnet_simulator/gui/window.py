@@ -6,7 +6,12 @@ from bnet_simulator.utils import config
 class Window:
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("BNet Simulation")
+        if config.SCHEDULER_TYPE == "static":
+            pygame.display.set_caption("BNet Simulation (Static Scheduler)")
+        elif config.SCHEDULER_TYPE == "dynamic":
+            pygame.display.set_caption("BNet Simulation (Dynamic Scheduler)")
+        elif config.SCHEDULER_TYPE == "rl":
+            pygame.display.set_caption("BNet Simulation (RL Scheduler)")
         self.surface = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT), pygame.RESIZABLE)
         self.running = True
         self.scale = min(config.WINDOW_WIDTH / config.WORLD_WIDTH, config.WINDOW_HEIGHT / config.WORLD_HEIGHT)

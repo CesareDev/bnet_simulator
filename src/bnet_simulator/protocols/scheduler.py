@@ -10,7 +10,17 @@ class BeaconScheduler:
         self.max_interval = max_interval
         self.elapsed_time = 0.0
         self.next_static_interval = random.uniform(self.min_interval, self.max_interval)
-        self.next_dynamic_interval = None  # For dynamic scheduling
+        self.next_dynamic_interval = None
+
+    def should_send(self, dt: float, battery: float, velocity: Tuple[float, float], neighbors: List[Tuple[uuid.UUID, float]], current_time: float) -> bool:
+        if config.SCHEDULER_TYPE == "static":
+            return self.should_send_static(dt)
+        elif config.SCHEDULER_TYPE == "dynamic":
+            return self.should_send_dynamic(dt, battery, velocity, neighbors, current_time)
+        elif config.SCHEDULER_TYPE == "rl":
+            raise ValueError(f"RL not yet implemented")
+        else:
+            raise ValueError(f"Unknown scheduler type: {config.SCHEDULER_TYPE}")
 
     def should_send_static(self, dt: float) -> bool:
         self.elapsed_time += dt

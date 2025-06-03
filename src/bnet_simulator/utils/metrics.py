@@ -1,5 +1,5 @@
 import csv
-from bnet_simulator.utils import logging
+from bnet_simulator.utils import logging, config
 
 class Metrics:
     def __init__(self):
@@ -7,10 +7,11 @@ class Metrics:
         self.beacons_received = 0
         self.beacons_lost = 0
         self.beacons_collided = 0
-        self.total_latency = 0.0  # if you want to compute average delay
-        self.discovery_times = {}  # receiver_id -> {sender_id -> first_seen_time}
-        self.reaction_latencies = []  # list of all first-contact delays
-        self.delivered_beacons = set()  # To avoid counting duplicates
+        self.total_latency = 0.0
+        self.discovery_times = {}
+        self.reaction_latencies = []
+        self.delivered_beacons = set()
+        self.scheduler_latencies = []
 
     def log_sent(self):
         self.beacons_sent += 1
@@ -22,12 +23,11 @@ class Metrics:
             self.delivered_beacons.add(key)
             self.total_latency += receive_time - timestamp
 
-            # Compute reaction latency (first discovery between sender and receiver)
             if receiver_id is not None:
                 if receiver_id not in self.discovery_times:
                     self.discovery_times[receiver_id] = {}
                 if sender_id not in self.discovery_times[receiver_id]:
-                    latency = receive_time - timestamp  # first reception latency
+                    latency = receive_time - timestamp
                     self.reaction_latencies.append(latency)
                     self.discovery_times[receiver_id][sender_id] = receive_time
 
@@ -37,6 +37,12 @@ class Metrics:
     def log_collision(self):
         self.beacons_collided += 1
 
+    def record_scheduler_latency(self, latency: float):  # NEW
+        self.scheduler_latencies.append(latency)
+
+    def avg_scheduler_latency(self) -> float:  # NEW
+        return sum(self.scheduler_latencies) / len(self.scheduler_latencies) if self.scheduler_latencies else 0.0
+
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
         return {
@@ -45,6 +51,7 @@ class Metrics:
             "Lost": self.beacons_lost,
             "Collisions": self.beacons_collided,
             "Avg Latency": avg_latency,
+            "Avg Scheduler Latency": self.avg_scheduler_latency(),  # NEW
             "Delivery Ratio": self.beacons_received / self.beacons_sent if self.beacons_sent else 0,
             "Collision Rate": self.beacons_collided / self.beacons_sent if self.beacons_sent else 0,
             "Avg Reaction Latency": (
@@ -56,17 +63,17 @@ class Metrics:
                 if sim_time > 0 else 0
             ),
         }
-    
-    def export_metrics_to_csv(self, summary, filename="simulation_metrics.csv"):
 
+    def export_metrics_to_csv(self, summary, filename="simulation_metrics.csv"):
+        if config.SCHEDULER_TYPE == "rl":
+            filename = "rl_" + filename
+        elif config.SCHEDULER_TYPE == "static":
+            filename = "static_" + filename
+        elif config.SCHEDULER_TYPE == "dynamic":
+            filename = "dynamic_" + filename
         with open(filename, mode="w", newline="") as csvfile:
             writer = csv.writer(csvfile)
-
-            # Header row
             writer.writerow(["Metric", "Value"])
-
-            # Write all metrics
             for key, value in summary.items():
                 writer.writerow([key, value])
-
         logging.log_info(f"Metrics exported to {filename}")
