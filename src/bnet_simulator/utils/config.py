@@ -7,6 +7,7 @@ TRASMISSION_TIME = 2e-7  # seconds
 # Buoy settings
 DEFAULT_BATTERY = 100.0  # %
 DEFAULT_BUOY_VELOCITY = 2.0 # m/s
+DEFAULT_BOAT_VELOCITY = 20.0 # m/s
 COMMUNICATION_RANGE_MAX = 60.0 # Max range for any beacon
 COMMUNICATION_RANGE_THRESHOLD = 30.0 # Up to this, 100% delivery
 DELIVERY_PROB_OVER_THRESHOLD = 0.7 # Probability if over threshold
@@ -15,17 +16,19 @@ DIFS_TIME = 0.048 # seconds
 BACKOFF_TIME_MIN = 0.001 # seconds
 BACKOFF_TIME_MAX = 0.016 # seconds
 SCHEDULER_TYPE = "static"  # Options: "static", "dynamic", "rl"
+SAFE_DISTANCE = 10.0  # meters, minimum distance between buoys
 
 # Simulation settings
 TARGET_FPS = 60
-SIMULATION_DURATION = 60.0  # seconds
+SIMULATION_DURATION = 120.0  # seconds
 ENABLE_METRICS = True  # Set to False to disable metrics collection
+SEED = None
 
 # World settings
-WORLD_WIDTH = 200.0  # meters or units
-WORLD_HEIGHT = 200.0  # meters or units
-MOBILE_BUOY_COUNT = 5  # Number of mobile buoys
-FIXED_BUOY_COUNT = 5  # Number of fixed buoys
+WORLD_WIDTH = 400.0  # meters or units
+WORLD_HEIGHT = 400.0  # meters or units
+MOBILE_BUOY_COUNT = 10  # Number of mobile buoys
+FIXED_BUOY_COUNT = 10 # Number of fixed buoys
 
 # GUI settings
 WINDOW_WIDTH = 1280

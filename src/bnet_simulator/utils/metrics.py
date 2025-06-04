@@ -1,3 +1,4 @@
+import os
 import csv
 from bnet_simulator.utils import logging, config
 
@@ -46,6 +47,11 @@ class Metrics:
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
         return {
+            "Scheduler Type": config.SCHEDULER_TYPE,
+            "World Size": f"{config.WORLD_WIDTH}x{config.WORLD_HEIGHT}",
+            "Mobile Buoys": config.MOBILE_BUOY_COUNT,
+            "Fixed Buoys": config.FIXED_BUOY_COUNT,
+            "Simulation Duration": config.SIMULATION_DURATION,
             "Sent": self.beacons_sent,
             "Received": self.beacons_received,
             "Lost": self.beacons_lost,
@@ -64,16 +70,24 @@ class Metrics:
             ),
         }
 
-    def export_metrics_to_csv(self, summary, filename="simulation_metrics.csv"):
-        if config.SCHEDULER_TYPE == "rl":
-            filename = "rl_" + filename
-        elif config.SCHEDULER_TYPE == "static":
-            filename = "static_" + filename
-        elif config.SCHEDULER_TYPE == "dynamic":
-            filename = "dynamic_" + filename
-        with open(filename, mode="w", newline="") as csvfile:
+    def export_metrics_to_csv(self, summary, filename=None):
+        # Ensure results directory exists at the project root (one level up from src)
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+        results_dir = os.path.join(project_root, "simulation_results")
+        os.makedirs(results_dir, exist_ok=True)
+
+        # Build a unique filename if not provided
+        if filename is None:
+            filename = (
+                f"{config.SCHEDULER_TYPE}_"
+                f"{int(config.WORLD_WIDTH)}x{int(config.WORLD_HEIGHT)}_"
+                f"mob{config.MOBILE_BUOY_COUNT}_fix{config.FIXED_BUOY_COUNT}.csv"
+            )
+        filepath = os.path.join(results_dir, filename)
+
+        with open(filepath, mode="w", newline="") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(["Metric", "Value"])
             for key, value in summary.items():
                 writer.writerow([key, value])
-        logging.log_info(f"Metrics exported to {filename}")
+        logging.log_info(f"Metrics exported to {filepath}")

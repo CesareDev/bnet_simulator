@@ -12,5 +12,6 @@ wheels/
 # Log files
 *.log
 
-# Metrics CSV
+# Metrics CSV / PNG
 *.csv
+*.png

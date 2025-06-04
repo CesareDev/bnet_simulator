@@ -68,7 +68,7 @@ class BeaconScheduler:
         if not neighbors:
             contact_score = 1.0
         else:
-            last_contact_time = max((ts for _, ts in neighbors), default=0.0)
+            last_contact_time = max((ts for _, ts, _ in neighbors), default=0.0)
             last_contact_delta = current_time - last_contact_time
             if last_contact_delta < 5.0:
                 contact_score = 0.0

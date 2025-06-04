@@ -25,6 +25,27 @@ def parse_args():
         type=float,
         default=None,
         help="Random seed for reproducibility (default: None, uses current time)")
+    parser.add_argument(
+        "--world-width",
+        type=float,
+        default=config.WORLD_WIDTH,
+        help="Width of the simulation world (default: from config)")
+    parser.add_argument(
+        "--world-height",
+        type=float,
+        default=config.WORLD_HEIGHT,
+        help="Height of the simulation world (default: from config)")
+    parser.add_argument(
+        "--mobile-buoy-count",
+        type=int,
+        default=config.MOBILE_BUOY_COUNT,
+        help="Number of mobile buoys (default: from config)")
+    parser.add_argument(
+        "--fixed-buoy-count",
+        type=int,
+        default=config.FIXED_BUOY_COUNT,
+        help="Number of fixed buoys (default: from config)")
+
     return parser.parse_args()
 
 def random_position():
@@ -44,13 +65,18 @@ def main():
     args = parse_args()
     config.SCHEDULER_TYPE = args.mode
     config.SIMULATION_DURATION = args.duration
-    
+    config.WORLD_WIDTH = args.world_width
+    config.WORLD_HEIGHT = args.world_height
+    config.MOBILE_BUOY_COUNT = args.mobile_buoy_count
+    config.FIXED_BUOY_COUNT = args.fixed_buoy_count
+    config.SEED = args.seed
+
     if args.seed is not None:
         random.seed(args.seed)
     else:
         random.seed(time.time())
 
-    print(args.seed)
+    print(f"Seed: {args.seed}")
 
     # Instantiate metrics if enabled in the config
     if config.ENABLE_METRICS:
@@ -88,11 +114,11 @@ def main():
     # Start the simulation (simulation time is defined in the config file)
     sim.start()
 
-    summary = metrics.summary(sim.simulated_time)
+    summary = metrics.summary(sim.simulated_time) if metrics else None
 
     # Export metrics to CSV
     if metrics: 
-        metrics.export_metrics_to_csv(summary, filename="simulation_metrics.csv")
+        metrics.export_metrics_to_csv(summary)
 
 if __name__ == "__main__":
     main()

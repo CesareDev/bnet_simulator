@@ -1,5 +1,6 @@
 import uuid
 import random
+import math
 from enum import Enum
 from typing import List, Tuple
 from bnet_simulator.protocols.scheduler import BeaconScheduler
@@ -27,9 +28,10 @@ class Buoy:
         self.id = uuid.uuid4()
         self.position = position
         self.is_mobile = is_mobile
+        self.is_boat = False
         self.battery = battery
         self.velocity = velocity
-        self.neighbors: List[Tuple[uuid.UUID, float]] = []
+        self.neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]] = [] #  (Neighbor ID, timestamp, last position)
         self.scheduler = BeaconScheduler()
         self.channel = channel
         self.state = BuoyState.RECEIVING
@@ -51,7 +53,7 @@ class Buoy:
 
     def cleanup_neighbors(self, sim_time: float):
         self.neighbors = [
-            (nid, ts) for nid, ts in self.neighbors
+            (nid, ts, p) for nid, ts, p in self.neighbors
             if sim_time - ts <= config.NEIGHBOR_TIMEOUT
         ]
 
@@ -131,13 +133,13 @@ class Buoy:
         beacons = self.channel.receive_all(self.id, self.position, sim_time)
         for beacon in beacons:
             updated = False
-            for i, (nid, _) in enumerate(self.neighbors):
+            for i, (nid, _, _) in enumerate(self.neighbors):
                 if nid == beacon.sender_id:
-                    self.neighbors[i] = (nid, sim_time)
+                    self.neighbors[i] = (nid, sim_time, beacon.position)
                     updated = True
                     break
             if not updated:
-                self.neighbors.append((beacon.sender_id, sim_time))
+                self.neighbors.append((beacon.sender_id, sim_time, beacon.position))
 
     def __repr__(self):
         return f"<Buoy id={str(self.id)[:6]} pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"

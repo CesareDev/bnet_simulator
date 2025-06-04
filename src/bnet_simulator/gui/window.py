@@ -96,7 +96,7 @@ class Window:
                 table_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
                 table_surface.fill((0, 0, 0, 120))  # RGBA: semi-transparent black
         
-                for i, (nid, _) in enumerate(neighbors):
+                for i, (nid, _, _) in enumerate(neighbors):
                     label = self.font.render(str(nid)[:6], True, (255, 255, 255))
                     table_surface.blit(label, (5, 5 + i * 15))
         

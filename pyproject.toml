@@ -8,13 +8,14 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "matplotlib>=3.10.3",
+    "pandas>=2.2.3",
     "pygame>=2.6.1",
 ]
 
 [project.scripts]
-static = "bnet_simulator.static_runner:main_wrapper"
-dynamic = "bnet_simulator.dynamic_runner:main_wrapper"
-all = "bnet_simulator.all_runner:main_wrapper"
+launch = "bnet_simulator.batch_launcher:main"
+plot = "bnet_simulator.plot_metrics:main"
 
 [build-system]
 requires = ["hatchling"]
