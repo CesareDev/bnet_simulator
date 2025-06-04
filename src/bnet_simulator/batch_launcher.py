@@ -5,14 +5,13 @@ def main():
     base_param_sets = [
         {"world_width": 200, "world_height": 200, "mobile_buoy_count": 5, "fixed_buoy_count": 5},
         {"world_width": 300, "world_height": 300, "mobile_buoy_count": 10, "fixed_buoy_count": 10},
-        # Add more as needed
+        # Here you can add more configurations
     ]
 
     modes = ["static", "dynamic"]
 
     for base_params in base_param_sets:
-        # Generate a unique seed for this configuration
-        seed = int(time.time_ns())
+        seed = time.time()
         procs = []
         for mode in modes:
             cmd = [

@@ -71,12 +71,10 @@ class Metrics:
         }
 
     def export_metrics_to_csv(self, summary, filename=None):
-        # Ensure results directory exists at the project root (one level up from src)
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
         results_dir = os.path.join(project_root, "simulation_results")
         os.makedirs(results_dir, exist_ok=True)
 
-        # Build a unique filename if not provided
         if filename is None:
             filename = (
                 f"{config.SCHEDULER_TYPE}_"

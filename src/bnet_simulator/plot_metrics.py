@@ -15,7 +15,6 @@ def load_all_metrics():
     return pd.DataFrame(data)
 
 def plot_metrics(df):
-    # Example: plot Delivery Ratio and Collisions by Scheduler Type
     for metric in ["Delivery Ratio", "Collisions", "Avg Latency"]:
         plt.figure()
         for sched_type in df["Scheduler Type"].unique():
