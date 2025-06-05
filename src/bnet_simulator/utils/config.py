@@ -2,7 +2,8 @@
 NEIGHBOR_TIMEOUT = 10.0  # seconds
 BEACON_MIN_INTERVAL = 1.0
 BEACON_MAX_INTERVAL = 5.0
-TRASMISSION_TIME = 2e-7  # seconds
+BIT_RATE = 1_000_000 # bits per second
+SPEED_OF_LIGHT = 3e8  # m/s
 
 # Buoy settings
 DEFAULT_BATTERY = 100.0  # %
@@ -16,6 +17,7 @@ DIFS_TIME = 0.048 # seconds
 BACKOFF_TIME_MIN = 0.001 # seconds
 BACKOFF_TIME_MAX = 0.016 # seconds
 SCHEDULER_TYPE = "static"  # Options: "static", "dynamic", "rl"
+
 SAFE_DISTANCE = 10.0  # meters, minimum distance between buoys
 
 # Simulation settings

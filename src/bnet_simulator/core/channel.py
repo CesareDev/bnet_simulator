@@ -31,7 +31,8 @@ class Channel:
                     self.metrics.log_collision()
                 return False  # Collision
 
-        self.active_transmissions.append((beacon, sim_time, sim_time + config.TRASMISSION_TIME))
+        trasmission_time = beacon.size_bits() / config.BIT_RATE
+        self.active_transmissions.append((beacon, sim_time, sim_time + trasmission_time))
         logging.log_info(f"Broadcasting beacon from {str(beacon.sender_id)[:6]}")
         return True
 
@@ -47,18 +48,25 @@ class Channel:
         for beacon, start, end in self.active_transmissions:
             if beacon.sender_id == receiver_id:
                 continue
-            if not (start <= sim_time <= end):
-                continue
 
             key = (receiver_id, beacon.sender_id, beacon.timestamp)
             if key in self.seen_attempts:
                 continue  # Already processed this beacon for this receiver
 
-            self.seen_attempts.add(key)
-
             dx = receiver_position[0] - beacon.position[0]
             dy = receiver_position[1] - beacon.position[1]
             distance = math.hypot(dx, dy)
+
+            if distance > config.COMMUNICATION_RANGE_MAX:
+                continue # Out of range
+
+            propagation_delay = distance / config.SPEED_OF_LIGHT
+            arrival_time = end + propagation_delay
+
+            if not (start <= sim_time < arrival_time):
+                continue # Not yet arrived
+
+            self.seen_attempts.add(key)
 
             if distance > config.COMMUNICATION_RANGE_MAX:
                 continue  # Out of range
