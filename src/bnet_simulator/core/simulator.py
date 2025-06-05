@@ -13,33 +13,44 @@ class Simulator:
         self.channel = channel
         self.running = False
         self.simulated_time = 0.0
-        self.window = Window()
+        self.window = Window() if not config.HEADLESS else None
 
     def start(self):
         self.running = True
         previous_time = time.time()
         dt = 1.0 / config.TARGET_FPS
         delta_real = dt
+        # Intercept keybord interrupts to stop the simulation
+        try:
+            while self.running and self.simulated_time < config.SIMULATION_DURATION:
 
-        while self.running and self.simulated_time < config.SIMULATION_DURATION and not self.window.should_close():
+                if not config.HEADLESS:
+                    if self.window.should_close():
+                        break
 
-            self.window.poll_input()
+                if not config.HEADLESS:
+                    self.window.poll_input()
 
-            start_time = time.time()
-            delta_real = start_time - previous_time
-            previous_time = start_time
-            self.simulated_time += delta_real
-            
-            self.update(delta_real)
+                start_time = time.time()
+                delta_real = start_time - previous_time
+                previous_time = start_time
+                self.simulated_time += delta_real
 
-            self.window.draw(self.buoys)
+                self.update(delta_real)
 
-            elapsed_time = time.time() - start_time
-            sleep_time = dt - elapsed_time
-            if sleep_time > 0.0:
-                time.sleep(sleep_time)
+                if not config.HEADLESS:
+                    self.window.draw(self.buoys)
 
-        self.window.close()
+                elapsed_time = time.time() - start_time
+                sleep_time = dt - elapsed_time
+                if sleep_time > 0.0:
+                    time.sleep(sleep_time)
+
+            if not config.HEADLESS:
+                self.window.close()
+        except KeyboardInterrupt:
+            logging.log_info("Simulation interrupted by user.")
+            self.running = False
 
     def update(self, dt: float):
         self.channel.update(self.simulated_time)

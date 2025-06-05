@@ -25,6 +25,7 @@ TARGET_FPS = 60
 SIMULATION_DURATION = 120.0  # seconds
 ENABLE_METRICS = True  # Set to False to disable metrics collection
 SEED = None
+HEADLESS = True
 
 # World settings
 WORLD_WIDTH = 400.0  # meters or units
