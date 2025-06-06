@@ -44,7 +44,13 @@ def parse_args():
         "--fixed-buoy-count",
         type=int,
         default=config.FIXED_BUOY_COUNT,
-        help="Number of fixed buoys (default: from config)")
+        help="Number of fixed buoys (default: from config)"),
+    parser.add_argument(
+        "--headless",
+        action='store_true',
+        help="Run in headless mode without GUI (default: False)"
+    )
+    
 
     return parser.parse_args()
 
@@ -70,6 +76,7 @@ def main():
     config.MOBILE_BUOY_COUNT = args.mobile_buoy_count
     config.FIXED_BUOY_COUNT = args.fixed_buoy_count
     config.SEED = args.seed
+    config.HEADLESS = args.headless
 
     if args.seed is not None:
         random.seed(args.seed)

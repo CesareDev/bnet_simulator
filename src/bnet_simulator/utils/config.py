@@ -1,17 +1,18 @@
 # Beacon settings
 NEIGHBOR_TIMEOUT = 10.0  # seconds
 BEACON_MIN_INTERVAL = 1.0
-BEACON_MAX_INTERVAL = 5.0
+BEACON_MAX_INTERVAL = 10.0
 BIT_RATE = 1_000_000 # bits per second
 SPEED_OF_LIGHT = 3e8  # m/s
 
 # Buoy settings
 DEFAULT_BATTERY = 100.0  # %
-DEFAULT_BUOY_VELOCITY = 2.0 # m/s
-DEFAULT_BOAT_VELOCITY = 20.0 # m/s
-COMMUNICATION_RANGE_MAX = 60.0 # Max range for any beacon
-COMMUNICATION_RANGE_THRESHOLD = 30.0 # Up to this, 100% delivery
-DELIVERY_PROB_OVER_THRESHOLD = 0.7 # Probability if over threshold
+DEFAULT_BUOY_VELOCITY = 5.0 # m/s
+# DEFAULT_BOAT_VELOCITY = 20.0 # m/s
+COMMUNICATION_RANGE_MAX = 120.0  # Max range for any beacon
+COMMUNICATION_RANGE_HIGH_PROB = 70.0  # Up to this, 90% delivery
+DELIVERY_PROB_HIGH = 0.9  # Probability if <= 70m
+DELIVERY_PROB_LOW = 0.15  # Probability if > 70m and <= 120m
 NEIGHBOR_TIMEOUT = 5.0  # seconds
 DIFS_TIME = 0.048 # seconds
 BACKOFF_TIME_MIN = 0.001 # seconds
@@ -25,7 +26,7 @@ TARGET_FPS = 60
 SIMULATION_DURATION = 120.0  # seconds
 ENABLE_METRICS = True  # Set to False to disable metrics collection
 SEED = None
-HEADLESS = True
+HEADLESS = False
 
 # World settings
 WORLD_WIDTH = 400.0  # meters or units

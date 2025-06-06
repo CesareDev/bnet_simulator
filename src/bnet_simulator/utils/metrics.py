@@ -33,6 +33,11 @@ class Metrics:
                     self.discovery_times[receiver_id][sender_id] = receive_time
 
     def log_lost(self):
+        # Remember that a beacon is lost if it was sent but not received so a single beacon
+        # can be lost multiple times because it is broadcasted and there are multiple receivers.
+        # E.G. 1 sender, 100 receivers, and the loss is 50%. So 50 receivers the beacon
+        # didn't received the beacon, and in the metrics we will log 50 lost beacons even if 
+        # the beacon was sent only once.
         self.beacons_lost += 1
 
     def log_collision(self):

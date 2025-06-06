@@ -68,15 +68,17 @@ class Channel:
 
             self.seen_attempts.add(key)
 
-            if distance > config.COMMUNICATION_RANGE_MAX:
-                continue  # Out of range
-
-            if distance <= config.COMMUNICATION_RANGE_THRESHOLD:
-                received.append(beacon)
-                if self.metrics:
-                    self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
-            else:
-                if random.random() < config.DELIVERY_PROB_OVER_THRESHOLD:
+            # Reception probability logic
+            if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
+                if random.random() < config.DELIVERY_PROB_HIGH:
+                    received.append(beacon)
+                    if self.metrics:
+                        self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
+                else:
+                    if self.metrics:
+                        self.metrics.log_lost()
+            elif distance <= config.COMMUNICATION_RANGE_MAX:
+                if random.random() < config.DELIVERY_PROB_LOW:
                     received.append(beacon)
                     if self.metrics:
                         self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)

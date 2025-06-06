@@ -58,9 +58,12 @@ class Buoy:
         ]
 
     def send_beacon(self, dt: float, sim_time: float) -> bool:
+
+        self.scheduler.tick(dt)
+
         # Determine if we should initiate transmission
         if not self.want_to_send:
-            if self.scheduler.should_send(dt, self.battery, self.velocity, self.neighbors, sim_time):
+            if self.scheduler.should_send(self.battery, self.velocity, self.neighbors, sim_time):
                 self.want_to_send = True
                 self.state = BuoyState.RECEIVING
                 self.scheduler_decision_time = sim_time
