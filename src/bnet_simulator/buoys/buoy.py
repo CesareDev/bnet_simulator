@@ -31,7 +31,7 @@ class Buoy:
         self.is_boat = False
         self.battery = battery
         self.velocity = velocity
-        self.neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]] = [] #  (Neighbor ID, timestamp, last position)
+        self.neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]] = []
         self.scheduler = BeaconScheduler()
         self.channel = channel
         self.state = BuoyState.RECEIVING
@@ -44,6 +44,10 @@ class Buoy:
         self.next_try_time = 0.0
         self.want_to_send = False
         self.scheduler_decision_time = 0.0
+
+        # Collision detection
+        self.recent_collisions = []
+        self.collision_window = 10.0  # seconds
 
     def update_position(self, dt: float):
         if self.is_mobile:
@@ -58,12 +62,11 @@ class Buoy:
         ]
 
     def send_beacon(self, dt: float, sim_time: float) -> bool:
-
         self.scheduler.tick(dt)
+        collision_rate = len(self.recent_collisions) / self.collision_window
 
-        # Determine if we should initiate transmission
         if not self.want_to_send:
-            if self.scheduler.should_send(self.battery, self.velocity, self.neighbors, sim_time):
+            if self.scheduler.should_send(self.battery, self.velocity, self.neighbors, sim_time, collision_rate):
                 self.want_to_send = True
                 self.state = BuoyState.RECEIVING
                 self.scheduler_decision_time = sim_time
@@ -75,7 +78,6 @@ class Buoy:
         if self.state == BuoyState.RECEIVING:
             if self.channel.is_busy(self.position, sim_time):
                 return False
-            logging.log_info(f"Buoy {str(self.id)[:6]} channel free, waiting DIFS")
             self.state = BuoyState.WAITING_DIFS
             self.next_try_time = sim_time + config.DIFS_TIME
             return False
@@ -83,12 +85,10 @@ class Buoy:
         # State: WAITING_DIFS
         if self.state == BuoyState.WAITING_DIFS:
             if self.channel.is_busy(self.position, sim_time):
-                logging.log_info(f"Buoy {str(self.id)[:6]} channel became busy during DIFS")
                 self.state = BuoyState.RECEIVING
                 return False
             if sim_time < self.next_try_time:
                 return False
-            logging.log_info(f"Buoy {str(self.id)[:6]} DIFS complete, starting backoff")
             self.backoff_time = random.uniform(config.BACKOFF_TIME_MIN, config.BACKOFF_TIME_MAX)
             self.backoff_remaining = self.backoff_time
             self.state = BuoyState.BACKOFF
@@ -102,7 +102,6 @@ class Buoy:
                 self.backoff_remaining -= waited
                 if self.backoff_remaining < 0:
                     self.backoff_remaining = 0.0
-                logging.log_info(f"Buoy {str(self.id)[:6]} interrupted during backoff, remaining: {self.backoff_remaining:.2f}s")
                 self.state = BuoyState.RECEIVING
                 return False
 
@@ -119,7 +118,7 @@ class Buoy:
                 timestamp=sim_time
             )
             success = self.channel.broadcast(beacon, sim_time)
-            logging.log_info(f"Buoy {str(self.id)[:6]} sent beacon at {sim_time:.2f}s: {'SUCCESS' if success else 'FAIL'}")
+            logging.log_info(f"Buoy {str(self.id)[:6]} sent beacon at {sim_time:.2f}s:")
 
             if success and self.metrics:
                 latency = sim_time - self.scheduler_decision_time
@@ -128,6 +127,10 @@ class Buoy:
             # Reset transmission attempt state
             self.want_to_send = False
             self.state = BuoyState.RECEIVING
+
+            if not success:
+                self.record_collision(sim_time)
+
             return success
 
         return False
@@ -143,6 +146,11 @@ class Buoy:
                     break
             if not updated:
                 self.neighbors.append((beacon.sender_id, sim_time, beacon.position))
+
+    def record_collision(self, sim_time: float):
+        self.recent_collisions.append(sim_time)
+        # Remove old collisions
+        self.recent_collisions = [t for t in self.recent_collisions if sim_time - t <= self.collision_window]
 
     def __repr__(self):
         return f"<Buoy id={str(self.id)[:6]} pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"

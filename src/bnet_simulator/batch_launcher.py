@@ -2,13 +2,30 @@ import subprocess
 import time
 
 def main():
-    base_param_sets = [
-        {"world_width": 400, "world_height": 400, "mobile_buoy_count": 5, "fixed_buoy_count": 5, "duration": 120, "headless": True},
-        {"world_width": 700, "world_height": 700, "mobile_buoy_count": 10, "fixed_buoy_count": 10, "duration": 180, "headless": True},
-        {"world_width": 1000, "world_height": 1000, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 240, "headless": True},
-        {"world_width": 1300, "world_height": 1300, "mobile_buoy_count": 20, "fixed_buoy_count": 20, "duration": 300, "headless": True},
-        # Here you can add more configurations
+
+    # 500x500 area with increasing total buoy count
+    density_variants = [
+        {"world_width": 500, "world_height": 500, "mobile_buoy_count": 5, "fixed_buoy_count": 5, "duration": 150, "headless": True},
+        {"world_width": 500, "world_height": 500, "mobile_buoy_count": 10, "fixed_buoy_count": 10, "duration": 150, "headless": True},
+        {"world_width": 500, "world_height": 500, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 150, "headless": True},
+        {"world_width": 500, "world_height": 500, "mobile_buoy_count": 20, "fixed_buoy_count": 20, "duration": 150, "headless": True},
     ]
+
+    # 30 buoys total in 800x800, different mobile/fixed splits
+    mobility_variants = [
+        {"world_width": 800, "world_height": 800, "mobile_buoy_count": 5, "fixed_buoy_count": 25, "duration": 180, "headless": True},
+        {"world_width": 800, "world_height": 800, "mobile_buoy_count": 10, "fixed_buoy_count": 20, "duration": 180, "headless": True},
+        {"world_width": 800, "world_height": 800, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 180, "headless": True},
+        {"world_width": 800, "world_height": 800, "mobile_buoy_count": 25, "fixed_buoy_count": 5, "duration": 180, "headless": True},
+    ]
+
+    scale_variants = [
+        {"world_width": 400, "world_height": 400, "mobile_buoy_count": 10, "fixed_buoy_count": 10, "duration": 120, "headless": True},
+        {"world_width": 800, "world_height": 800, "mobile_buoy_count": 20, "fixed_buoy_count": 20, "duration": 180, "headless": True},
+        {"world_width": 1200, "world_height": 1200, "mobile_buoy_count": 30, "fixed_buoy_count": 30, "duration": 240, "headless": True},
+    ]
+
+    base_param_sets = density_variants + mobility_variants + scale_variants
 
     modes = ["static", "dynamic"]
 

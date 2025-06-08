@@ -48,10 +48,24 @@ class Metrics:
 
     def avg_scheduler_latency(self) -> float:  # NEW
         return sum(self.scheduler_latencies) / len(self.scheduler_latencies) if self.scheduler_latencies else 0.0
+    
+    def get_parameters(self) -> dict:
+        if config.SCHEDULER_TYPE != "dynamic":
+            return {}
+
+        return {
+            "Motion Weight": config.MOTION_WEIGHT,
+            "Density Weight": config.DENSITY_WEIGHT,
+            "Contact Weight": config.CONTACT_WEIGHT,
+            "Density Midpoint": config.DENSITY_MIDPOINT,
+            "Density Alpha": config.DENSITY_ALPHA,
+            "Contact Midpoint": config.CONTACT_MIDPOINT,
+            "Contact Alpha": config.CONTACT_ALPHA,
+        }
 
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
-        return {
+        base_summary = {
             "Scheduler Type": config.SCHEDULER_TYPE,
             "World Size": f"{config.WORLD_WIDTH}x{config.WORLD_HEIGHT}",
             "Mobile Buoys": config.MOBILE_BUOY_COUNT,
@@ -74,7 +88,9 @@ class Metrics:
                 if sim_time > 0 else 0
             ),
         }
-
+        parameters = self.get_parameters()
+        return {**base_summary, **parameters}
+    
     def export_metrics_to_csv(self, summary, filename=None):
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
         results_dir = os.path.join(project_root, "simulation_results")
