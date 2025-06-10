@@ -12,10 +12,11 @@ dependencies = [
     "pandas>=2.2.3",
     "pygame>=2.6.1",
     "scipy>=1.15.3",
+    "tqdm>=4.67.1",
 ]
 
 [project.scripts]
-launch = "bnet_simulator.batch_launcher:main"
+train = "bnet_simulator.train_scheduler:main"
 plot = "bnet_simulator.plot_metrics:main"
 
 [build-system]

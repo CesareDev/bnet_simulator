@@ -57,6 +57,7 @@ class Metrics:
             "Motion Weight": config.MOTION_WEIGHT,
             "Density Weight": config.DENSITY_WEIGHT,
             "Contact Weight": config.CONTACT_WEIGHT,
+            "Congestion Weight": config.CONGESTION_WEIGHT,
             "Density Midpoint": config.DENSITY_MIDPOINT,
             "Density Alpha": config.DENSITY_ALPHA,
             "Contact Midpoint": config.CONTACT_MIDPOINT,
@@ -108,5 +109,9 @@ class Metrics:
             writer = csv.writer(csvfile)
             writer.writerow(["Metric", "Value"])
             for key, value in summary.items():
-                writer.writerow([key, value])
+                # Patch: Write floats with high precision for latency metrics
+                if isinstance(value, float) and "latency" in key.lower():
+                    writer.writerow([key, f"{value:.10f}"])
+                else:
+                    writer.writerow([key, value])
         logging.log_info(f"Metrics exported to {filepath}")

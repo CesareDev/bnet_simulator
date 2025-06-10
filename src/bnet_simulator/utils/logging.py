@@ -17,6 +17,8 @@ COLORS = {
 LOG_FILE = Path("simulator.log")
 
 def _log(level: str, message: str, to_console: bool = True, to_file: bool = False):
+    if not config.ENABLE_LOGGING:
+        return
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     color = COLORS.get(level, '')
     reset = COLORS['RESET']

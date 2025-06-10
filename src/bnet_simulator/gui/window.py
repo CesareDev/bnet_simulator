@@ -24,7 +24,6 @@ class Window:
         self.min_scale = 0.1
         self.max_scale = 10.0
 
-
     def poll_input(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:

@@ -27,6 +27,7 @@ SIMULATION_DURATION = 120.0  # seconds
 ENABLE_METRICS = True  # Set to False to disable metrics collection
 SEED = None
 HEADLESS = False
+ENABLE_LOGGING = False  # Set to False to disable all logging output
 
 # World settings
 WORLD_WIDTH = 400.0  # meters or units
@@ -44,10 +45,12 @@ FIXED_COLOR = (255, 255, 100)
 MAX_NEIGHBORS_DISPLAYED = 5
 
 # Dynamic scheduler settings
-MOTION_WEIGHT = 0.2
+MOTION_WEIGHT = 0.1
 DENSITY_WEIGHT = 0.4
-CONTACT_WEIGHT = 0.4
-DENSITY_MIDPOINT = 2.0
-DENSITY_ALPHA = 2.0
-CONTACT_MIDPOINT = 8.0
-CONTACT_ALPHA = 0.6
+CONTACT_WEIGHT = 0.2
+CONGESTION_WEIGHT = 0.3
+
+DENSITY_MIDPOINT = 2.5
+DENSITY_ALPHA = 4.0
+CONTACT_MIDPOINT = 6.0
+CONTACT_ALPHA = 1.5

@@ -59,10 +59,10 @@ class Simulator:
         random.shuffle(self.buoys)
 
         # Check if any buoy is outside the world bounds
-        self.buoys = [
-            buoy for buoy in self.buoys
-            if not self.is_outside_world(buoy)
-        ]
+        # self.buoys = [
+        #     buoy for buoy in self.buoys
+        #     if not self.is_outside_world(buoy)
+        # ]
 
         # Update buoys
         for buoy in self.buoys:

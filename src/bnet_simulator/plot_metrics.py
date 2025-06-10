@@ -2,106 +2,103 @@ import os
 import glob
 import pandas as pd
 import matplotlib.pyplot as plt
-import re
 import numpy as np
 from scipy.interpolate import make_interp_spline
+import re
 
 RESULTS_DIR = "simulation_results"
-METRICS_TO_PLOT = [
-    "Delivery Ratio", "Collisions", "Avg Latency",
-    "Avg Scheduler Latency", "Throughput (beacons/sec)",
-    "Avg Reaction Latency"
-]
 
-COLORS = {
-    "static": "tab:blue",
-    "dynamic": "tab:green",
-    "rl": "tab:red"
+# Colors based on World Size
+WORLD_SIZE_COLORS = {
+    "500.0x500.0": "tab:blue",
+    "800.0x800.0": "tab:green",
+    "1200.0x1200.0": "tab:red",
+    "Other": "tab:gray"
 }
 
-LINESTYLES = {
-    "Density": "-",
-    "Mobility": "--",
-    "Scale": "-."
+# Line styles based on Scheduler Type
+SCHEDULER_STYLES = {
+    "static": "solid",
+    "dynamic": "dashed",
+    "rl": "dotted"
 }
 
 def sanitize_filename(name):
     return re.sub(r'[^a-zA-Z0-9_]', '_', name.lower())
 
-def classify_scenario(row):
-    world_size = row.get("World Size", "")
-    total = int(row.get("Mobile Buoys", 0)) + int(row.get("Fixed Buoys", 0))
-    if world_size == "500.0x500.0":
-        return "Density"
-    elif world_size == "800.0x800.0" and total == 30:
-        return "Mobility"
-    elif world_size in {"400.0x400.0", "800.0x800.0", "1200.0x1200.0"}:
-        return "Scale"
-    return "Other"
-
 def load_all_metrics():
     data = []
     for csv_file in glob.glob(os.path.join(RESULTS_DIR, "*.csv")):
-        df = pd.read_csv(csv_file, index_col=0, header=0)
+        df = pd.read_csv(csv_file, index_col=0)
         row = df["Value"].to_dict()
         row["filename"] = os.path.basename(csv_file)
+
         try:
             row["Mobile Buoys"] = int(row.get("Mobile Buoys", 0))
             row["Fixed Buoys"] = int(row.get("Fixed Buoys", 0))
             row["Total Buoys"] = row["Mobile Buoys"] + row["Fixed Buoys"]
-        except Exception:
+        except:
             row["Mobile Buoys"] = 0
             row["Fixed Buoys"] = 0
             row["Total Buoys"] = 0
-        row["Scenario"] = classify_scenario(row)
+
+        row["World Size"] = str(row.get("World Size", "Other"))
         data.append(row)
+
     return pd.DataFrame(data)
 
+def smooth_curve(x_vals, y_vals):
+    if len(x_vals) < 4:
+        return x_vals, y_vals
+    x_sorted = np.array(sorted(x_vals))
+    y_sorted = np.array([y for _, y in sorted(zip(x_vals, y_vals))])
+    try:
+        spline = make_interp_spline(x_sorted, y_sorted, k=2)
+        x_smooth = np.linspace(x_sorted.min(), x_sorted.max(), 200)
+        y_smooth = spline(x_smooth)
+        return x_smooth, y_smooth
+    except Exception:
+        return x_sorted, y_sorted
+
 def plot_metrics(df: pd.DataFrame):
-    for metric in METRICS_TO_PLOT:
+    config_fields = {
+        "Scheduler Type", "World Size", "Mobile Buoys", "Fixed Buoys",
+        "Simulation Duration", "Sent", "Received", "Lost", "Collisions",
+        "filename", "Total Buoys",
+        "Motion Weight", "Density Weight", "Contact Weight", "Congestion Weight",
+        "Density Midpoint", "Density Alpha", "Contact Midpoint", "Contact Alpha"
+    }
+
+    metric_columns = [col for col in df.columns if col not in config_fields]
+
+    for metric in metric_columns:
         plt.figure(figsize=(10, 6))
-        for scenario in sorted(df["Scenario"].unique()):
+
+        for world_size in sorted(df["World Size"].unique()):
             for scheduler in sorted(df["Scheduler Type"].unique()):
-                subset = df[(df["Scheduler Type"] == scheduler) & (df["Scenario"] == scenario)]
+                subset = df[(df["World Size"] == world_size) & (df["Scheduler Type"] == scheduler)].copy()
+
                 if subset.empty:
                     continue
-                subset = subset.copy()
+
                 subset[metric] = pd.to_numeric(subset[metric], errors="coerce")
                 grouped = subset.groupby("Total Buoys")[metric].mean().reset_index()
                 x_vals = grouped["Total Buoys"].values
-                y_vals = grouped[metric].clip(lower=0).values
+                y_vals = grouped[metric].values
 
-                # Interpolate only if enough unique points
-                if len(x_vals) >= 4:
-                    try:
-                        spline = make_interp_spline(x_vals, y_vals, k=2)
-                        x_smooth = np.linspace(x_vals.min(), x_vals.max(), 100)
-                        y_smooth = spline(x_smooth)
-                        plt.plot(
-                            x_smooth, y_smooth,
-                            label=f"{scheduler} ({scenario})",
-                            color=COLORS.get(scheduler, None),
-                            linestyle=LINESTYLES.get(scenario, "-"),
-                        )
-                    except Exception:
-                        plt.plot(
-                            x_vals, y_vals,
-                            label=f"{scheduler} ({scenario})",
-                            color=COLORS.get(scheduler, None),
-                            linestyle=LINESTYLES.get(scenario, "-"),
-                        )
-                # Always plot the real data points
-                plt.scatter(
-                    x_vals, y_vals,
-                    color=COLORS.get(scheduler, None),
-                    marker='o'
-                )
+                x_smooth, y_smooth = smooth_curve(x_vals, y_vals)
+                label = f"{scheduler} ({world_size})"
+                color = WORLD_SIZE_COLORS.get(world_size, "tab:gray")
+                linestyle = SCHEDULER_STYLES.get(scheduler, "solid")
+
+                plt.plot(x_smooth, y_smooth, label=label, color=color, linestyle=linestyle)
+                plt.scatter(x_vals, y_vals, color=color, edgecolor='black')
 
         plt.title(f"{metric} vs Total Buoys")
         plt.xlabel("Total Buoys")
         plt.ylabel(metric)
         plt.grid(True)
-        plt.legend(title="Scheduler (Scenario)")
+        plt.legend(title="Scheduler + World Size", loc="best", fontsize="small")
         plt.tight_layout()
         filename = os.path.join(RESULTS_DIR, f"{sanitize_filename(metric)}.png")
         plt.savefig(filename, bbox_inches="tight")
@@ -113,7 +110,7 @@ def main():
         print("No simulation results found.")
         return
     plot_metrics(df)
-    print("Plots saved in:", RESULTS_DIR)
+    print("Plots saved to:", RESULTS_DIR)
 
 if __name__ == "__main__":
     main()

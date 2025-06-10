@@ -1,3 +1,6 @@
+import os
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+
 from bnet_simulator.core.simulator import Simulator
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.buoys.buoy import Buoy
@@ -82,8 +85,6 @@ def main():
         random.seed(args.seed)
     else:
         random.seed(time.time())
-
-    print(f"Seed: {args.seed}")
 
     # Instantiate metrics if enabled in the config
     if config.ENABLE_METRICS:
