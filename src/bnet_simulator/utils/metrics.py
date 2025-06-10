@@ -94,7 +94,7 @@ class Metrics:
     
     def export_metrics_to_csv(self, summary, filename=None):
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-        results_dir = os.path.join(project_root, "simulation_results")
+        results_dir = os.path.join(project_root, "train_results")
         os.makedirs(results_dir, exist_ok=True)
 
         if filename is None:

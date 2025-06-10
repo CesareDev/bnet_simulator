@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import make_interp_spline
 import re
+import argparse
 
-RESULTS_DIR = "simulation_results"
+RESULTS_DIR = "train_results"
 
 # Colors based on World Size
 WORLD_SIZE_COLORS = {
@@ -26,9 +27,9 @@ SCHEDULER_STYLES = {
 def sanitize_filename(name):
     return re.sub(r'[^a-zA-Z0-9_]', '_', name.lower())
 
-def load_all_metrics():
+def load_all_metrics(results_dir):
     data = []
-    for csv_file in glob.glob(os.path.join(RESULTS_DIR, "*.csv")):
+    for csv_file in glob.glob(os.path.join(results_dir, "*.csv")):
         df = pd.read_csv(csv_file, index_col=0)
         row = df["Value"].to_dict()
         row["filename"] = os.path.basename(csv_file)
@@ -60,7 +61,7 @@ def smooth_curve(x_vals, y_vals):
     except Exception:
         return x_sorted, y_sorted
 
-def plot_metrics(df: pd.DataFrame):
+def plot_metrics(df: pd.DataFrame, results_dir):
     config_fields = {
         "Scheduler Type", "World Size", "Mobile Buoys", "Fixed Buoys",
         "Simulation Duration", "Sent", "Received", "Lost", "Collisions",
@@ -81,7 +82,13 @@ def plot_metrics(df: pd.DataFrame):
                 if subset.empty:
                     continue
 
+                # Convert to numeric and drop NaNs
                 subset[metric] = pd.to_numeric(subset[metric], errors="coerce")
+                subset = subset.dropna(subset=[metric])
+
+                if subset.empty:
+                    continue
+
                 grouped = subset.groupby("Total Buoys")[metric].mean().reset_index()
                 x_vals = grouped["Total Buoys"].values
                 y_vals = grouped[metric].values
@@ -100,17 +107,61 @@ def plot_metrics(df: pd.DataFrame):
         plt.grid(True)
         plt.legend(title="Scheduler + World Size", loc="best", fontsize="small")
         plt.tight_layout()
-        filename = os.path.join(RESULTS_DIR, f"{sanitize_filename(metric)}.png")
+        filename = os.path.join(results_dir, f"{sanitize_filename(metric)}.png")
         plt.savefig(filename, bbox_inches="tight")
         plt.close()
 
+def plot_delivery_ratio(results_dir):
+    static_files = [f for f in os.listdir(results_dir) if f.startswith("static_") and f.endswith(".csv")]
+    dynamic_files = [f for f in os.listdir(results_dir) if f.startswith("dynamic_") and f.endswith(".csv")]
+
+    static_ratios = []
+    dynamic_ratios = []
+
+    for f in static_files:
+        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+        if "Delivery Ratio" in df.index:
+            try:
+                val = float(df.loc["Delivery Ratio", "Value"])
+                static_ratios.append(val)
+            except Exception:
+                pass
+    for f in dynamic_files:
+        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+        if "Delivery Ratio" in df.index:
+            try:
+                val = float(df.loc["Delivery Ratio", "Value"])
+                dynamic_ratios.append(val)
+            except Exception:
+                pass
+
+    plt.figure(figsize=(8, 5))
+    plt.boxplot([static_ratios, dynamic_ratios], tick_labels=["Static", "Dynamic"])
+    plt.ylabel("Delivery Ratio")
+    plt.title("Delivery Ratio: Static vs Dynamic (Test Set)")
+    plt.grid(True)
+    plt.savefig(os.path.join(results_dir, "delivery_ratio_boxplot.png"), bbox_inches="tight")
+    plt.close()
+
 def main():
-    df = load_all_metrics()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--results-dir", type=str, default=None, help="Directory with result CSVs")
+    args = parser.parse_args()
+
+    # Priority: CLI arg > ENV > default
+    results_dir = args.results_dir or os.environ.get("RESULTS_DIR", "train_results")
+
+    print(f"Loading results from: {results_dir}")
+
+    df = load_all_metrics(results_dir)
     if df.empty:
         print("No simulation results found.")
         return
-    plot_metrics(df)
-    print("Plots saved to:", RESULTS_DIR)
+
+    plot_metrics(df, results_dir)
+    plot_delivery_ratio(results_dir)
+
+    print("Plots saved to:", results_dir)
 
 if __name__ == "__main__":
     main()

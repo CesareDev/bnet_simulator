@@ -3,6 +3,7 @@ import math
 import uuid
 import json
 import os
+import sys
 from typing import Tuple, List
 from bnet_simulator.utils import config
 
@@ -16,9 +17,14 @@ class BeaconScheduler:
 
         # Load dynamic parameters from file if in dynamic mode
         if config.SCHEDULER_TYPE == "dynamic":
-            param_path = "current_parameters.json"
-            if os.path.exists(param_path):
-                with open(param_path, "r") as f:
+            # Look for --param-file argument in sys.argv
+            param_file = None
+            for i, arg in enumerate(sys.argv):
+                if arg == "--param-file" and i + 1 < len(sys.argv):
+                    param_file = sys.argv[i + 1]
+                    break
+            if param_file and os.path.exists(param_file):
+                with open(param_file, "r") as f:
                     params = json.load(f)
                 config.MOTION_WEIGHT = params["MOTION_WEIGHT"]
                 config.DENSITY_WEIGHT = params["DENSITY_WEIGHT"]

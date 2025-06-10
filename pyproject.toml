@@ -17,7 +17,7 @@ dependencies = [
 
 [project.scripts]
 train = "bnet_simulator.train_scheduler:main"
-plot = "bnet_simulator.plot_metrics:main"
+test = "bnet_simulator.test_scheduler:main"
 
 [build-system]
 requires = ["hatchling"]

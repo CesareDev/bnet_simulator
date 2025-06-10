@@ -53,6 +53,12 @@ def parse_args():
         action='store_true',
         help="Run in headless mode without GUI (default: False)"
     )
+    parser.add_argument(
+        "--param-file",
+        type=str,
+        default=None,
+        help="Path to dynamic parameter file"
+    )
     
 
     return parser.parse_args()

@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 # ---- Configurable ----
 BASE_CMD = ["uv", "run", "python", "src/bnet_simulator/main.py"]
-RESULTS_DIR = "simulation_results"
+RESULTS_DIR = "train_results"
 BEST_PARAMS_FILE = "best_dynamic_params.json"
 CURRENT_PARAMS_FILE = "current_parameters.json"
 METRICS = [
@@ -51,8 +51,8 @@ BASE_PARAM_SETS = [
     {"world_width": 800, "world_height": 800, "mobile_buoy_count": 25, "fixed_buoy_count": 5, "duration": 180, "headless": True},
 ]
 
-def write_dynamic_config(params: dict):
-    with open(CURRENT_PARAMS_FILE, "w") as f:
+def write_dynamic_config(params: dict, param_file: str):
+    with open(param_file, "w") as f:
         json.dump(params, f)
 
 def collect_metrics(scheduler_type):
@@ -71,9 +71,12 @@ def evaluate_metrics(df):
 def run_all_scenarios_for_mode(mode, params=None, seeds=None):
     procs = []
     max_duration = max(scenario["duration"] for scenario in BASE_PARAM_SETS)
+    param_files = []
     for i, scenario in enumerate(BASE_PARAM_SETS):
+        param_file = f"current_parameters_{i}.json"
+        param_files.append(param_file)
         if params:
-            write_dynamic_config(params)
+            write_dynamic_config(params, param_file)
         seed = seeds[i] if seeds else int(random.uniform(1, 1e9))
         cmd = BASE_CMD + [
             "--mode", mode,
@@ -83,6 +86,7 @@ def run_all_scenarios_for_mode(mode, params=None, seeds=None):
             "--mobile-buoy-count", str(scenario["mobile_buoy_count"]),
             "--fixed-buoy-count", str(scenario["fixed_buoy_count"]),
             "--duration", str(scenario["duration"]),
+            "--param-file", param_file,  # pass the filename as an argument
         ]
         if scenario.get("headless"):
             cmd.append("--headless")
@@ -96,6 +100,10 @@ def run_all_scenarios_for_mode(mode, params=None, seeds=None):
     # Wait for all processes to finish (if any are still running)
     for proc in procs:
         proc.wait()
+    # Clean up parameter files
+    for param_file in param_files:
+        if os.path.exists(param_file):
+            os.remove(param_file)
 
 def main():
     # 1. Generate a fixed seed for each scenario (used for both static and dynamic)
@@ -140,10 +148,6 @@ def main():
     best_params = {metric: best_per_metric[metric][0] for metric in METRICS}
     with open(BEST_PARAMS_FILE, "w") as f:
         json.dump(best_params, f, indent=2)
-
-    # 5. Delete current_parameters.json after training
-    if os.path.exists(CURRENT_PARAMS_FILE):
-        os.remove(CURRENT_PARAMS_FILE)
 
     print("Best configurations per metric (compared to static):")
     for metric, (params, improvement) in best_per_metric.items():
