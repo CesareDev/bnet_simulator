@@ -54,3 +54,5 @@ DENSITY_MIDPOINT = 2.5
 DENSITY_ALPHA = 4.0
 CONTACT_MIDPOINT = 6.0
 CONTACT_ALPHA = 1.5
+
+SCORE_FUNCTION = "sigmoid"  # Options: "sigmoid", "tanh", "linear"

@@ -74,6 +74,18 @@ class BeaconScheduler:
 
         return False
 
+    def score(value, midpoint, alpha, mode):
+        if mode == "sigmoid":
+            return 1 / (1 + math.exp(-alpha * (value - midpoint)))
+        elif mode == "tanh":
+            return 0.5 * (1 + math.tanh(alpha * (value - midpoint)))
+        elif mode == "linear":
+            # For density: value = num_neighbors, for contact: value = delta
+            # Linear scaling between 0 and 1, centered at midpoint
+            return max(0.0, min((value / midpoint), 1.0))
+        else:
+            raise ValueError(f"Unknown score function: {mode}")
+
     def compute_interval(
         self,
         velocity: Tuple[float, float],
@@ -81,33 +93,42 @@ class BeaconScheduler:
         current_time: float,
         collision_rate: float = 0.0
     ) -> float:
-        
         # --- Motion Score ---
         speed = math.hypot(*velocity)
         motion_score = min(speed / config.DEFAULT_BUOY_VELOCITY, 1.0)
-    
+
         # --- Density Score ---
         num_neighbors = len(neighbors)
-        density_score = 1 / (1 + math.exp(-config.DENSITY_ALPHA * (num_neighbors - config.DENSITY_MIDPOINT)))
-    
+        density_score = self.score(
+            num_neighbors,
+            config.DENSITY_MIDPOINT,
+            config.DENSITY_ALPHA,
+            config.SCORE_FUNCTION
+        )
+
         # --- Contact Score ---
         if not neighbors:
             contact_score = 1.0
         else:
             last_contact = max((ts for _, ts, _ in neighbors), default=0.0)
             delta = current_time - last_contact
-            contact_score = 1 / (1 + math.exp(-config.CONTACT_ALPHA * (delta - config.CONTACT_MIDPOINT)))
-    
+            contact_score = self.score(
+                delta,
+                config.CONTACT_MIDPOINT,
+                config.CONTACT_ALPHA,
+                config.SCORE_FUNCTION
+            )
+
         # --- Congestion Score ---
         congestion_score = min(collision_rate, 1.0)
-    
+
         # --- Composite (linear blend) ---
         k = (
             config.MOTION_WEIGHT * motion_score +
             config.DENSITY_WEIGHT * density_score +
             config.CONTACT_WEIGHT * contact_score +
-            config.CONGESTION_WEIGHT * (1 - congestion_score)  # Encourage sending when low congestion
+            config.CONGESTION_WEIGHT * (1 - congestion_score)
         )
-    
+
         interval = self.min_interval + (1 - k) * (self.max_interval - self.min_interval)
         return max(self.min_interval, min(interval, self.max_interval))
