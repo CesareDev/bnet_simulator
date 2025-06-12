@@ -18,3 +18,10 @@ wheels/
 
 # Training parameters
 *.json
+
+# Latex files
+*.aux
+*.log
+*.fdb_latexmk
+*.fls
+*.synctex.gz
