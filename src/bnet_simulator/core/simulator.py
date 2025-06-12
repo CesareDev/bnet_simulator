@@ -11,6 +11,7 @@ class Simulator:
     def __init__(self, buoys: List[Buoy], channel: Channel):
         self.buoys = buoys
         self.channel = channel
+        self.channel.buoys = self.buoys
         self.running = False
         self.simulated_time = 0.0
         self.window = Window() if not config.HEADLESS else None

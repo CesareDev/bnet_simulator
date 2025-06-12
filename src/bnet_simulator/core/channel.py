@@ -34,6 +34,15 @@ class Channel:
         trasmission_time = beacon.size_bits() / config.BIT_RATE
         self.active_transmissions.append((beacon, sim_time, sim_time + trasmission_time))
         logging.log_info(f"Broadcasting beacon from {str(beacon.sender_id)[:6]}")
+
+        receivers_in_range = [
+            buoy for buoy in self.buoys
+            if buoy.id != beacon.sender_id and self.in_range(beacon.position, buoy.position)
+        ] if hasattr(self, "buoys") else []
+        n_receivers = len(receivers_in_range)
+        if self.metrics:
+            self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
+
         return True
 
     def is_busy(self, position: Tuple[float, float], sim_time: float) -> bool:
@@ -68,33 +77,47 @@ class Channel:
 
             self.seen_attempts.add(key)
 
-            # Reception probability logic
-            if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
-                if random.random() < config.DELIVERY_PROB_HIGH:
-                    received.append(beacon)
-                    if self.metrics:
-                        self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
-                else:
-                    if self.metrics:
-                        self.metrics.log_lost()
-            elif distance <= config.COMMUNICATION_RANGE_MAX:
-                if random.random() < config.DELIVERY_PROB_LOW:
-                    received.append(beacon)
-                    if self.metrics:
-                        self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
-                else:
-                    logging.log_error(f"Packet lost from {str(beacon.sender_id)[:6]} to {str(receiver_id)[:6]}")
-                    if self.metrics:
-                        self.metrics.log_lost()
+            # --- Channel behavior switch ---
+            if config.IDEAL_CHANNEL:
+                # Ideal: always deliver if in range, ignore collisions
+                received.append(beacon)
+                if self.metrics:
+                    self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
+                    self.metrics.log_actually_received(beacon.sender_id)
+            else:
+                # Realistic: probabilistic delivery and collisions
+                if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
+                    if random.random() < config.DELIVERY_PROB_HIGH:
+                        received.append(beacon)
+                        if self.metrics:
+                            self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
+                            self.metrics.log_actually_received(beacon.sender_id)
+                    else:
+                        if self.metrics:
+                            self.metrics.log_lost()
+                elif distance <= config.COMMUNICATION_RANGE_MAX:
+                    if random.random() < config.DELIVERY_PROB_LOW:
+                        received.append(beacon)
+                        if self.metrics:
+                            self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
+                            self.metrics.log_actually_received(beacon.sender_id)
+                    else:
+                        logging.log_error(f"Packet lost from {str(beacon.sender_id)[:6]} to {str(receiver_id)[:6]}")
+                        if self.metrics:
+                            self.metrics.log_lost()
 
-        if len(received) <= 1:
+        if config.IDEAL_CHANNEL:
+            # In ideal mode, ignore collisions
             return received
         else:
-            # Collision at receiver — discard all
-            logging.log_error(f"Collision detected while receiving at {str(receiver_id)[:6]}")
-            if self.metrics:
-                self.metrics.log_collision()
-            return []
+            if len(received) <= 1:
+                return received
+            else:
+                # Collision at receiver — discard all
+                logging.log_error(f"Collision detected while receiving at {str(receiver_id)[:6]}")
+                if self.metrics:
+                    self.metrics.log_collision()
+                return []
 
     def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> bool:
         dx = pos1[0] - pos2[0]

@@ -74,7 +74,7 @@ class BeaconScheduler:
 
         return False
 
-    def score(value, midpoint, alpha, mode):
+    def score(self, value, midpoint, alpha, mode):
         if mode == "sigmoid":
             return 1 / (1 + math.exp(-alpha * (value - midpoint)))
         elif mode == "tanh":
@@ -97,7 +97,7 @@ class BeaconScheduler:
         speed = math.hypot(*velocity)
         motion_score = min(speed / config.DEFAULT_BUOY_VELOCITY, 1.0)
 
-        # --- Density Score ---
+        # --- Density Score (sigmoid: high when sparse, low when dense) ---
         num_neighbors = len(neighbors)
         density_score = self.score(
             num_neighbors,
@@ -119,15 +119,12 @@ class BeaconScheduler:
                 config.SCORE_FUNCTION
             )
 
-        # --- Congestion Score ---
-        congestion_score = min(collision_rate, 1.0)
-
         # --- Composite (linear blend) ---
         k = (
             config.MOTION_WEIGHT * motion_score +
             config.DENSITY_WEIGHT * density_score +
-            config.CONTACT_WEIGHT * contact_score +
-            config.CONGESTION_WEIGHT * (1 - congestion_score)
+            config.CONTACT_WEIGHT * contact_score
+            # + config.CONGESTION_WEIGHT * (1 - congestion_score)
         )
 
         interval = self.min_interval + (1 - k) * (self.max_interval - self.min_interval)

@@ -59,8 +59,12 @@ def parse_args():
         default=None,
         help="Path to dynamic parameter file"
     )
-    
-
+    parser.add_argument(
+        "--result-file",
+        type=str,
+        default=None,
+        help="Filename for metrics CSV output"
+    )
     return parser.parse_args()
 
 def random_position():
@@ -131,8 +135,8 @@ def main():
     summary = metrics.summary(sim.simulated_time) if metrics else None
 
     # Export metrics to CSV
-    if metrics: 
-        metrics.export_metrics_to_csv(summary)
+    if metrics:
+        metrics.export_metrics_to_csv(summary, filename=args.result_file)
 
 if __name__ == "__main__":
     main()

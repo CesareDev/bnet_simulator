@@ -5,23 +5,16 @@ import os
 import shutil
 from tqdm import tqdm
 
+# ---- Scenarios ----
 BASE_PARAM_SETS = [
+    # 500x500 world
     {"world_width": 500, "world_height": 500, "mobile_buoy_count": 5, "fixed_buoy_count": 5, "duration": 150, "headless": True},
     {"world_width": 500, "world_height": 500, "mobile_buoy_count": 10, "fixed_buoy_count": 10, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 20, "fixed_buoy_count": 20, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 5, "fixed_buoy_count": 25, "duration": 180, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 10, "fixed_buoy_count": 20, "duration": 180, "headless": True},
     {"world_width": 500, "world_height": 500, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 180, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 25, "fixed_buoy_count": 5, "duration": 180, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 5, "fixed_buoy_count": 5, "duration": 150, "headless": True},
+    # 800x800 world (scaled up)
     {"world_width": 800, "world_height": 800, "mobile_buoy_count": 10, "fixed_buoy_count": 10, "duration": 150, "headless": True},
     {"world_width": 800, "world_height": 800, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 150, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 20, "fixed_buoy_count": 20, "duration": 150, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 5, "fixed_buoy_count": 25, "duration": 180, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 10, "fixed_buoy_count": 20, "duration": 180, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 180, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 25, "fixed_buoy_count": 5, "duration": 180, "headless": True},
+    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 20, "fixed_buoy_count": 20, "duration": 180, "headless": True},
 ]
 
 BEST_PARAMS_FILE = "best_dynamic_params.json"
@@ -31,14 +24,15 @@ PARAM_KEYS = [
 ]
 
 TEST_RESULTS_DIR = "test_results"
-SRC_RESULTS_DIR = "train_results"
+SRC_RESULTS_DIR = "tune_results"
+METRICS = ["Delivery Ratio"]
 
 def average_best_params(best_params):
-    # best_params: dict of metric -> param dict
+    # best_params: dict of metric -> param dict (and possibly floats)
     param_lists = {k: [] for k in PARAM_KEYS}
     for metric_params in best_params.values():
-        if metric_params is None:
-            continue
+        if not isinstance(metric_params, dict):
+            continue  # skip floats like "Best Delivery Ratio Value"
         for k in PARAM_KEYS:
             param_lists[k].append(metric_params[k])
     # Compute average for each param
@@ -54,6 +48,11 @@ def run_batch(mode, avg_params=None):
     param_files = []
     max_duration = max(base_params["duration"] for base_params in BASE_PARAM_SETS)
     for i, base_params in enumerate(BASE_PARAM_SETS):
+        result_file = os.path.join(
+            TEST_RESULTS_DIR,
+            f"{mode}_{int(base_params['world_width'])}x{int(base_params['world_height'])}_"
+            f"mob{base_params['mobile_buoy_count']}_fix{base_params['fixed_buoy_count']}.csv"
+        )
         cmd = [
             "uv", "run", "python", "src/bnet_simulator/main.py",
             "--mode", mode,
@@ -63,7 +62,8 @@ def run_batch(mode, avg_params=None):
             "--mobile-buoy-count", str(base_params["mobile_buoy_count"]),
             "--fixed-buoy-count", str(base_params["fixed_buoy_count"]),
             "--duration", str(base_params["duration"]),
-            "--headless"
+            "--headless",
+            "--result-file", result_file
         ]
         if mode == "dynamic" and avg_params is not None:
             param_file = f"test_parameters_{i}.json"
@@ -85,7 +85,9 @@ def run_batch(mode, avg_params=None):
             os.remove(param_file)
 
 def move_results_to_test_dir():
-    os.makedirs(TEST_RESULTS_DIR, exist_ok=True)
+    if not os.path.exists(SRC_RESULTS_DIR):
+        print(f"Source results directory '{SRC_RESULTS_DIR}' does not exist. Skipping move.")
+        return
     for f in os.listdir(SRC_RESULTS_DIR):
         if f.startswith("static_") or f.startswith("dynamic_"):
             src = os.path.join(SRC_RESULTS_DIR, f)
@@ -115,17 +117,16 @@ def main():
         print("Running dynamic test set...")
         run_batch("dynamic", avg_params=avg_params)
 
-        print("Moving test results to test_results/ ...")
-        move_results_to_test_dir()
-
     print("Plotting test results...")
-
-    # Plot using the test_results directory
+    import subprocess
     subprocess.run([
-        "uv", "run", "python", "src/bnet_simulator/plot_metrics.py"
-    ], env={**os.environ, "RESULTS_DIR": TEST_RESULTS_DIR})
-
+        "uv", "run", "python", "src/bnet_simulator/plot_metrics.py",
+        "--results-dir", TEST_RESULTS_DIR,
+        "--plot-dir", "test_plots"
+    ])
     print("Done.")
 
 if __name__ == "__main__":
+    if not os.path.exists(TEST_RESULTS_DIR):
+        os.makedirs(TEST_RESULTS_DIR)
     main()

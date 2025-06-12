@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-train = "bnet_simulator.train_scheduler:main"
+tune = "bnet_simulator.tune_scheduler:main"
 test = "bnet_simulator.test_scheduler:main"
 
 [build-system]

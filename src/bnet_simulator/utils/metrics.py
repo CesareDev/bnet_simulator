@@ -13,6 +13,10 @@ class Metrics:
         self.reaction_latencies = []
         self.delivered_beacons = set()
         self.scheduler_latencies = []
+        self.potentially_sent = 0  # Total "sent" (sum over all senders × receivers in range)
+        self.actually_received = 0  # Total "received" (sum over all receivers)
+        self.potentially_sent_per_sender = {}  # sender_id -> count
+        self.actually_received_per_sender = {}  # sender_id -> count
 
     def log_sent(self):
         self.beacons_sent += 1
@@ -64,6 +68,17 @@ class Metrics:
             "Contact Alpha": config.CONTACT_ALPHA,
         }
 
+    def log_potentially_sent(self, sender_id, n_receivers):
+        self.potentially_sent += n_receivers
+        self.potentially_sent_per_sender[sender_id] = self.potentially_sent_per_sender.get(sender_id, 0) + n_receivers
+
+    def log_actually_received(self, sender_id):
+        self.actually_received += 1
+        self.actually_received_per_sender[sender_id] = self.actually_received_per_sender.get(sender_id, 0) + 1
+
+    def delivery_ratio(self):
+        return self.actually_received / self.potentially_sent if self.potentially_sent else 0
+
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
         base_summary = {
@@ -77,8 +92,8 @@ class Metrics:
             "Lost": self.beacons_lost,
             "Collisions": self.beacons_collided,
             "Avg Latency": avg_latency,
-            "Avg Scheduler Latency": self.avg_scheduler_latency(),  # NEW
-            "Delivery Ratio": self.beacons_received / self.beacons_sent if self.beacons_sent else 0,
+            "Avg Scheduler Latency": self.avg_scheduler_latency(),
+            "Delivery Ratio": self.delivery_ratio(),  # <-- use new logic here!
             "Collision Rate": self.beacons_collided / self.beacons_sent if self.beacons_sent else 0,
             "Avg Reaction Latency": (
                 sum(self.reaction_latencies) / len(self.reaction_latencies)
@@ -88,13 +103,16 @@ class Metrics:
                 self.beacons_received / sim_time
                 if sim_time > 0 else 0
             ),
+            # Add debug info for troubleshooting
+            "Potentially Sent": self.potentially_sent,
+            "Actually Received": self.actually_received,
         }
         parameters = self.get_parameters()
         return {**base_summary, **parameters}
     
     def export_metrics_to_csv(self, summary, filename=None):
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-        results_dir = os.path.join(project_root, "train_results")
+        results_dir = os.path.join(project_root, "tune_results")
         os.makedirs(results_dir, exist_ok=True)
 
         if filename is None:
@@ -103,15 +121,19 @@ class Metrics:
                 f"{int(config.WORLD_WIDTH)}x{int(config.WORLD_HEIGHT)}_"
                 f"mob{config.MOBILE_BUOY_COUNT}_fix{config.FIXED_BUOY_COUNT}.csv"
             )
-        filepath = os.path.join(results_dir, filename)
+            filepath = os.path.join(results_dir, filename)
+        else:
+            # If filename is an absolute path or starts with a directory, use as is
+            if os.path.isabs(filename) or "/" in filename:
+                filepath = filename
+                # Ensure the directory exists
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            else:
+                filepath = os.path.join(results_dir, filename)
 
         with open(filepath, mode="w", newline="") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(["Metric", "Value"])
             for key, value in summary.items():
-                # Patch: Write floats with high precision for latency metrics
-                if isinstance(value, float) and "latency" in key.lower():
-                    writer.writerow([key, f"{value:.10f}"])
-                else:
-                    writer.writerow([key, value])
+                writer.writerow([key, value])
         logging.log_info(f"Metrics exported to {filepath}")

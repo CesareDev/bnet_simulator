@@ -28,6 +28,7 @@ ENABLE_METRICS = True  # Set to False to disable metrics collection
 SEED = None
 HEADLESS = False
 ENABLE_LOGGING = False  # Set to False to disable all logging output
+IDEAL_CHANNEL = False  # If True, channel is ideal (no loss, no collisions)
 
 # World settings
 WORLD_WIDTH = 400.0  # meters or units
