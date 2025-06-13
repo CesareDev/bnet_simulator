@@ -111,11 +111,10 @@ class Metrics:
         return {**base_summary, **parameters}
     
     def export_metrics_to_csv(self, summary, filename=None):
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-        results_dir = os.path.join(project_root, "tune_results")
-        os.makedirs(results_dir, exist_ok=True)
-
         if filename is None:
+            # Default: save to metrics/tune_results/
+            results_dir = os.path.join("metrics", "tune_results")
+            os.makedirs(results_dir, exist_ok=True)
             filename = (
                 f"{config.SCHEDULER_TYPE}_"
                 f"{int(config.WORLD_WIDTH)}x{int(config.WORLD_HEIGHT)}_"
@@ -123,13 +122,8 @@ class Metrics:
             )
             filepath = os.path.join(results_dir, filename)
         else:
-            # If filename is an absolute path or starts with a directory, use as is
-            if os.path.isabs(filename) or "/" in filename:
-                filepath = filename
-                # Ensure the directory exists
-                os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            else:
-                filepath = os.path.join(results_dir, filename)
+            filepath = filename
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
         with open(filepath, mode="w", newline="") as csvfile:
             writer = csv.writer(csvfile)

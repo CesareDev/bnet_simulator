@@ -1,121 +1,145 @@
 import os
-import glob
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.interpolate import make_interp_spline
 import re
 import argparse
 
-# Colors based on World Size
-WORLD_SIZE_COLORS = {
-    "500.0x500.0": "tab:blue",
-    "800.0x800.0": "tab:green",
-    "1200.0x1200.0": "tab:red",
-    "Other": "tab:gray"
-}
-
-# Line styles based on Scheduler Type
-SCHEDULER_STYLES = {
-    "static": "solid",
-    "dynamic": "dashed",
-    "rl": "dotted"
-}
-
-def sanitize_filename(name):
-    return re.sub(r'[^a-zA-Z0-9_]', '_', name.lower())
-
-def load_all_metrics(results_dir):
-    data = []
-    for csv_file in glob.glob(os.path.join(results_dir, "*.csv")):
-        df = pd.read_csv(csv_file, index_col=0)
-        row = df["Value"].to_dict()
-        row["filename"] = os.path.basename(csv_file)
-
-        try:
-            row["Mobile Buoys"] = int(row.get("Mobile Buoys", 0))
-            row["Fixed Buoys"] = int(row.get("Fixed Buoys", 0))
-            row["Total Buoys"] = row["Mobile Buoys"] + row["Fixed Buoys"]
-        except:
-            row["Mobile Buoys"] = 0
-            row["Fixed Buoys"] = 0
-            row["Total Buoys"] = 0
-
-        row["World Size"] = str(row.get("World Size", "Other"))
-        data.append(row)
-
-    return pd.DataFrame(data)
-
-def smooth_curve(x_vals, y_vals):
-    if len(x_vals) < 4:
-        return x_vals, y_vals
-    x_sorted = np.array(sorted(x_vals))
-    y_sorted = np.array([y for _, y in sorted(zip(x_vals, y_vals))])
-    try:
-        spline = make_interp_spline(x_sorted, y_sorted, k=2)
-        x_smooth = np.linspace(x_sorted.min(), x_sorted.max(), 200)
-        y_smooth = spline(x_smooth)
-        return x_smooth, y_smooth
-    except Exception:
-        return x_sorted, y_sorted
-
-def plot_metrics(df: pd.DataFrame, plot_dir):
-    metric = "Delivery Ratio"
-    plt.figure(figsize=(10, 6))
-    for world_size in sorted(df["World Size"].unique()):
-        for scheduler in sorted(df["Scheduler Type"].unique()):
-            subset = df[(df["World Size"] == world_size) & (df["Scheduler Type"] == scheduler)].copy()
-            if subset.empty:
-                continue
-            subset[metric] = pd.to_numeric(subset[metric], errors="coerce")
-            subset = subset.dropna(subset=[metric])
-            if subset.empty:
-                continue
-            grouped = subset.groupby("Total Buoys")[metric].mean().reset_index()
-            x_vals = grouped["Total Buoys"].values
-            y_vals = grouped[metric].values
-            plt.plot(x_vals, y_vals, label=f"{scheduler} ({world_size})")
-            plt.scatter(x_vals, y_vals)
-    plt.title(f"{metric} vs Total Buoys")
-    plt.xlabel("Total Buoys")
-    plt.ylabel(metric)
-    plt.grid(True)
-    plt.legend(title="Scheduler + World Size", loc="best", fontsize="small")
-    plt.tight_layout()
-    filename = os.path.join(plot_dir, f"{sanitize_filename(metric)}.png")
-    plt.savefig(filename, bbox_inches="tight")
-    plt.close()
-
-def plot_delivery_ratio(results_dir, plot_dir):
+def plot_line_metrics(results_dir, plot_dir):
+    # Line plot: Delivery Ratio vs Total Buoys, one line per (scheduler, world size)
     static_files = [f for f in os.listdir(results_dir) if f.startswith("static_") and f.endswith(".csv")]
     dynamic_files = [f for f in os.listdir(results_dir) if f.startswith("dynamic_") and f.endswith(".csv")]
 
-    static_ratios = []
-    dynamic_ratios = []
+    def extract_info(filename):
+        match = re.match(r"(static|dynamic)_(\d+)x(\d+)_mob(\d+)_fix(\d+)", filename)
+        if match:
+            scheduler = match.group(1)
+            world_size = f"{match.group(2)}x{match.group(3)}"
+            total_buoys = int(match.group(4)) + int(match.group(5))
+            return scheduler, world_size, total_buoys
+        return None, None, None
 
-    for f in static_files:
-        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
-        if "Delivery Ratio" in df.index:
-            try:
-                val = float(df.loc["Delivery Ratio", "Value"])
-                static_ratios.append(val)
-            except Exception:
-                pass
-    for f in dynamic_files:
-        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
-        if "Delivery Ratio" in df.index:
-            try:
-                val = float(df.loc["Delivery Ratio", "Value"])
-                dynamic_ratios.append(val)
-            except Exception:
-                pass
+    data = {}
+    schedulers = ["static", "dynamic"]
+    world_sizes = set()
+    total_buoys_set = set()
 
-    plt.figure(figsize=(8, 5))
-    plt.boxplot([static_ratios, dynamic_ratios], tick_labels=["Static", "Dynamic"])
+    for f in static_files + dynamic_files:
+        scheduler, world_size, total_buoys = extract_info(f)
+        if scheduler and world_size and total_buoys is not None:
+            df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+            if "Delivery Ratio" in df.index:
+                data[(scheduler, world_size, total_buoys)] = float(df.loc["Delivery Ratio", "Value"])
+                world_sizes.add(world_size)
+                total_buoys_set.add(total_buoys)
+
+    # Only keep 500x500 and 800x800
+    world_sizes = [ws for ws in sorted(world_sizes) if ws in ("500x500", "800x800")]
+    total_buoys_list = sorted(total_buoys_set)
+
+    color_map = {
+        "500x500": "tab:blue",
+        "800x800": "tab:green",
+    }
+    default_color = "tab:gray"
+
+    plt.figure(figsize=(10, 6))
+    for world_size in world_sizes:
+        for scheduler in schedulers:
+            y_vals = []
+            for total_buoys in total_buoys_list:
+                y_vals.append(data.get((scheduler, world_size, total_buoys), np.nan))
+            label = f"{scheduler.capitalize()} {world_size}"
+            color = color_map.get(world_size, default_color)
+            linestyle = "-" if scheduler == "static" else "--"
+            plt.plot(total_buoys_list, y_vals, label=label, color=color, linestyle=linestyle, marker="o")
+    plt.title("Delivery Ratio vs Total Buoys")
+    plt.xlabel("Total Buoys")
     plt.ylabel("Delivery Ratio")
-    plt.title("Delivery Ratio: Static vs Dynamic (Test Set)")
     plt.grid(True)
-    plt.savefig(os.path.join(plot_dir, "delivery_ratio_boxplot.png"), bbox_inches="tight")
+    plt.legend(title="Scheduler + World Size", loc="best", fontsize="small")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plot_dir, "delivery_ratio_line.png"), bbox_inches="tight")
+    plt.close()
+
+def plot_grouped_bar_green_blue(results_dir, plot_dir):
+    # Grouped bar plot: for each total buoys, bars for each (scheduler, world size)
+    static_files = [f for f in os.listdir(results_dir) if f.startswith("static_") and f.endswith(".csv")]
+    dynamic_files = [f for f in os.listdir(results_dir) if f.startswith("dynamic_") and f.endswith(".csv")]
+
+    def extract_info(filename):
+        match = re.match(r"(static|dynamic)_(\d+)x(\d+)_mob(\d+)_fix(\d+)", filename)
+        if match:
+            scheduler = match.group(1)
+            world_size = f"{match.group(2)}x{match.group(3)}"
+            total_buoys = int(match.group(4)) + int(match.group(5))
+            return scheduler, world_size, total_buoys
+        return None, None, None
+
+    data = {}
+    world_sizes = set()
+    total_buoys_set = set()
+    schedulers = ["static", "dynamic"]
+
+    for f in static_files + dynamic_files:
+        scheduler, world_size, total_buoys = extract_info(f)
+        if scheduler and world_size and total_buoys is not None:
+            if world_size not in ("500x500", "800x800"):
+                continue
+            df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+            if "Delivery Ratio" in df.index:
+                data[(total_buoys, world_size, scheduler)] = float(df.loc["Delivery Ratio", "Value"])
+                world_sizes.add(world_size)
+                total_buoys_set.add(total_buoys)
+
+    world_sizes = [ws for ws in sorted(world_sizes) if ws in ("500x500", "800x800")]
+    total_buoys_list = sorted(total_buoys_set)
+    n_world = len(world_sizes)
+    n_sched = len(schedulers)
+    n_bars_per_group = n_world * n_sched
+
+    color_map = {
+        "500x500": "tab:blue",
+        "800x800": "tab:green",
+    }
+    default_color = "tab:gray"
+
+    fig, ax = plt.subplots(figsize=(max(10, len(total_buoys_list)*1.5), 7))
+
+    bar_handles = []
+    bar_labels = []
+    width = 0.8 / n_bars_per_group
+
+    for i, world_size in enumerate(world_sizes):
+        color = color_map.get(world_size, default_color)
+        for j, scheduler in enumerate(schedulers):
+            bar_vals = []
+            for total_buoys in total_buoys_list:
+                val = data.get((total_buoys, world_size, scheduler), 0)
+                bar_vals.append(val)
+            offset = (i * n_sched + j - n_bars_per_group / 2) * width + width/2
+            hatch = "//" if scheduler == "dynamic" else ""
+            rects = ax.bar(np.arange(len(total_buoys_list)) + offset, bar_vals, width,
+                           label=f"{scheduler.capitalize()} {world_size}",
+                           color=color, hatch=hatch, edgecolor='black')
+            bar_handles.append(rects[0])
+            bar_labels.append(f"{scheduler.capitalize()} {world_size}")
+
+            for rect in rects:
+                height = rect.get_height()
+                ax.annotate(f'{height:.2f}',
+                            xy=(rect.get_x() + rect.get_width() / 2, height),
+                            xytext=(0, 3),
+                            textcoords="offset points",
+                            ha='center', va='bottom', fontsize=8)
+
+    ax.set_ylabel('Delivery Ratio')
+    ax.set_title('Delivery Ratio by Total Buoys, Scheduler, and World Size')
+    ax.set_xticks(np.arange(len(total_buoys_list)))
+    ax.set_xticklabels([str(t) for t in total_buoys_list], rotation=0, ha='center')
+    ax.legend(bar_handles, bar_labels, fontsize="small", ncol=2)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plot_dir, "delivery_ratio_grouped_bar_green_blue.png"), bbox_inches="tight")
     plt.close()
 
 def main():
@@ -124,7 +148,6 @@ def main():
     parser.add_argument("--plot-dir", type=str, default=None, help="Directory to save plots")
     args = parser.parse_args()
 
-    # Default: tune_results for tuning, tune_plots for tuning plots
     results_dir = args.results_dir or os.environ.get("RESULTS_DIR", "tune_results")
     plot_dir = args.plot_dir or os.environ.get("PLOT_DIR", "tune_plots")
 
@@ -134,13 +157,8 @@ def main():
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir, exist_ok=True)
 
-    df = load_all_metrics(results_dir)
-    if df.empty:
-        print("No simulation results found.")
-        return
-
-    plot_metrics(df, plot_dir)
-    plot_delivery_ratio(results_dir, plot_dir)
+    plot_line_metrics(results_dir, plot_dir)
+    plot_grouped_bar_green_blue(results_dir, plot_dir)
 
     print("Plots saved to:", plot_dir)
 

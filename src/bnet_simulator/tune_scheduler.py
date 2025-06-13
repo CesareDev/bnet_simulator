@@ -7,12 +7,22 @@ import time
 import random
 from itertools import product, islice
 from tqdm import tqdm
-import multiprocessing
+from bnet_simulator.utils import config
 
-# ---- Configurable ----
+# ---- Directory Utility ----
+def get_metrics_dir(base, ideal):
+    return os.path.join("metrics", f"{base}{'_ideal' if ideal else ''}")
+
+IDEAL = getattr(config, "IDEAL_CHANNEL", False)
+RESULTS_DIR = get_metrics_dir("tune_results", IDEAL)
+PLOTS_DIR = get_metrics_dir("tune_plot", IDEAL)
+BEST_PARAMS_FILE = os.path.join("metrics", f"best_dynamic_params{'_ideal' if IDEAL else ''}.json")
+
+os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(PLOTS_DIR, exist_ok=True)
+os.makedirs("metrics", exist_ok=True)
+
 BASE_CMD = ["uv", "run", "python", "src/bnet_simulator/main.py"]
-RESULTS_DIR = "tune_results"
-BEST_PARAMS_FILE = "best_dynamic_params.json"
 METRICS = [
     "Delivery Ratio"
 ]
@@ -33,13 +43,13 @@ PARAM_SPACE = {
 # ---- Scenarios ----
 BASE_PARAM_SETS = [
     # 500x500 world
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 5, "fixed_buoy_count": 5, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 10, "fixed_buoy_count": 10, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 180, "headless": True},
+    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 4, "fixed_buoy_count": 4, "duration": 150, "headless": True},
+    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 8, "fixed_buoy_count": 8, "duration": 150, "headless": True},
+    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 12, "fixed_buoy_count": 12, "duration": 180, "headless": True},
     # 800x800 world (scaled up)
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 10, "fixed_buoy_count": 10, "duration": 150, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 15, "fixed_buoy_count": 15, "duration": 150, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 20, "fixed_buoy_count": 30, "duration": 180, "headless": True},
+    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 8, "fixed_buoy_count": 8, "duration": 150, "headless": True},
+    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 12, "fixed_buoy_count": 12, "duration": 150, "headless": True},
+    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 16, "fixed_buoy_count": 16, "duration": 180, "headless": True},
 ]
 
 def collect_metrics(scheduler_type):
@@ -68,6 +78,11 @@ def run_static_scenarios(seeds):
     procs = []
     for i, scenario in enumerate(BASE_PARAM_SETS):
         seed = seeds[i] if seeds else int(random.uniform(1, 1e9))
+        result_file = os.path.join(
+            RESULTS_DIR,
+            f"static_{int(scenario['world_width'])}x{int(scenario['world_height'])}_"
+            f"mob{scenario['mobile_buoy_count']}_fix{scenario['fixed_buoy_count']}.csv"
+        )
         cmd = BASE_CMD + [
             "--mode", "static",
             "--seed", str(seed),
@@ -76,6 +91,7 @@ def run_static_scenarios(seeds):
             "--mobile-buoy-count", str(scenario["mobile_buoy_count"]),
             "--fixed-buoy-count", str(scenario["fixed_buoy_count"]),
             "--duration", str(scenario["duration"]),
+            "--result-file", result_file,
         ]
         if scenario.get("headless"):
             cmd.append("--headless")
@@ -98,8 +114,8 @@ def run_dynamic_batch(param_batch, batch_start_idx, scenario_seeds, total_pbar=N
             param_file = f"current_parameters_{scenario_idx}_{param_idx}.json"
             with open(param_file, "w") as f:
                 json.dump(params, f)
-            # --- FIX: Save result in tune_results ---
-            result_file = os.path.join(RESULTS_DIR,
+            result_file = os.path.join(
+                RESULTS_DIR,
                 f"dynamic_{int(scenario['world_width'])}x{int(scenario['world_height'])}_"
                 f"mob{scenario['mobile_buoy_count']}_fix{scenario['fixed_buoy_count']}_param{param_idx}.csv"
             )
@@ -192,12 +208,10 @@ def main():
     print(f"Best parameter set saved to {BEST_PARAMS_FILE}")
 
     print("Plotting tuning results...")
-    # Save plots in tune_plots
-    import subprocess
     subprocess.run([
         "uv", "run", "python", "src/bnet_simulator/plot_metrics.py",
         "--results-dir", RESULTS_DIR,
-        "--plot-dir", "tune_plots"
+        "--plot-dir", PLOTS_DIR
     ])
     print("Done.")
 

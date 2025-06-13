@@ -66,25 +66,28 @@ class Channel:
             dy = receiver_position[1] - beacon.position[1]
             distance = math.hypot(dx, dy)
 
-            if distance > config.COMMUNICATION_RANGE_MAX:
-                continue # Out of range
-
-            propagation_delay = distance / config.SPEED_OF_LIGHT
-            arrival_time = end + propagation_delay
-
-            if not (start <= sim_time < arrival_time):
-                continue # Not yet arrived
-
-            self.seen_attempts.add(key)
-
             # --- Channel behavior switch ---
             if config.IDEAL_CHANNEL:
-                # Ideal: always deliver if in range, ignore collisions
+                # Ideal: only receive if <= 70m, always successful
+                if distance > config.COMMUNICATION_RANGE_HIGH_PROB:
+                    continue  # Out of range for ideal channel
+                propagation_delay = distance / config.SPEED_OF_LIGHT
+                arrival_time = end + propagation_delay
+                if not (start <= sim_time < arrival_time):
+                    continue  # Not yet arrived
+                self.seen_attempts.add(key)
                 received.append(beacon)
                 if self.metrics:
                     self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
                     self.metrics.log_actually_received(beacon.sender_id)
             else:
+                if distance > config.COMMUNICATION_RANGE_MAX:
+                    continue # Out of range
+                propagation_delay = distance / config.SPEED_OF_LIGHT
+                arrival_time = end + propagation_delay
+                if not (start <= sim_time < arrival_time):
+                    continue # Not yet arrived
+                self.seen_attempts.add(key)
                 # Realistic: probabilistic delivery and collisions
                 if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
                     if random.random() < config.DELIVERY_PROB_HIGH:
@@ -106,18 +109,14 @@ class Channel:
                         if self.metrics:
                             self.metrics.log_lost()
 
-        if config.IDEAL_CHANNEL:
-            # In ideal mode, ignore collisions
+        if len(received) <= 1:
             return received
         else:
-            if len(received) <= 1:
-                return received
-            else:
-                # Collision at receiver — discard all
-                logging.log_error(f"Collision detected while receiving at {str(receiver_id)[:6]}")
-                if self.metrics:
-                    self.metrics.log_collision()
-                return []
+            # Collision at receiver — discard all
+            logging.log_error(f"Collision detected while receiving at {str(receiver_id)[:6]}")
+            if self.metrics:
+                self.metrics.log_collision()
+            return []
 
     def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> bool:
         dx = pos1[0] - pos2[0]
