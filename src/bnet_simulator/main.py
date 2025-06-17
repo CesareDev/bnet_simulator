@@ -9,6 +9,7 @@ from bnet_simulator.utils.metrics import Metrics
 import random
 import time
 import argparse
+import math
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run the BNet Simulator")
@@ -68,9 +69,16 @@ def parse_args():
     return parser.parse_args()
 
 def random_position():
+    # Place all buoys randomly within a small circle at the center of the world
+    center_x = config.WORLD_WIDTH / 2
+    center_y = config.WORLD_HEIGHT / 2
+    # Use a radius smaller than the communication range to ensure all are in range
+    max_radius = min(getattr(config, "COMMUNICATION_RANGE_HIGH_PROB", 70), config.WORLD_WIDTH, config.WORLD_HEIGHT) / 2.5
+    angle = random.uniform(0, 2 * 3.1415926535)
+    radius = random.uniform(0, max_radius)
     return (
-        random.uniform(0, config.WORLD_WIDTH),
-        random.uniform(0, config.WORLD_HEIGHT)
+        center_x + radius * math.cos(angle),
+        center_y + radius * math.sin(angle)
     )
 
 def random_velocity():

@@ -33,24 +33,26 @@ PARAM_SPACE = {
     "MOTION_WEIGHT": [0.1, 0.3],
     "DENSITY_WEIGHT": [0.2, 0.4],
     "CONTACT_WEIGHT": [0.1, 0.3],
-    "CONGESTION_WEIGHT": [0.1, 0.3],
     "DENSITY_MIDPOINT": [2.5],
     "DENSITY_ALPHA": [3.0, 4.0],
     "CONTACT_MIDPOINT": [6.0],
     "CONTACT_ALPHA": [1.5],
+    "SCORE_FUNCTION": ["sigmoid", "linear", "tanh"],
 }
 
 # ---- Scenarios ----
-BASE_PARAM_SETS = [
-    # 500x500 world
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 4, "fixed_buoy_count": 4, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 8, "fixed_buoy_count": 8, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 12, "fixed_buoy_count": 12, "duration": 180, "headless": True},
-    # 800x800 world (scaled up)
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 8, "fixed_buoy_count": 8, "duration": 150, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 12, "fixed_buoy_count": 12, "duration": 150, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 16, "fixed_buoy_count": 16, "duration": 180, "headless": True},
-]
+BASE_PARAM_SETS = []
+for n_total in range(2, 11):
+    n_mobile = random.randint(0, n_total)
+    n_fixed = n_total - n_mobile
+    BASE_PARAM_SETS.append({
+        "world_width": 200,
+        "world_height": 200,
+        "mobile_buoy_count": n_mobile,
+        "fixed_buoy_count": n_fixed,
+        "duration": 120,
+        "headless": True
+    })
 
 def collect_metrics(scheduler_type):
     pattern = os.path.join(RESULTS_DIR, f"{scheduler_type}_*.csv")
@@ -114,10 +116,12 @@ def run_dynamic_batch(param_batch, batch_start_idx, scenario_seeds, total_pbar=N
             param_file = f"current_parameters_{scenario_idx}_{param_idx}.json"
             with open(param_file, "w") as f:
                 json.dump(params, f)
+            # Set SCORE_FUNCTION in config before running
+            config.SCORE_FUNCTION = params.get("SCORE_FUNCTION", "sigmoid")
             result_file = os.path.join(
                 RESULTS_DIR,
                 f"dynamic_{int(scenario['world_width'])}x{int(scenario['world_height'])}_"
-                f"mob{scenario['mobile_buoy_count']}_fix{scenario['fixed_buoy_count']}_param{param_idx}.csv"
+                f"mob{scenario['mobile_buoy_count']}_fix{scenario['fixed_buoy_count']}_param{param_idx}_{config.SCORE_FUNCTION}.csv"
             )
             cmd = BASE_CMD + [
                 "--mode", "dynamic",

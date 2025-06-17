@@ -93,7 +93,7 @@ class Metrics:
             "Collisions": self.beacons_collided,
             "Avg Latency": avg_latency,
             "Avg Scheduler Latency": self.avg_scheduler_latency(),
-            "Delivery Ratio": self.delivery_ratio(),  # <-- use new logic here!
+            "Delivery Ratio": self.delivery_ratio(),
             "Collision Rate": self.beacons_collided / self.beacons_sent if self.beacons_sent else 0,
             "Avg Reaction Latency": (
                 sum(self.reaction_latencies) / len(self.reaction_latencies)
@@ -103,9 +103,9 @@ class Metrics:
                 self.beacons_received / sim_time
                 if sim_time > 0 else 0
             ),
-            # Add debug info for troubleshooting
             "Potentially Sent": self.potentially_sent,
             "Actually Received": self.actually_received,
+            "Score Function": getattr(config, "SCORE_FUNCTION", "sigmoid"),
         }
         parameters = self.get_parameters()
         return {**base_summary, **parameters}

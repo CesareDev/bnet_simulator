@@ -29,7 +29,6 @@ class BeaconScheduler:
                 config.MOTION_WEIGHT = params["MOTION_WEIGHT"]
                 config.DENSITY_WEIGHT = params["DENSITY_WEIGHT"]
                 config.CONTACT_WEIGHT = params["CONTACT_WEIGHT"]
-                config.CONGESTION_WEIGHT = params["CONGESTION_WEIGHT"]
                 config.DENSITY_MIDPOINT = params["DENSITY_MIDPOINT"]
                 config.DENSITY_ALPHA = params["DENSITY_ALPHA"]
                 config.CONTACT_MIDPOINT = params["CONTACT_MIDPOINT"]
@@ -38,11 +37,11 @@ class BeaconScheduler:
     def tick(self, dt: float):
         self.elapsed_time += dt
 
-    def should_send(self, battery, velocity, neighbors, current_time, collision_rate=0.0):
+    def should_send(self, battery, velocity, neighbors, current_time):
         if config.SCHEDULER_TYPE == "static":
             return self.should_send_static()
         elif config.SCHEDULER_TYPE == "dynamic":
-            return self.should_send_dynamic(battery, velocity, neighbors, current_time, collision_rate)
+            return self.should_send_dynamic(battery, velocity, neighbors, current_time)
         elif config.SCHEDULER_TYPE == "rl":
             raise ValueError("RL scheduler not yet implemented.")
         else:
@@ -61,11 +60,10 @@ class BeaconScheduler:
         velocity: Tuple[float, float],
         neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
         current_time: float,
-        collision_rate=0.0
     ) -> bool:
 
         if self.next_dynamic_interval is None:
-            self.next_dynamic_interval = self.compute_interval(velocity, neighbors, current_time, collision_rate)
+            self.next_dynamic_interval = self.compute_interval(velocity, neighbors, current_time)
 
         if self.elapsed_time >= self.next_dynamic_interval:
             self.elapsed_time = 0.0
@@ -91,7 +89,6 @@ class BeaconScheduler:
         velocity: Tuple[float, float],
         neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
         current_time: float,
-        collision_rate: float = 0.0
     ) -> float:
         # --- Motion Score ---
         speed = math.hypot(*velocity)

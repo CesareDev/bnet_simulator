@@ -2,6 +2,7 @@ import subprocess
 import time
 import json
 import os
+import random
 from tqdm import tqdm
 from bnet_simulator.utils import config
 
@@ -17,16 +18,22 @@ os.makedirs(TEST_RESULTS_DIR, exist_ok=True)
 os.makedirs(TEST_PLOTS_DIR, exist_ok=True)
 os.makedirs("metrics", exist_ok=True)
 
-BASE_PARAM_SETS = [
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 4, "fixed_buoy_count": 4, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 8, "fixed_buoy_count": 8, "duration": 150, "headless": True},
-    {"world_width": 500, "world_height": 500, "mobile_buoy_count": 12, "fixed_buoy_count": 12, "duration": 180, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 8, "fixed_buoy_count": 8, "duration": 150, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 12, "fixed_buoy_count": 12, "duration": 150, "headless": True},
-    {"world_width": 800, "world_height": 800, "mobile_buoy_count": 16, "fixed_buoy_count": 16, "duration": 180, "headless": True},
-]
+# ---- Scenarios ----
+BASE_PARAM_SETS = []
+for n_total in range(2, 11):
+    n_mobile = random.randint(0, n_total)
+    n_fixed = n_total - n_mobile
+    BASE_PARAM_SETS.append({
+        "world_width": 200,
+        "world_height": 200,
+        "mobile_buoy_count": n_mobile,
+        "fixed_buoy_count": n_fixed,
+        "duration": 120,
+        "headless": True
+    })
+
 PARAM_KEYS = [
-    "MOTION_WEIGHT", "DENSITY_WEIGHT", "CONTACT_WEIGHT", "CONGESTION_WEIGHT",
+    "MOTION_WEIGHT", "DENSITY_WEIGHT", "CONTACT_WEIGHT", "SCORE_FUNCTION",
     "DENSITY_MIDPOINT", "DENSITY_ALPHA", "CONTACT_MIDPOINT", "CONTACT_ALPHA"
 ]
 
@@ -98,6 +105,10 @@ def main():
         with open(BEST_PARAMS_FILE, "r") as f:
             best_params = json.load(f)
         avg_params = average_best_params(best_params)
+
+        # Set the best score function in config
+        if "SCORE_FUNCTION" in best_params["Delivery Ratio"]:
+            config.SCORE_FUNCTION = best_params["Delivery Ratio"]["SCORE_FUNCTION"]
 
         print("Running static test set...")
         run_batch("static")

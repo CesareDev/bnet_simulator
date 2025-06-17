@@ -66,7 +66,7 @@ class Buoy:
         collision_rate = len(self.recent_collisions) / self.collision_window
 
         if not self.want_to_send:
-            if self.scheduler.should_send(self.battery, self.velocity, self.neighbors, sim_time, collision_rate):
+            if self.scheduler.should_send(self.battery, self.velocity, self.neighbors, sim_time):
                 self.want_to_send = True
                 self.state = BuoyState.RECEIVING
                 self.scheduler_decision_time = sim_time

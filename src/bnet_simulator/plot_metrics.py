@@ -5,104 +5,52 @@ import numpy as np
 import re
 import argparse
 
-def plot_line_metrics(results_dir, plot_dir):
-    # Line plot: Delivery Ratio vs Total Buoys, one line per (scheduler, world size)
+score_func_hatch = {
+    "sigmoid": "",
+    "linear": "xx",
+    "tanh": "//",
+}
+
+def extract_info(filename, results_dir):
+    match = re.match(r"(static|dynamic)_(\d+)x(\d+)_mob(\d+)_fix(\d+)", filename)
+    if match:
+        scheduler = match.group(1)
+        total_buoys = int(match.group(4)) + int(match.group(5))
+        df = pd.read_csv(os.path.join(results_dir, filename), index_col=0)
+        score_func = "sigmoid"
+        if "Score Function" in df.index:
+            score_func = str(df.loc["Score Function", "Value"])
+        return scheduler, total_buoys, score_func
+    return None, None, None
+
+def plot_grouped_bar_metric(results_dir, plot_dir, metric, filename, ylabel, title):
     static_files = [f for f in os.listdir(results_dir) if f.startswith("static_") and f.endswith(".csv")]
     dynamic_files = [f for f in os.listdir(results_dir) if f.startswith("dynamic_") and f.endswith(".csv")]
 
-    def extract_info(filename):
-        match = re.match(r"(static|dynamic)_(\d+)x(\d+)_mob(\d+)_fix(\d+)", filename)
-        if match:
-            scheduler = match.group(1)
-            world_size = f"{match.group(2)}x{match.group(3)}"
-            total_buoys = int(match.group(4)) + int(match.group(5))
-            return scheduler, world_size, total_buoys
-        return None, None, None
-
     data = {}
     schedulers = ["static", "dynamic"]
-    world_sizes = set()
     total_buoys_set = set()
+    score_funcs = set()
 
     for f in static_files + dynamic_files:
-        scheduler, world_size, total_buoys = extract_info(f)
-        if scheduler and world_size and total_buoys is not None:
+        scheduler, total_buoys, score_func = extract_info(f, results_dir)
+        if scheduler and total_buoys is not None:
             df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
-            if "Delivery Ratio" in df.index:
-                data[(scheduler, world_size, total_buoys)] = float(df.loc["Delivery Ratio", "Value"])
-                world_sizes.add(world_size)
+            if metric in df.index:
+                data[(total_buoys, scheduler, score_func)] = float(df.loc[metric, "Value"])
                 total_buoys_set.add(total_buoys)
+                score_funcs.add(score_func)
 
-    # Only keep 500x500 and 800x800
-    world_sizes = [ws for ws in sorted(world_sizes) if ws in ("500x500", "800x800")]
     total_buoys_list = sorted(total_buoys_set)
-
-    color_map = {
-        "500x500": "tab:blue",
-        "800x800": "tab:green",
-    }
-    default_color = "tab:gray"
-
-    plt.figure(figsize=(10, 6))
-    for world_size in world_sizes:
-        for scheduler in schedulers:
-            y_vals = []
-            for total_buoys in total_buoys_list:
-                y_vals.append(data.get((scheduler, world_size, total_buoys), np.nan))
-            label = f"{scheduler.capitalize()} {world_size}"
-            color = color_map.get(world_size, default_color)
-            linestyle = "-" if scheduler == "static" else "--"
-            plt.plot(total_buoys_list, y_vals, label=label, color=color, linestyle=linestyle, marker="o")
-    plt.title("Delivery Ratio vs Total Buoys")
-    plt.xlabel("Total Buoys")
-    plt.ylabel("Delivery Ratio")
-    plt.grid(True)
-    plt.legend(title="Scheduler + World Size", loc="best", fontsize="small")
-    plt.tight_layout()
-    plt.savefig(os.path.join(plot_dir, "delivery_ratio_line.png"), bbox_inches="tight")
-    plt.close()
-
-def plot_grouped_bar_green_blue(results_dir, plot_dir):
-    # Grouped bar plot: for each total buoys, bars for each (scheduler, world size)
-    static_files = [f for f in os.listdir(results_dir) if f.startswith("static_") and f.endswith(".csv")]
-    dynamic_files = [f for f in os.listdir(results_dir) if f.startswith("dynamic_") and f.endswith(".csv")]
-
-    def extract_info(filename):
-        match = re.match(r"(static|dynamic)_(\d+)x(\d+)_mob(\d+)_fix(\d+)", filename)
-        if match:
-            scheduler = match.group(1)
-            world_size = f"{match.group(2)}x{match.group(3)}"
-            total_buoys = int(match.group(4)) + int(match.group(5))
-            return scheduler, world_size, total_buoys
-        return None, None, None
-
-    data = {}
-    world_sizes = set()
-    total_buoys_set = set()
-    schedulers = ["static", "dynamic"]
-
-    for f in static_files + dynamic_files:
-        scheduler, world_size, total_buoys = extract_info(f)
-        if scheduler and world_size and total_buoys is not None:
-            if world_size not in ("500x500", "800x800"):
-                continue
-            df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
-            if "Delivery Ratio" in df.index:
-                data[(total_buoys, world_size, scheduler)] = float(df.loc["Delivery Ratio", "Value"])
-                world_sizes.add(world_size)
-                total_buoys_set.add(total_buoys)
-
-    world_sizes = [ws for ws in sorted(world_sizes) if ws in ("500x500", "800x800")]
-    total_buoys_list = sorted(total_buoys_set)
-    n_world = len(world_sizes)
+    score_funcs = sorted(score_funcs)
     n_sched = len(schedulers)
-    n_bars_per_group = n_world * n_sched
+    n_score = len(score_funcs)
+    n_bars_per_group = n_sched * n_score
 
     color_map = {
-        "500x500": "tab:blue",
-        "800x800": "tab:green",
+        "static": "tab:blue",
+        "dynamic": "tab:green",
     }
-    default_color = "tab:gray"
 
     fig, ax = plt.subplots(figsize=(max(10, len(total_buoys_list)*1.5), 7))
 
@@ -110,20 +58,19 @@ def plot_grouped_bar_green_blue(results_dir, plot_dir):
     bar_labels = []
     width = 0.8 / n_bars_per_group
 
-    for i, world_size in enumerate(world_sizes):
-        color = color_map.get(world_size, default_color)
-        for j, scheduler in enumerate(schedulers):
+    for j, scheduler in enumerate(schedulers):
+        for k, score_func in enumerate(score_funcs):
             bar_vals = []
             for total_buoys in total_buoys_list:
-                val = data.get((total_buoys, world_size, scheduler), 0)
-                bar_vals.append(val)
-            offset = (i * n_sched + j - n_bars_per_group / 2) * width + width/2
-            hatch = "//" if scheduler == "dynamic" else ""
+                bar_vals.append(data.get((total_buoys, scheduler, score_func), 0))
+            offset = (j * n_score + k - n_bars_per_group / 2) * width + width/2
+            color = color_map[scheduler]
+            hatch = score_func_hatch.get(score_func, "") if scheduler == "dynamic" else ""
             rects = ax.bar(np.arange(len(total_buoys_list)) + offset, bar_vals, width,
-                           label=f"{scheduler.capitalize()} {world_size}",
+                           label=f"{scheduler.capitalize()} ({score_func})",
                            color=color, hatch=hatch, edgecolor='black')
             bar_handles.append(rects[0])
-            bar_labels.append(f"{scheduler.capitalize()} {world_size}")
+            bar_labels.append(f"{scheduler.capitalize()} ({score_func})")
 
             for rect in rects:
                 height = rect.get_height()
@@ -133,13 +80,13 @@ def plot_grouped_bar_green_blue(results_dir, plot_dir):
                             textcoords="offset points",
                             ha='center', va='bottom', fontsize=8)
 
-    ax.set_ylabel('Delivery Ratio')
-    ax.set_title('Delivery Ratio by Total Buoys, Scheduler, and World Size')
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
     ax.set_xticks(np.arange(len(total_buoys_list)))
     ax.set_xticklabels([str(t) for t in total_buoys_list], rotation=0, ha='center')
     ax.legend(bar_handles, bar_labels, fontsize="small", ncol=2)
     plt.tight_layout()
-    plt.savefig(os.path.join(plot_dir, "delivery_ratio_grouped_bar_green_blue.png"), bbox_inches="tight")
+    plt.savefig(os.path.join(plot_dir, filename), bbox_inches="tight")
     plt.close()
 
 def main():
@@ -157,8 +104,20 @@ def main():
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir, exist_ok=True)
 
-    plot_line_metrics(results_dir, plot_dir)
-    plot_grouped_bar_green_blue(results_dir, plot_dir)
+    plot_grouped_bar_metric(
+        results_dir, plot_dir,
+        metric="Delivery Ratio",
+        filename="delivery_ratio_grouped_bar.png",
+        ylabel="Delivery Ratio",
+        title="Delivery Ratio by Total Buoys, Scheduler, Score Function"
+    )
+    plot_grouped_bar_metric(
+        results_dir, plot_dir,
+        metric="Collision Rate",
+        filename="collision_rate_grouped_bar.png",
+        ylabel="Collision Rate",
+        title="Collision Rate by Total Buoys, Scheduler, Score Function"
+    )
 
     print("Plots saved to:", plot_dir)
 
