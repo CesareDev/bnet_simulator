@@ -9,6 +9,7 @@ from bnet_simulator.utils.metrics import Metrics
 import random
 import time
 import argparse
+import json
 import math
 
 def parse_args():
@@ -66,6 +67,18 @@ def parse_args():
         default=None,
         help="Filename for metrics CSV output"
     )
+    parser.add_argument(
+        "--positions-file",
+        type=str,
+        default=None,
+        help="Path to a file with buoy positions (optional)"
+    )
+    parser.add_argument(
+        "--density",
+        type=float,
+        default=None,
+        help="Density value for this scenario (optional)"
+    )
     return parser.parse_args()
 
 def random_position():
@@ -87,6 +100,20 @@ def random_velocity():
         random.uniform(-1, 1) * config.DEFAULT_BUOY_VELOCITY
     )
 
+def compute_average_density(positions, comm_range):
+    densities = []
+    for i, (x0, y0) in enumerate(positions):
+        count = 0
+        for j, (x1, y1) in enumerate(positions):
+            if i != j:
+                dx = x0 - x1
+                dy = y0 - y1
+                if math.hypot(dx, dy) <= comm_range:
+                    count += 1
+        densities.append(count)
+    avg_density = sum(densities) / len(densities)
+    return math.ceil(avg_density)
+
 def main():
     # Parse command line arguments
     args = parse_args()
@@ -104,9 +131,14 @@ def main():
     else:
         random.seed(time.time())
 
-    # Instantiate metrics if enabled in the config
+    positions = None
+    if args.positions_file:
+        with open(args.positions_file, "r") as f:
+            positions = json.load(f)
+
+    # Instantiate metrics, pass density
     if config.ENABLE_METRICS:
-        metrics = Metrics()
+        metrics = Metrics(density=args.density)
     else:
         metrics = None
 
@@ -122,15 +154,18 @@ def main():
             battery=config.DEFAULT_BATTERY,
             velocity=random_velocity(),
             metrics=metrics) for _ in range(config.MOBILE_BUOY_COUNT)]
-    static_buoys = [
-        Buoy(
-            channel=channel,
-            position=random_position(),
-            is_mobile=False,
-            battery=config.DEFAULT_BATTERY,
-            metrics=metrics
-        ) for _ in range(config.FIXED_BUOY_COUNT)
-    ]
+    static_buoys = []
+    for i in range(config.FIXED_BUOY_COUNT):
+        pos = positions[i] if positions else random_position()
+        static_buoys.append(
+            Buoy(
+                channel=channel,
+                position=pos,
+                is_mobile=False,
+                battery=config.DEFAULT_BATTERY,
+                metrics=metrics
+            )
+        )
 
     buoys = mobile_buoys + static_buoys
 
@@ -145,6 +180,11 @@ def main():
     # Export metrics to CSV
     if metrics:
         metrics.export_metrics_to_csv(summary, filename=args.result_file)
+
+    # Compute and print the measured density
+    positions = [buoy.position for buoy in static_buoys]
+    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
+    measured_density = compute_average_density(positions, comm_range)
 
 if __name__ == "__main__":
     main()

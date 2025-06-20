@@ -3,7 +3,7 @@ import csv
 from bnet_simulator.utils import logging, config
 
 class Metrics:
-    def __init__(self):
+    def __init__(self, density=None):
         self.beacons_sent = 0
         self.beacons_received = 0
         self.beacons_lost = 0
@@ -17,6 +17,7 @@ class Metrics:
         self.actually_received = 0  # Total "received" (sum over all receivers)
         self.potentially_sent_per_sender = {}  # sender_id -> count
         self.actually_received_per_sender = {}  # sender_id -> count
+        self.density = density
 
     def log_sent(self):
         self.beacons_sent += 1
@@ -108,8 +109,11 @@ class Metrics:
             "Score Function": getattr(config, "SCORE_FUNCTION", "sigmoid"),
         }
         parameters = self.get_parameters()
-        return {**base_summary, **parameters}
-    
+        summary = {**base_summary, **parameters}
+        if self.density is not None:
+            summary["Density"] = self.density
+        return summary
+
     def export_metrics_to_csv(self, summary, filename=None):
         if filename is None:
             # Default: save to metrics/tune_results/

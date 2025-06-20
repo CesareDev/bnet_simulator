@@ -2,35 +2,65 @@ import subprocess
 import time
 import json
 import os
-import random
+import math
 from tqdm import tqdm
 from bnet_simulator.utils import config
 
-def get_metrics_dir(base, ideal):
-    return os.path.join("metrics", f"{base}{'_ideal' if ideal else ''}")
+def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob"):
+    if range_type == "max":
+        comm_range = config.COMMUNICATION_RANGE_MAX
+    else:
+        comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
+    k = neighbor_density
+    n_buoys = max(20, k + 1)
+    angle_step = 2 * math.pi / n_buoys
+    theta = k * angle_step / 2
+    radius = comm_range / (2 * math.sin(theta / 2))
+    center_x = world_width / 2
+    center_y = world_height / 2
+    positions = []
+    for i in range(n_buoys):
+        angle = i * angle_step
+        x = center_x + radius * math.cos(angle)
+        y = center_y + radius * math.sin(angle)
+        positions.append((x, y))
+    return positions
+
+def generate_density_scenarios(
+    densities=range(2, 11),
+    duration=120,
+    headless=True,
+    world_width=200,
+    world_height=200
+):
+    range_type = "max" if not config.IDEAL_CHANNEL else "high_prob"
+    scenarios = []
+    for d in densities:
+        positions = arrange_buoys_exact_density(world_width, world_height, d, range_type=range_type)
+        scenarios.append({
+            "world_width": world_width,
+            "world_height": world_height,
+            "mobile_buoy_count": 0,
+            "fixed_buoy_count": len(positions),
+            "duration": duration,
+            "headless": headless,
+            "positions": positions,
+            "density": d
+        })
+    return scenarios
 
 IDEAL = getattr(config, "IDEAL_CHANNEL", False)
-TEST_RESULTS_DIR = get_metrics_dir("test_results", IDEAL)
-TEST_PLOTS_DIR = get_metrics_dir("test_plot", IDEAL)
+TEST_RESULTS_DIR = os.path.join("metrics", f"test_results{'_ideal' if IDEAL else ''}")
+TEST_PLOTS_DIR = os.path.join("metrics", f"test_plot{'_ideal' if IDEAL else ''}")
 BEST_PARAMS_FILE = os.path.join("metrics", f"best_dynamic_params{'_ideal' if IDEAL else ''}.json")
 
 os.makedirs(TEST_RESULTS_DIR, exist_ok=True)
 os.makedirs(TEST_PLOTS_DIR, exist_ok=True)
 os.makedirs("metrics", exist_ok=True)
 
-# ---- Scenarios ----
-BASE_PARAM_SETS = []
-for n_total in range(2, 11):
-    n_mobile = random.randint(0, n_total)
-    n_fixed = n_total - n_mobile
-    BASE_PARAM_SETS.append({
-        "world_width": 200,
-        "world_height": 200,
-        "mobile_buoy_count": n_mobile,
-        "fixed_buoy_count": n_fixed,
-        "duration": 120,
-        "headless": True
-    })
+BASE_PARAM_SETS = generate_density_scenarios(
+    densities=range(2, 11), duration=120, headless=True, world_width=200, world_height=200
+)
 
 PARAM_KEYS = [
     "MOTION_WEIGHT", "DENSITY_WEIGHT", "CONTACT_WEIGHT", "SCORE_FUNCTION",
@@ -44,7 +74,17 @@ def average_best_params(best_params):
             continue
         for k in PARAM_KEYS:
             param_lists[k].append(metric_params[k])
-    avg_params = {k: sum(v)/len(v) if v else 0.0 for k, v in param_lists.items()}
+    avg_params = {}
+    for k, v in param_lists.items():
+        if not v:
+            avg_params[k] = 0.0
+        elif isinstance(v[0], (int, float)):
+            avg_params[k] = sum(v) / len(v)
+        elif k == "SCORE_FUNCTION":
+            from collections import Counter
+            avg_params[k] = Counter(v).most_common(1)[0][0]
+        else:
+            avg_params[k] = v[0]
     return avg_params
 
 def write_param_file(params, filename):
@@ -56,10 +96,12 @@ def run_batch(mode, avg_params=None):
     param_files = []
     max_duration = max(base_params["duration"] for base_params in BASE_PARAM_SETS)
     for i, base_params in enumerate(BASE_PARAM_SETS):
+        positions_file = f"positions_{i}.json"
+        with open(positions_file, "w") as f:
+            json.dump(base_params["positions"], f)
         result_file = os.path.join(
             TEST_RESULTS_DIR,
-            f"{mode}_{int(base_params['world_width'])}x{int(base_params['world_height'])}_"
-            f"mob{base_params['mobile_buoy_count']}_fix{base_params['fixed_buoy_count']}.csv"
+            f"{mode}_density{base_params['density']}_n{base_params['fixed_buoy_count']}.csv"
         )
         cmd = [
             "uv", "run", "python", "src/bnet_simulator/main.py",
@@ -71,7 +113,9 @@ def run_batch(mode, avg_params=None):
             "--fixed-buoy-count", str(base_params["fixed_buoy_count"]),
             "--duration", str(base_params["duration"]),
             "--headless",
-            "--result-file", result_file
+            "--result-file", result_file,
+            "--positions-file", positions_file,
+            "--density", str(base_params["density"])
         ]
         if mode == "dynamic" and avg_params is not None:
             param_file = f"test_parameters_{i}.json"
@@ -89,6 +133,10 @@ def run_batch(mode, avg_params=None):
     for param_file in param_files:
         if os.path.exists(param_file):
             os.remove(param_file)
+    for i in range(len(BASE_PARAM_SETS)):
+        positions_file = f"positions_{i}.json"
+        if os.path.exists(positions_file):
+            os.remove(positions_file)
 
 def main():
     test_csvs = [
@@ -106,7 +154,6 @@ def main():
             best_params = json.load(f)
         avg_params = average_best_params(best_params)
 
-        # Set the best score function in config
         if "SCORE_FUNCTION" in best_params["Delivery Ratio"]:
             config.SCORE_FUNCTION = best_params["Delivery Ratio"]["SCORE_FUNCTION"]
 

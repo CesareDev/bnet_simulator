@@ -76,10 +76,7 @@ class Channel:
                 if not (start <= sim_time < arrival_time):
                     continue  # Not yet arrived
                 self.seen_attempts.add(key)
-                received.append(beacon)
-                if self.metrics:
-                    self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
-                    self.metrics.log_actually_received(beacon.sender_id)
+                received.append(beacon)            
             else:
                 if distance > config.COMMUNICATION_RANGE_MAX:
                     continue # Out of range
@@ -92,24 +89,21 @@ class Channel:
                 if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
                     if random.random() < config.DELIVERY_PROB_HIGH:
                         received.append(beacon)
-                        if self.metrics:
-                            self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
-                            self.metrics.log_actually_received(beacon.sender_id)
                     else:
                         if self.metrics:
                             self.metrics.log_lost()
                 elif distance <= config.COMMUNICATION_RANGE_MAX:
                     if random.random() < config.DELIVERY_PROB_LOW:
                         received.append(beacon)
-                        if self.metrics:
-                            self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
-                            self.metrics.log_actually_received(beacon.sender_id)
                     else:
                         logging.log_error(f"Packet lost from {str(beacon.sender_id)[:6]} to {str(receiver_id)[:6]}")
                         if self.metrics:
                             self.metrics.log_lost()
 
         if len(received) <= 1:
+            if self.metrics and len(received) == 1:
+                self.metrics.log_received(received[0].sender_id, received[0].timestamp, sim_time, receiver_id)
+                self.metrics.log_actually_received(received[0].sender_id)
             return received
         else:
             # Collision at receiver — discard all

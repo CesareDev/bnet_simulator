@@ -4,18 +4,57 @@ import pandas as pd
 import subprocess
 import glob
 import time
-import random
+import math
 from itertools import product, islice
 from tqdm import tqdm
 from bnet_simulator.utils import config
 
-# ---- Directory Utility ----
-def get_metrics_dir(base, ideal):
-    return os.path.join("metrics", f"{base}{'_ideal' if ideal else ''}")
+def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob"):
+    if range_type == "max":
+        comm_range = config.COMMUNICATION_RANGE_MAX
+    else:
+        comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
+    k = neighbor_density
+    n_buoys = max(20, k + 1)
+    angle_step = 2 * math.pi / n_buoys
+    theta = k * angle_step / 2
+    radius = comm_range / (2 * math.sin(theta / 2))
+    center_x = world_width / 2
+    center_y = world_height / 2
+    positions = []
+    for i in range(n_buoys):
+        angle = i * angle_step
+        x = center_x + radius * math.cos(angle)
+        y = center_y + radius * math.sin(angle)
+        positions.append((x, y))
+    return positions
+
+def generate_density_scenarios(
+    densities=range(2, 11),
+    duration=120,
+    headless=True,
+    world_width=200,
+    world_height=200
+):
+    range_type = "max" if not config.IDEAL_CHANNEL else "high_prob"
+    scenarios = []
+    for d in densities:
+        positions = arrange_buoys_exact_density(world_width, world_height, d, range_type=range_type)
+        scenarios.append({
+            "world_width": world_width,
+            "world_height": world_height,
+            "mobile_buoy_count": 0,
+            "fixed_buoy_count": len(positions),
+            "duration": duration,
+            "headless": headless,
+            "positions": positions,
+            "density": d
+        })
+    return scenarios
 
 IDEAL = getattr(config, "IDEAL_CHANNEL", False)
-RESULTS_DIR = get_metrics_dir("tune_results", IDEAL)
-PLOTS_DIR = get_metrics_dir("tune_plot", IDEAL)
+RESULTS_DIR = os.path.join("metrics", f"tune_results{'_ideal' if IDEAL else ''}")
+PLOTS_DIR = os.path.join("metrics", f"tune_plot{'_ideal' if IDEAL else ''}")
 BEST_PARAMS_FILE = os.path.join("metrics", f"best_dynamic_params{'_ideal' if IDEAL else ''}.json")
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -28,7 +67,6 @@ METRICS = [
 ]
 PARAM_BATCH_SIZE = 2
 
-# ---- Search Space ----
 PARAM_SPACE = {
     "MOTION_WEIGHT": [0.1, 0.3],
     "DENSITY_WEIGHT": [0.2, 0.4],
@@ -40,19 +78,9 @@ PARAM_SPACE = {
     "SCORE_FUNCTION": ["sigmoid", "linear", "tanh"],
 }
 
-# ---- Scenarios ----
-BASE_PARAM_SETS = []
-for n_total in range(2, 11):
-    n_mobile = random.randint(0, n_total)
-    n_fixed = n_total - n_mobile
-    BASE_PARAM_SETS.append({
-        "world_width": 200,
-        "world_height": 200,
-        "mobile_buoy_count": n_mobile,
-        "fixed_buoy_count": n_fixed,
-        "duration": 120,
-        "headless": True
-    })
+BASE_PARAM_SETS = generate_density_scenarios(
+    densities=range(2, 11), duration=120, headless=True, world_width=200, world_height=200
+)
 
 def collect_metrics(scheduler_type):
     pattern = os.path.join(RESULTS_DIR, f"{scheduler_type}_*.csv")
@@ -65,7 +93,6 @@ def collect_metrics(scheduler_type):
     return pd.DataFrame(metrics)
 
 def evaluate_metrics(df):
-    # Only consider Delivery Ratio
     return {"Delivery Ratio": pd.to_numeric(df["Delivery Ratio"], errors="coerce").mean() if "Delivery Ratio" in df.columns else float('nan')}
 
 def batched(iterable, n):
@@ -79,11 +106,13 @@ def batched(iterable, n):
 def run_static_scenarios(seeds):
     procs = []
     for i, scenario in enumerate(BASE_PARAM_SETS):
-        seed = seeds[i] if seeds else int(random.uniform(1, 1e9))
+        seed = seeds[i] if seeds else int(time.time())
+        positions_file = f"positions_{i}.json"
+        with open(positions_file, "w") as f:
+            json.dump(scenario["positions"], f)
         result_file = os.path.join(
             RESULTS_DIR,
-            f"static_{int(scenario['world_width'])}x{int(scenario['world_height'])}_"
-            f"mob{scenario['mobile_buoy_count']}_fix{scenario['fixed_buoy_count']}.csv"
+            f"static_density{scenario['density']}_n{scenario['fixed_buoy_count']}.csv"
         )
         cmd = BASE_CMD + [
             "--mode", "static",
@@ -94,6 +123,8 @@ def run_static_scenarios(seeds):
             "--fixed-buoy-count", str(scenario["fixed_buoy_count"]),
             "--duration", str(scenario["duration"]),
             "--result-file", result_file,
+            "--positions-file", positions_file,
+            "--density", str(scenario["density"]),
         ]
         if scenario.get("headless"):
             cmd.append("--headless")
@@ -106,6 +137,10 @@ def run_static_scenarios(seeds):
             pbar.update(1)
     for proc in procs:
         proc.wait()
+    for i in range(len(BASE_PARAM_SETS)):
+        positions_file = f"positions_{i}.json"
+        if os.path.exists(positions_file):
+            os.remove(positions_file)
 
 def run_dynamic_batch(param_batch, batch_start_idx, scenario_seeds, total_pbar=None):
     procs = []
@@ -116,12 +151,12 @@ def run_dynamic_batch(param_batch, batch_start_idx, scenario_seeds, total_pbar=N
             param_file = f"current_parameters_{scenario_idx}_{param_idx}.json"
             with open(param_file, "w") as f:
                 json.dump(params, f)
-            # Set SCORE_FUNCTION in config before running
-            config.SCORE_FUNCTION = params.get("SCORE_FUNCTION", "sigmoid")
+            positions_file = f"positions_{scenario_idx}.json"
+            with open(positions_file, "w") as f:
+                json.dump(scenario["positions"], f)
             result_file = os.path.join(
                 RESULTS_DIR,
-                f"dynamic_{int(scenario['world_width'])}x{int(scenario['world_height'])}_"
-                f"mob{scenario['mobile_buoy_count']}_fix{scenario['fixed_buoy_count']}_param{param_idx}_{config.SCORE_FUNCTION}.csv"
+                f"dynamic_density{scenario['density']}_n{scenario['fixed_buoy_count']}_param{param_idx}.csv"
             )
             cmd = BASE_CMD + [
                 "--mode", "dynamic",
@@ -133,7 +168,9 @@ def run_dynamic_batch(param_batch, batch_start_idx, scenario_seeds, total_pbar=N
                 "--duration", str(scenario["duration"]),
                 "--param-file", param_file,
                 "--result-file", result_file,
-                "--headless"
+                "--headless",
+                "--positions-file", positions_file,
+                "--density", str(scenario["density"]),
             ]
             procs.append(subprocess.Popen(cmd))
             time.sleep(0.1)
@@ -146,18 +183,19 @@ def run_dynamic_batch(param_batch, batch_start_idx, scenario_seeds, total_pbar=N
         proc.wait()
         if total_pbar is not None:
             total_pbar.update(1)
-    # Clean up param files
     for batch_param_idx, params in enumerate(param_batch):
         param_idx = param_idx_offset + batch_param_idx
         for scenario_idx, scenario in enumerate(BASE_PARAM_SETS):
             param_file = f"current_parameters_{scenario_idx}_{param_idx}.json"
             if os.path.exists(param_file):
                 os.remove(param_file)
+            positions_file = f"positions_{scenario_idx}.json"
+            if os.path.exists(positions_file):
+                os.remove(positions_file)
 
 def main():
-    scenario_seeds = [int(random.uniform(1, 1e9)) for _ in BASE_PARAM_SETS]
+    scenario_seeds = [int(time.time()) + i for i in range(len(BASE_PARAM_SETS))]
 
-    # 1. Run all static scenarios (only if not already present)
     static_csvs = glob.glob(os.path.join(RESULTS_DIR, "static_*.csv"))
     if static_csvs:
         print(f"Found {len(static_csvs)} static CSV files, skipping static simulation.")
@@ -167,7 +205,6 @@ def main():
     static_df = collect_metrics("static")
     static_scores = evaluate_metrics(static_df)
 
-    # 2. Prepare all parameter sets
     keys, values = zip(*PARAM_SPACE.items())
     all_param_sets = [dict(zip(keys, combo)) for combo in product(*values)]
     print(f"Total parameter sets: {len(all_param_sets)}")
@@ -178,7 +215,6 @@ def main():
         for batch_start_idx, param_batch in enumerate(batched(all_param_sets, PARAM_BATCH_SIZE)):
             run_dynamic_batch(param_batch, batch_start_idx * PARAM_BATCH_SIZE, scenario_seeds, total_pbar=total_pbar)
 
-    # 4. Collect and evaluate
     best_delivery_ratio = -float("inf")
     best_params = None
 
@@ -200,7 +236,6 @@ def main():
             best_delivery_ratio = avg_delivery_ratio
             best_params = params
 
-    # Always write the best found, even if it's not better than static
     with open(BEST_PARAMS_FILE, "w") as f:
         json.dump({
             "Delivery Ratio": best_params,
