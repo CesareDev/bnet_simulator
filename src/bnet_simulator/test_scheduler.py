@@ -33,7 +33,7 @@ def generate_density_scenarios(
     world_width=200,
     world_height=200
 ):
-    range_type = "max" if not config.IDEAL_CHANNEL else "high_prob"
+    range_type = "max" if not IDEAL else "high_prob"
     scenarios = []
     for d in densities:
         positions = arrange_buoys_exact_density(world_width, world_height, d, range_type=range_type)
@@ -48,19 +48,6 @@ def generate_density_scenarios(
             "density": d
         })
     return scenarios
-
-IDEAL = getattr(config, "IDEAL_CHANNEL", False)
-TEST_RESULTS_DIR = os.path.join("metrics", f"test_results{'_ideal' if IDEAL else ''}")
-TEST_PLOTS_DIR = os.path.join("metrics", f"test_plot{'_ideal' if IDEAL else ''}")
-BEST_PARAMS_FILE = os.path.join("metrics", f"best_dynamic_params{'_ideal' if IDEAL else ''}.json")
-
-os.makedirs(TEST_RESULTS_DIR, exist_ok=True)
-os.makedirs(TEST_PLOTS_DIR, exist_ok=True)
-os.makedirs("metrics", exist_ok=True)
-
-BASE_PARAM_SETS = generate_density_scenarios(
-    densities=range(2, 11), duration=120, headless=True, world_width=200, world_height=200
-)
 
 PARAM_KEYS = [
     "MOTION_WEIGHT", "DENSITY_WEIGHT", "CONTACT_WEIGHT", "SCORE_FUNCTION"
@@ -114,8 +101,10 @@ def run_batch(mode, avg_params=None):
             "--headless",
             "--result-file", result_file,
             "--positions-file", positions_file,
-            "--density", str(base_params["density"])
+            "--density", str(base_params["density"]),
         ]
+        if IDEAL:
+            cmd.append("--ideal")
         if mode == "dynamic" and avg_params is not None:
             param_file = f"test_parameters_{i}.json"
             write_param_file(avg_params, param_file)
@@ -138,6 +127,30 @@ def run_batch(mode, avg_params=None):
             os.remove(positions_file)
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ideal", 
+        action="store_true",
+        help="Use ideal channel conditions (no loss)"
+    )
+    args = parser.parse_args()
+    global IDEAL
+    IDEAL = args.ideal
+
+    TEST_RESULTS_DIR = os.path.join("metrics", f"test_results{'_ideal' if IDEAL else ''}")
+    TEST_PLOTS_DIR = os.path.join("metrics", f"test_plot{'_ideal' if IDEAL else ''}")
+    BEST_PARAMS_FILE = os.path.join("metrics", f"best_dynamic_params{'_ideal' if IDEAL else ''}.json")
+
+    os.makedirs(TEST_RESULTS_DIR, exist_ok=True)
+    os.makedirs(TEST_PLOTS_DIR, exist_ok=True)
+    os.makedirs("metrics", exist_ok=True)
+    
+    global BASE_PARAM_SETS
+    BASE_PARAM_SETS = generate_density_scenarios(
+        densities=range(2, 11), duration=120, headless=True, world_width=200, world_height=200
+    )
+
     test_csvs = [
         f for f in os.listdir(TEST_RESULTS_DIR)
         if f.startswith("static_") or f.startswith("dynamic_")

@@ -37,7 +37,7 @@ def generate_density_scenarios(
     world_width=200,
     world_height=200
 ):
-    range_type = "max" if not config.IDEAL_CHANNEL else "high_prob"
+    range_type = "max" if not IDEAL else "high_prob"
     scenarios = []
     for d in densities:
         positions = arrange_buoys_exact_density(world_width, world_height, d, range_type=range_type)
@@ -53,8 +53,6 @@ def generate_density_scenarios(
         })
     return scenarios
 
-IDEAL = getattr(config, "IDEAL_CHANNEL", False)
-
 BASE_CMD = ["uv", "run", "python", "src/bnet_simulator/main.py"]
 METRICS = [
     "Delivery Ratio"
@@ -67,15 +65,6 @@ PARAM_SPACE = {
     "CONTACT_WEIGHT": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
     "SCORE_FUNCTION": ["linear"],
 }
-
-BASE_PARAM_SETS = generate_density_scenarios(
-    densities=range(2, 11), duration=180, headless=True, world_width=300, world_height=300
-)
-
-RESULTS_DIR = os.path.join("metrics", f"tune_results{'_ideal' if IDEAL else ''}")
-PLOTS_DIR = os.path.join("metrics", f"tune_plots{'_ideal' if IDEAL else ''}")
-os.makedirs(RESULTS_DIR, exist_ok=True)
-os.makedirs(PLOTS_DIR, exist_ok=True)
 
 def collect_metrics(scheduler_type, results_dir):
     pattern = os.path.join(results_dir, f"{scheduler_type}_*.csv")
@@ -123,6 +112,8 @@ def run_static_scenarios(scenario_seeds, results_dir):
         ]
         if scenario.get("headless"):
             cmd.append("--headless")
+        if IDEAL:
+            cmd.append("--ideal")
         procs.append(subprocess.Popen(cmd))
         time.sleep(0.1)
     max_duration = max(scenario["duration"] for scenario in BASE_PARAM_SETS)
@@ -167,6 +158,8 @@ def run_dynamic_batch(param_batch, batch_start_idx, scenario_seeds, results_dir,
                 "--positions-file", positions_file,
                 "--density", str(scenario["density"]),
             ]
+            if IDEAL:
+                cmd.append("--ideal")
             procs.append(subprocess.Popen(cmd))
             time.sleep(0.1)
     max_duration = max(scenario["duration"] for scenario in BASE_PARAM_SETS)
@@ -188,68 +181,32 @@ def run_dynamic_batch(param_batch, batch_start_idx, scenario_seeds, results_dir,
             if os.path.exists(positions_file):
                 os.remove(positions_file)
 
-def run_auto_batch(scenario_seeds, results_dir):
-    procs = []
-    for i, scenario in enumerate(BASE_PARAM_SETS):
-        seed = scenario_seeds[i] if scenario_seeds else int(time.time())
-        positions_file = f"positions_{i}.json"
-        with open(positions_file, "w") as f:
-            json.dump(scenario["positions"], f)
-        result_file = os.path.join(
-            results_dir,
-            f"auto_density{scenario['density']}_n{scenario['fixed_buoy_count']}.csv"
-        )
-        auto_param_file = os.path.join(
-            results_dir,
-            f"auto_params_density{scenario['density']}_n{scenario['fixed_buoy_count']}.json"
-        )
-        cmd = BASE_CMD + [
-            "--mode", "auto",
-            "--seed", str(seed),
-            "--world-width", str(scenario["world_width"]),
-            "--world-height", str(scenario["world_height"]),
-            "--mobile-buoy-count", str(scenario["mobile_buoy_count"]),
-            "--fixed-buoy-count", str(scenario["fixed_buoy_count"]),
-            "--duration", str(scenario["duration"]),
-            "--result-file", result_file,
-            "--positions-file", positions_file,
-            "--density", str(scenario["density"]),
-            "--auto-param-file", auto_param_file,
-        ]
-        if scenario.get("headless"):
-            cmd.append("--headless")
-        procs.append(subprocess.Popen(cmd))
-        time.sleep(0.1)
-    max_duration = max(scenario["duration"] for scenario in BASE_PARAM_SETS)
-    with tqdm(total=max_duration, desc="Simulating auto", leave=False, unit="s") as pbar:
-        for _ in range(max_duration):
-            time.sleep(1)
-            pbar.update(1)
-    for proc in procs:
-        proc.wait()
-    for i in range(len(BASE_PARAM_SETS)):
-        positions_file = f"positions_{i}.json"
-        if os.path.exists(positions_file):
-            os.remove(positions_file)
-
-    # Collect and print the auto-tuned parameters for each scenario
-    auto_param_files = glob.glob(os.path.join(results_dir, "auto_params_density*.json"))
-    all_auto_params = []
-    for param_file in auto_param_files:
-        with open(param_file, "r") as f:
-            params = json.load(f)
-        params["filename"] = os.path.basename(param_file)
-        all_auto_params.append(params)
-    auto_params_outfile = os.path.join(results_dir, "auto_tuned_params_summary.json")
-    with open(auto_params_outfile, "w") as f:
-        json.dump(all_auto_params, f, indent=2)
-    print(f"Auto-tuned parameters saved to {auto_params_outfile}")
-
 def results_exist(results_dir, prefix):
     """Check if at least one result CSV exists for a given scheduler type."""
     return bool(glob.glob(os.path.join(results_dir, f"{prefix}_*.csv")))
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ideal",
+        action='store_true',
+        help="Use ideal channel conditions (no loss)"
+    )
+    args = parser.parse_args()
+    global IDEAL
+    IDEAL = args.ideal
+
+    RESULTS_DIR = os.path.join("metrics", f"tune_results{'_ideal' if IDEAL else ''}")
+    PLOTS_DIR = os.path.join("metrics", f"tune_plots{'_ideal' if IDEAL else ''}")
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(PLOTS_DIR, exist_ok=True)
+
+    global BASE_PARAM_SETS
+    BASE_PARAM_SETS = generate_density_scenarios(
+        densities=range(2, 11), duration=180, headless=True, world_width=300, world_height=300
+    )
+
     scenario_seeds = [int(time.time()) + i for i in range(len(BASE_PARAM_SETS))]
 
     # --- STATIC ---
@@ -307,26 +264,6 @@ def main():
         print(json.dumps(best_params, indent=2))
         print(f"Best parameter set saved to {best_params_file}")
 
-    # --- AUTO ---
-    #if results_exist(RESULTS_DIR, "auto"):
-    #    print("Found auto CSV files, skipping auto simulation.")
-    #else:
-    #    print("Running auto batch...")
-    #    run_auto_batch(scenario_seeds, RESULTS_DIR)
-#
-    ## Always aggregate auto-tuned parameters after auto batch
-    #auto_param_files = glob.glob(os.path.join(RESULTS_DIR, "auto_params_density*.json"))
-    #all_auto_params = []
-    #for param_file in auto_param_files:
-    #    with open(param_file, "r") as f:
-    #        params = json.load(f)
-    #    params["filename"] = os.path.basename(param_file)
-    #    all_auto_params.append(params)
-    #auto_params_outfile = os.path.join(RESULTS_DIR, "auto_tuned_params_summary.json")
-    #with open(auto_params_outfile, "w") as f:
-    #    json.dump(all_auto_params, f, indent=2)
-    #print(f"Auto-tuned parameters saved to {auto_params_outfile}")
-#
     print("Plotting tuning results...")
     subprocess.run([
         "uv", "run", "python", "src/bnet_simulator/plot_metrics.py",
