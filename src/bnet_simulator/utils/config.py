@@ -17,7 +17,7 @@ NEIGHBOR_TIMEOUT = 5.0  # seconds
 DIFS_TIME = 0.048 # seconds
 BACKOFF_TIME_MIN = 0.001 # seconds
 BACKOFF_TIME_MAX = 0.016 # seconds
-SCHEDULER_TYPE = "static"  # Options: "static", "dynamic", "rl"
+SCHEDULER_TYPE = "static"  # Options: "static", "dynamic", "auto"
 
 SAFE_DISTANCE = 10.0  # meters, minimum distance between buoys
 
@@ -28,7 +28,7 @@ ENABLE_METRICS = True  # Set to False to disable metrics collection
 SEED = None
 HEADLESS = False
 ENABLE_LOGGING = False  # Set to False to disable all logging output
-IDEAL_CHANNEL = False  # If True, channel is ideal (no loss, no collisions)
+IDEAL_CHANNEL = False  # If True, channel is iqdeal (no loss, no collisions)
 
 # World settings
 WORLD_WIDTH = 400.0  # meters or units

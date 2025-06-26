@@ -16,7 +16,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run the BNet Simulator")
     parser.add_argument(
         "--mode",
-        choices=["static", "dynamic", "rl"],
+        choices=["static", "dynamic", "auto"],
         default=config.SCHEDULER_TYPE,
         help="Scheduler mode to use for the simulation (default: static)"
     )
@@ -79,6 +79,11 @@ def parse_args():
         default=None,
         help="Density value for this scenario (optional)"
     )
+    parser.add_argument(
+        "--ideal",
+        action='store_true',
+        help="Use ideal channel conditions (no loss)"
+    )
     return parser.parse_args()
 
 def random_position():
@@ -125,6 +130,7 @@ def main():
     config.FIXED_BUOY_COUNT = args.fixed_buoy_count
     config.SEED = args.seed
     config.HEADLESS = args.headless
+    config.IDEAL_CHANNEL = args.ideal
 
     if args.seed is not None:
         random.seed(args.seed)

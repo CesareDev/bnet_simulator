@@ -115,4 +115,8 @@ class Channel:
     def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> bool:
         dx = pos1[0] - pos2[0]
         dy = pos1[1] - pos2[1]
-        return math.hypot(dx, dy) <= config.COMMUNICATION_RANGE_MAX
+        distance = math.hypot(dx, dy)
+        if config.IDEAL_CHANNEL:
+            return distance <= config.COMMUNICATION_RANGE_HIGH_PROB
+        else:
+            return distance <= config.COMMUNICATION_RANGE_MAX

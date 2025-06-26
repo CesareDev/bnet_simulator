@@ -13,6 +13,19 @@ def plot_block_by_density(results_dir, plot_dir):
             pdr = float(df.loc["Delivery Ratio", "Value"])
             sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
             data.append((density, pdr, sched_type))
+        # fallback: infer scheduler type from filename if not present
+        elif "Density" in df.index and "Delivery Ratio" in df.index:
+            density = float(df.loc["Density", "Value"])
+            pdr = float(df.loc["Delivery Ratio", "Value"])
+            if f.startswith("static_"):
+                sched_type = "static"
+            elif f.startswith("dynamic_"):
+                sched_type = "dynamic"
+            elif f.startswith("auto_"):
+                sched_type = "auto"
+            else:
+                sched_type = "unknown"
+            data.append((density, pdr, sched_type))
     if not data:
         print("No data with density found.")
         return
@@ -22,10 +35,10 @@ def plot_block_by_density(results_dir, plot_dir):
     grouped = df.groupby(["Density", "Scheduler"]).mean().reset_index()
 
     densities = sorted(df["Density"].unique())
-    schedulers = ["static", "dynamic"]
-    color_map = {"static": "tab:blue", "dynamic": "tab:green"}
+    schedulers = ["static", "dynamic", "auto"]
+    color_map = {"static": "tab:blue", "dynamic": "tab:green", "auto": "tab:orange"}
 
-    bar_width = 0.35
+    bar_width = 0.25
     x = np.arange(len(densities))
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -40,7 +53,7 @@ def plot_block_by_density(results_dir, plot_dir):
     ax.set_xlabel("Local Density (neighbors in range)")
     ax.set_ylabel("Delivery Ratio")
     ax.set_title("Delivery Ratio vs Local Density (Block Plot)")
-    ax.set_xticks(x + bar_width / 2)
+    ax.set_xticks(x + bar_width)
     ax.set_xticklabels([str(int(d)) for d in densities])
     ax.legend()
     ax.grid(axis="y", linestyle="--", alpha=0.6)
