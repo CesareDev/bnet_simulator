@@ -21,8 +21,6 @@ def plot_block_by_density(results_dir, plot_dir):
                 sched_type = "static"
             elif f.startswith("dynamic_"):
                 sched_type = "dynamic"
-            elif f.startswith("auto_"):
-                sched_type = "auto"
             else:
                 sched_type = "unknown"
             data.append((density, pdr, sched_type))
@@ -35,8 +33,8 @@ def plot_block_by_density(results_dir, plot_dir):
     grouped = df.groupby(["Density", "Scheduler"]).mean().reset_index()
 
     densities = sorted(df["Density"].unique())
-    schedulers = ["static", "dynamic", "auto"]
-    color_map = {"static": "tab:blue", "dynamic": "tab:green", "auto": "tab:orange"}
+    schedulers = ["static", "dynamic"]
+    color_map = {"static": "tab:blue", "dynamic": "tab:green"}
 
     bar_width = 0.25
     x = np.arange(len(densities))

@@ -135,7 +135,7 @@ def main():
         help="Use ideal channel conditions (no loss)"
     )
     args = parser.parse_args()
-    global IDEAL
+    global IDEAL, TEST_RESULTS_DIR, TEST_PLOTS_DIR, BEST_PARAMS_FILE, BASE_PARAM_SETS
     IDEAL = args.ideal
 
     TEST_RESULTS_DIR = os.path.join("metrics", f"test_results{'_ideal' if IDEAL else ''}")
@@ -145,8 +145,7 @@ def main():
     os.makedirs(TEST_RESULTS_DIR, exist_ok=True)
     os.makedirs(TEST_PLOTS_DIR, exist_ok=True)
     os.makedirs("metrics", exist_ok=True)
-    
-    global BASE_PARAM_SETS
+
     BASE_PARAM_SETS = generate_density_scenarios(
         densities=range(2, 11), duration=120, headless=True, world_width=200, world_height=200
     )

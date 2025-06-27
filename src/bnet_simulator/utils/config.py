@@ -8,7 +8,6 @@ SPEED_OF_LIGHT = 3e8  # m/s
 # Buoy settings
 DEFAULT_BATTERY = 100.0  # %
 DEFAULT_BUOY_VELOCITY = 5.0 # m/s
-# DEFAULT_BOAT_VELOCITY = 20.0 # m/s
 COMMUNICATION_RANGE_MAX = 120.0  # Max range for any beacon
 COMMUNICATION_RANGE_HIGH_PROB = 70.0  # Up to this, 90% delivery
 DELIVERY_PROB_HIGH = 0.9  # Probability if <= 70m
@@ -57,3 +56,5 @@ CONTACT_MIDPOINT = 6.0
 CONTACT_ALPHA = 1.5
 
 SCORE_FUNCTION = "sigmoid"  # Options: "sigmoid", "tanh", "linear"
+
+STATIC_INTERVAL = 2.0  # seconds
