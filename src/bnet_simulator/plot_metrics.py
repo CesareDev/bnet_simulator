@@ -59,6 +59,37 @@ def plot_block_by_density(results_dir, plot_dir):
     plt.savefig(os.path.join(plot_dir, "delivery_ratio_block_by_density.png"))
     plt.close()
 
+def plot_vessel_metrics(results_dir, plot_dir):
+    files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
+    vessel_files = []
+    
+    # Find all vessel scenario files
+    for f in files:
+        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+        if "Is Vessel Scenario" in df.index:
+            vessel_files.append(f)
+            
+    if not vessel_files:
+        print("No vessel scenario data found.")
+        return
+        
+    # Process data for vessel delivery ratio
+    vessel_data = []
+    for f in vessel_files:
+        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+        sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
+        
+        # Get per-sender delivery ratios
+        sender_drs = {}
+        for metric, value in df.iterrows():
+            if metric.startswith("Sender") and metric.endswith("DR to Vessel"):
+                sender_id = metric.split()[1]  # Extract sender ID
+                sender_drs[sender_id] = float(value["Value"])
+                
+        vessel_data.append((sched_type, len(sender_drs), sender_drs))
+    
+    # Rest of plotting remains similar...
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
@@ -76,7 +107,8 @@ def main():
         os.makedirs(plot_dir, exist_ok=True)
 
     plot_block_by_density(results_dir, plot_dir)
-
+    plot_vessel_metrics(results_dir, plot_dir)
+    
     print("Plots saved to:", plot_dir)
 
 if __name__ == "__main__":

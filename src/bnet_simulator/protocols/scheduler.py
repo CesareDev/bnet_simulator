@@ -81,22 +81,31 @@ class BeaconScheduler:
         
         num_neighbors = len(neighbors)
         
-        # Set thresholds based on channel type
+        # Set thresholds based on channel type and network density
         if config.IDEAL_CHANNEL:
-            # For ideal channels, be more collision-aware
-            DENSITY_THRESHOLD = 6  # More sensitive to density
-            CONTACT_THRESHOLD = 3.0  # Less sensitive to contacts
-            
-            # Adjust effective max interval based on density
-            # For dense networks, use longer intervals to avoid collisions
-            if num_neighbors > 8:
-                effective_max_interval = self.max_interval  # Full interval for very dense
-            elif num_neighbors > 5:
-                effective_max_interval = self.max_interval * 0.8  # 80% of max for dense
+            if num_neighbors <= 5:
+                # For sparse networks with ideal channel, AVOID collisions by being less aggressive
+                DENSITY_THRESHOLD = 4  # More sensitive to even few neighbors
+                CONTACT_THRESHOLD = 6.0  # Much less sensitive to contacts (longer intervals)
+                
+                # KEY CHANGE: Use longer intervals for sparse networks to reduce collisions
+                if num_neighbors <= 3:
+                    effective_max_interval = min(self.max_interval * 0.95, 5.0)  # Much longer intervals
+                else:
+                    effective_max_interval = min(self.max_interval * 0.9, 4.0)  # Longer intervals
             else:
-                effective_max_interval = min(self.max_interval * 0.6, 3.0)  # Short for sparse
+                # For denser networks, use previous approach
+                DENSITY_THRESHOLD = 6
+                CONTACT_THRESHOLD = 3.0
+                
+                if num_neighbors > 8:
+                    effective_max_interval = self.max_interval  # Full interval for very dense
+                elif num_neighbors > 5:
+                    effective_max_interval = self.max_interval * 0.8  # 80% of max for dense
+                else:
+                    effective_max_interval = min(self.max_interval * 0.6, 3.0)  # Short for sparse
         else:
-            # Keep your current non-ideal settings
+            # Non-ideal channel settings (unchanged)
             DENSITY_THRESHOLD = 5
             CONTACT_THRESHOLD = 2.0
             effective_max_interval = min(self.max_interval, 3.0)
@@ -111,25 +120,26 @@ class BeaconScheduler:
             last_contact_delta = current_time - last_contact
         contact_score = 1 - min(1.0, last_contact_delta / CONTACT_THRESHOLD)
         
-        # Simplified weight calculation
+        # Adjust weights based on network density and channel type
         if config.IDEAL_CHANNEL:
-            if num_neighbors > 8:
-                # Very dense - heavily prioritize density to avoid collisions
+            if num_neighbors <= 5:
+                # KEY CHANGE: For sparse ideal networks, REDUCE aggressiveness
+                # Higher density weight, lower contact weight
+                motion_weight = 0.10
+                density_weight = 0.60  # Heavily prioritize density even with few neighbors
+                contact_weight = 0.30  # Lower contact weight to reduce frequent transmissions
+            elif num_neighbors > 8:
+                # Very dense - heavily prioritize density to avoid collisions (unchanged)
                 motion_weight = 0.05
-                density_weight = 0.75  # Much higher weight on density
+                density_weight = 0.75
                 contact_weight = 0.20
-            elif num_neighbors > 5:
-                # Moderately dense
+            else:
+                # Moderately dense (unchanged)
                 motion_weight = 0.10
                 density_weight = 0.65
                 contact_weight = 0.25
-            else:
-                # Sparse - be more aggressive with contact
-                motion_weight = 0.15
-                density_weight = 0.40
-                contact_weight = 0.45
         else:
-            # Keep your current non-ideal weights
+            # Non-ideal weights (unchanged)
             motion_weight = 0.1
             density_weight = 0.2
             contact_weight = 0.7
@@ -141,17 +151,22 @@ class BeaconScheduler:
             contact_weight * contact_score
         )
         
-        # Density-based boost for ideal channel only
+        # Apply density-based adjustments to k
         if config.IDEAL_CHANNEL:
             if num_neighbors <= 3:
-                # Very sparse network - more aggressive
-                k = min(k + 0.2, 1.0)  # Add significant boost
+                # CRITICAL CHANGE: For very sparse networks, REDUCE aggressiveness
+                k = max(k - 0.2, 0.0)  # Subtract instead of add
             elif num_neighbors <= 5:
-                # Somewhat sparse - slightly more aggressive
-                k = min(k + 0.1, 1.0)
-            # No boost for dense networks
+                # Somewhat sparse - still reduce aggressiveness
+                k = max(k - 0.1, 0.0)
+            elif num_neighbors <= 8:
+                # Medium density - no adjustment
+                pass
+            else:
+                # Dense network - slight boost
+                k = min(k + 0.05, 1.0)
         else:
-            # Keep your current boost for non-ideal
+            # Non-ideal channel boost (unchanged)
             k = min(k + 0.2, 1.0)
         
         k = max(0.0, min(k, 1.0))

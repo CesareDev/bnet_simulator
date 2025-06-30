@@ -35,10 +35,19 @@ class Channel:
         self.active_transmissions.append((beacon, sim_time, sim_time + trasmission_time))
         logging.log_info(f"Broadcasting beacon from {str(beacon.sender_id)[:6]}")
 
+        # Track receivers in range
         receivers_in_range = [
             buoy for buoy in self.buoys
             if buoy.id != beacon.sender_id and self.in_range(beacon.position, buoy.position)
         ] if hasattr(self, "buoys") else []
+        
+        # Track vessel-specific targeting
+        if self.metrics and self.metrics.vessel_id:
+            for buoy in receivers_in_range:
+                if buoy.id == self.metrics.vessel_id:
+                    self.metrics.log_vessel_targeted(beacon.sender_id)
+                    break  # Only need to log once per broadcast
+        
         n_receivers = len(receivers_in_range)
         if self.metrics:
             self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
@@ -102,8 +111,14 @@ class Channel:
 
         if len(received) <= 1:
             if self.metrics and len(received) == 1:
-                self.metrics.log_received(received[0].sender_id, received[0].timestamp, sim_time, receiver_id)
-                self.metrics.log_actually_received(received[0].sender_id)
+                beacon = received[0]
+                self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
+                self.metrics.log_actually_received(beacon.sender_id)
+                
+                # Track vessel-specific reception
+                if self.metrics.vessel_id and receiver_id == self.metrics.vessel_id:
+                    # Track that the vessel successfully received this beacon
+                    self.metrics.log_vessel_received(beacon.sender_id)
             return received
         else:
             # Collision at receiver — discard all
