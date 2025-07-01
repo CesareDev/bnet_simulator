@@ -9,7 +9,7 @@ from tqdm import tqdm
 from bnet_simulator.utils import config
 
 def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob"):
-    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9 # Use 90% of the range for safety
+    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.8 # Use 90% of the range for safety
     k = neighbor_density
     n_buoys = max(20, k + 1)
     angle_step = 2 * math.pi / n_buoys
@@ -26,7 +26,14 @@ def arrange_buoys_exact_density(world_width, world_height, neighbor_density, ran
     return positions
 
 def arrange_buoys_with_vessel(world_width, world_height, buoy_count, range_type="high_prob"):
-    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9 # Use 90% of the range for safety
+    # if range_type == "max":
+    #     comm_range = config.COMMUNICATION_RANGE_MAX
+    # else:
+    #     comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
+    
+    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
+    # Use 75% of range to ensure reliable communication (was 90%)
+    safe_range = comm_range * 0.8
     
     # Place vessel at center
     vessel_pos = (world_width / 2, world_height / 2)
@@ -36,8 +43,8 @@ def arrange_buoys_with_vessel(world_width, world_height, buoy_count, range_type=
     
     for i in range(buoy_count):
         angle = 2 * math.pi * i / buoy_count
-        x = vessel_pos[0] + comm_range * math.cos(angle)
-        y = vessel_pos[1] + comm_range * math.sin(angle)
+        x = vessel_pos[0] + safe_range * math.cos(angle)
+        y = vessel_pos[1] + safe_range * math.sin(angle)
         positions.append((x, y))
     
     return positions
@@ -159,6 +166,7 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
             "--result-file", static_result_file,
             "--positions-file", static_positions_file,
             "--density", str(scenario["density"]),
+            "--static-interval", str(STATIC_INTERVAL),  # Add this line
         ] + vessel_args
         
         if scenario.get("headless"):
@@ -229,9 +237,16 @@ def main():
         action='store_true',
         help="Run scenario with a vessel (listening-only buoy)"
     )
+    parser.add_argument(
+        "--static-interval",
+        type=float,
+        default=1.0,
+        help="Static interval value (default: 1.0)"
+    )
     args = parser.parse_args()
-    global IDEAL, BASE_PARAM_SETS
+    global IDEAL, BASE_PARAM_SETS, STATIC_INTERVAL
     IDEAL = args.ideal
+    STATIC_INTERVAL = args.static_interval
 
     if args.vessel:
         # Run vessel scenarios with varying buoy counts
@@ -242,15 +257,17 @@ def main():
             world_width=300,
             world_height=300
         )
-        RESULTS_DIR = os.path.join("metrics", f"vessel_results{'_ideal' if IDEAL else ''}")
-        PLOTS_DIR = os.path.join("metrics", f"vessel_plots{'_ideal' if IDEAL else ''}")
+        # Include interval in directory names
+        RESULTS_DIR = os.path.join("metrics", f"vessel_results_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
+        PLOTS_DIR = os.path.join("metrics", f"vessel_plots_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
     else:
         # Regular density scenarios
         BASE_PARAM_SETS = generate_density_scenarios(
             densities=range(2, 11), duration=300, headless=True, world_width=300, world_height=300
         )
-        RESULTS_DIR = os.path.join("metrics", f"tune_results{'_ideal' if IDEAL else ''}")
-        PLOTS_DIR = os.path.join("metrics", f"tune_plots{'_ideal' if IDEAL else ''}")
+        # Include interval in directory names
+        RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
+        PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
     
     os.makedirs(RESULTS_DIR, exist_ok=True)
     os.makedirs(PLOTS_DIR, exist_ok=True)
@@ -268,11 +285,13 @@ def main():
     else:
         print("Found existing CSV files for both static and dynamic, skipping simulations.")
 
+    # Uncommented plotting section
     print("Plotting results...")
     subprocess.run([
         "uv", "run", "python", "src/bnet_simulator/plot_metrics.py",
         "--results-dir", RESULTS_DIR,
-        "--plot-dir", PLOTS_DIR
+        "--plot-dir", PLOTS_DIR,
+        "--interval", str(STATIC_INTERVAL)  # Pass interval to plotting script
     ])
     print("All simulations complete.")
 

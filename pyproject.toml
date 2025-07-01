@@ -16,8 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-tune = "bnet_simulator.tune_scheduler:main"
-test = "bnet_simulator.test_scheduler:main"
+test = "bnet_simulator.run_interval_comparison:main"
 
 [build-system]
 requires = ["hatchling"]

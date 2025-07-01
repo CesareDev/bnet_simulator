@@ -23,6 +23,7 @@ class Metrics:
         self.vessel_id = None
         self.potentially_sent_to_vessel = {}  # sender_id -> count of beacons potentially received by vessel
         self.vessel_received_count = 0  # Total beacons received by vessel
+        self.vessel_received_per_sender = {}  # sender_id -> count of beacons received by vessel
 
     def log_sent(self):
         self.beacons_sent += 1
@@ -41,10 +42,6 @@ class Metrics:
                     latency = receive_time - timestamp
                     self.reaction_latencies.append(latency)
                     self.discovery_times[receiver_id][sender_id] = receive_time
-                    
-                    # Track vessel reception
-                    if self.vessel_id and receiver_id == self.vessel_id:
-                        self.vessel_received_count += 1
 
     def log_lost(self):
         self.beacons_lost += 1
@@ -57,21 +54,6 @@ class Metrics:
 
     def avg_scheduler_latency(self) -> float:
         return sum(self.scheduler_latencies) / len(self.scheduler_latencies) if self.scheduler_latencies else 0.0
-    
-    def get_parameters(self) -> dict:
-        if config.SCHEDULER_TYPE != "dynamic":
-            return {}
-
-        return {
-            "Motion Weight": config.MOTION_WEIGHT,
-            "Density Weight": config.DENSITY_WEIGHT,
-            "Contact Weight": config.CONTACT_WEIGHT,
-            "Congestion Weight": config.CONGESTION_WEIGHT,
-            "Density Midpoint": config.DENSITY_MIDPOINT,
-            "Density Alpha": config.DENSITY_ALPHA,
-            "Contact Midpoint": config.CONTACT_MIDPOINT,
-            "Contact Alpha": config.CONTACT_ALPHA,
-        }
 
     def log_potentially_sent(self, sender_id, n_receivers):
         self.potentially_sent += n_receivers
@@ -90,9 +72,11 @@ class Metrics:
             self.potentially_sent_to_vessel[sender_id] = self.potentially_sent_to_vessel.get(sender_id, 0) + 1
 
     def log_vessel_received(self, sender_id):
-        """Track when the vessel successfully receives a beacon"""
-        if self.vessel_id:  # Only track if we have a vessel
-            self.vessel_received_count += 1
+        # Track vessel reception with per-sender counts
+        self.vessel_received_count += 1
+        # Add to per-sender tracking
+        self.vessel_received_per_sender[sender_id] = self.vessel_received_per_sender.get(sender_id, 0) + 1
+        pass
 
     def vessel_delivery_ratio(self):
         """Calculate delivery ratio specifically for the vessel"""
@@ -135,29 +119,23 @@ class Metrics:
             base_summary["Vessel ID"] = str(self.vessel_id)
             
             # Calculate vessel-specific metrics
-            discovered = 0
-            if self.vessel_id in self.discovery_times:
-                discovered = len(self.discovery_times[self.vessel_id])
-                
             total_potential = sum(self.potentially_sent_to_vessel.values())
             
-            base_summary["Vessel Discovered Senders"] = discovered
+            base_summary["Vessel Discovered Senders"] = len(self.vessel_received_per_sender)
             base_summary["Vessel Potential Senders"] = len(self.potentially_sent_to_vessel)
             base_summary["Vessel Potential Beacons"] = total_potential
             base_summary["Vessel Received Beacons"] = self.vessel_received_count
             base_summary["Vessel Delivery Ratio"] = self.vessel_delivery_ratio()
             
-            # Add per-sender delivery ratios to vessel
-            if self.vessel_id in self.discovery_times:
-                for sender_id in self.potentially_sent_to_vessel:
-                    received = 1 if sender_id in self.discovery_times[self.vessel_id] else 0
-                    sent = self.potentially_sent_to_vessel[sender_id]
-                    if sent > 0:
-                        sender_key = f"Sender {str(sender_id)[:6]} DR to Vessel"
-                        base_summary[sender_key] = received / sent
+            # Add accurate per-sender delivery ratios to vessel
+            for sender_id in self.potentially_sent_to_vessel:
+                received = self.vessel_received_per_sender.get(sender_id, 0)  # Count actual receptions
+                sent = self.potentially_sent_to_vessel[sender_id]
+                if sent > 0:
+                    sender_key = f"Sender {str(sender_id)[:6]} DR to Vessel"
+                    base_summary[sender_key] = received / sent
         
-        parameters = self.get_parameters()
-        summary = {**base_summary, **parameters}
+        summary = {**base_summary}
         if self.density is not None:
             summary["Density"] = self.density
         return summary

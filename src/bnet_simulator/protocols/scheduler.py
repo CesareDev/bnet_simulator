@@ -17,21 +17,7 @@ class BeaconScheduler:
         self.max_interval = max_interval
         self.elapsed_time = 0.0
         self.next_static_interval = random.uniform(self.min_interval, self.max_interval)
-        self.next_dynamic_interval = None
-
-        # Load dynamic parameters from file if in dynamic mode
-        if config.SCHEDULER_TYPE == "dynamic":
-            param_file = None
-            for i, arg in enumerate(sys.argv):
-                if arg == "--param-file" and i + 1 < len(sys.argv):
-                    param_file = sys.argv[i + 1]
-                    break
-            if param_file and os.path.exists(param_file):
-                with open(param_file, "r") as f:
-                    params = json.load(f)
-                config.MOTION_WEIGHT = params["MOTION_WEIGHT"]
-                config.DENSITY_WEIGHT = params["DENSITY_WEIGHT"]
-                config.CONTACT_WEIGHT = params["CONTACT_WEIGHT"]
+        self.next_dynamic_interval = random.uniform(self.min_interval, self.max_interval)
 
     def tick(self, dt: float):
         self.elapsed_time += dt
@@ -41,15 +27,13 @@ class BeaconScheduler:
             return self.should_send_static()
         elif config.SCHEDULER_TYPE == "dynamic":
             return self.should_send_dynamic(battery, velocity, neighbors, current_time)
-        elif config.SCHEDULER_TYPE == "auto":
-            return self.should_send_auto(battery, velocity, neighbors, current_time)
         else:
             raise ValueError(f"Unknown scheduler type: {config.SCHEDULER_TYPE}")
 
     def should_send_static(self) -> bool:
         if self.elapsed_time >= self.next_static_interval:
             self.elapsed_time = 0.0
-            self.next_static_interval = random.uniform(self.min_interval, self.max_interval)
+            self.next_static_interval = config.STATIC_INTERVAL
             return True
         return False
 
@@ -118,32 +102,37 @@ class BeaconScheduler:
         else:
             last_contact = max((ts for _, ts, _ in neighbors), default=0.0)
             last_contact_delta = current_time - last_contact
-        contact_score = 1 - min(1.0, last_contact_delta / CONTACT_THRESHOLD)
+        contact_score = 1 -  min(1.0, last_contact_delta / CONTACT_THRESHOLD)
         
         # Adjust weights based on network density and channel type
-        if config.IDEAL_CHANNEL:
-            if num_neighbors <= 5:
-                # KEY CHANGE: For sparse ideal networks, REDUCE aggressiveness
-                # Higher density weight, lower contact weight
-                motion_weight = 0.10
-                density_weight = 0.60  # Heavily prioritize density even with few neighbors
-                contact_weight = 0.30  # Lower contact weight to reduce frequent transmissions
-            elif num_neighbors > 8:
-                # Very dense - heavily prioritize density to avoid collisions (unchanged)
-                motion_weight = 0.05
-                density_weight = 0.75
-                contact_weight = 0.20
-            else:
-                # Moderately dense (unchanged)
-                motion_weight = 0.10
-                density_weight = 0.65
-                contact_weight = 0.25
-        else:
-            # Non-ideal weights (unchanged)
-            motion_weight = 0.1
-            density_weight = 0.2
-            contact_weight = 0.7
+        # if config.IDEAL_CHANNEL:
+        #     if num_neighbors <= 5:
+        #         # KEY CHANGE: For sparse ideal networks, REDUCE aggressiveness
+        #         # Higher density weight, lower contact weight
+        #         motion_weight = 0.10
+        #         density_weight = 0.60  # Heavily prioritize density even with few neighbors
+        #         contact_weight = 0.30  # Lower contact weight to reduce frequent transmissions
+        #     elif num_neighbors > 8:
+        #         # Very dense - heavily prioritize density to avoid collisions (unchanged)
+        #         motion_weight = 0.05
+        #         density_weight = 0.75
+        #         contact_weight = 0.20
+        #     else:
+        #         # Moderately dense (unchanged)
+        #         motion_weight = 0.10
+        #         density_weight = 0.65
+        #         contact_weight = 0.25
+        # else:
+        #     # Non-ideal weights (unchanged)
+        #     motion_weight = 0.1
+        #     density_weight = 0.2
+        #     contact_weight = 0.7
         
+        # Fixed weights
+        motion_weight = 0.4
+        density_weight = 0.3
+        contact_weight = 0.3
+
         # Apply the weights
         k = (
             motion_weight * motion_score +
@@ -152,22 +141,22 @@ class BeaconScheduler:
         )
         
         # Apply density-based adjustments to k
-        if config.IDEAL_CHANNEL:
-            if num_neighbors <= 3:
-                # CRITICAL CHANGE: For very sparse networks, REDUCE aggressiveness
-                k = max(k - 0.2, 0.0)  # Subtract instead of add
-            elif num_neighbors <= 5:
-                # Somewhat sparse - still reduce aggressiveness
-                k = max(k - 0.1, 0.0)
-            elif num_neighbors <= 8:
-                # Medium density - no adjustment
-                pass
-            else:
-                # Dense network - slight boost
-                k = min(k + 0.05, 1.0)
-        else:
-            # Non-ideal channel boost (unchanged)
-            k = min(k + 0.2, 1.0)
+        # if config.IDEAL_CHANNEL:
+        #     if num_neighbors <= 3:
+        #         # CRITICAL CHANGE: For very sparse networks, REDUCE aggressiveness
+        #         k = max(k - 0.2, 0.0)  # Subtract instead of add
+        #     elif num_neighbors <= 5:
+        #         # Somewhat sparse - still reduce aggressiveness
+        #         k = max(k - 0.1, 0.0)
+        #     elif num_neighbors <= 8:
+        #         # Medium density - no adjustment
+        #         pass
+        #     else:
+        #         # Dense network - slight boost
+        #         k = min(k + 0.05, 1.0)
+        # else:
+        #     # Non-ideal channel boost (unchanged)
+        #     k = min(k + 0.2, 1.0)
         
         k = max(0.0, min(k, 1.0))
         interval = self.min_interval + (1 - k) * (effective_max_interval - self.min_interval)

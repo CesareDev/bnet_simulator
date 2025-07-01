@@ -25,42 +25,42 @@ def parse_args():
         "--duration",
         type=float,
         default=config.SIMULATION_DURATION,
-        help="Duration of the simulation in seconds (default: 60.0)")
+        help="Duration of the simulation in seconds (default: 60.0)"
+    )
     parser.add_argument(
         "--seed",
         type=float,
         default=None,
-        help="Random seed for reproducibility (default: None, uses current time)")
+        help="Random seed for reproducibility (default: None, uses current time)"
+    )
     parser.add_argument(
         "--world-width",
         type=float,
         default=config.WORLD_WIDTH,
-        help="Width of the simulation world (default: from config)")
+        help="Width of the simulation world (default: from config)"
+    )
     parser.add_argument(
         "--world-height",
         type=float,
         default=config.WORLD_HEIGHT,
-        help="Height of the simulation world (default: from config)")
+        help="Height of the simulation world (default: from config)"
+    )
     parser.add_argument(
         "--mobile-buoy-count",
         type=int,
         default=config.MOBILE_BUOY_COUNT,
-        help="Number of mobile buoys (default: from config)")
+        help="Number of mobile buoys (default: from config)"
+    )
     parser.add_argument(
         "--fixed-buoy-count",
         type=int,
         default=config.FIXED_BUOY_COUNT,
-        help="Number of fixed buoys (default: from config)"),
+        help="Number of fixed buoys (default: from config)"
+    )
     parser.add_argument(
         "--headless",
         action='store_true',
         help="Run in headless mode without GUI (default: False)"
-    )
-    parser.add_argument(
-        "--param-file",
-        type=str,
-        default=None,
-        help="Path to dynamic parameter file"
     )
     parser.add_argument(
         "--result-file",
@@ -90,6 +90,12 @@ def parse_args():
         type=int,
         default=None,
         help="Index of the buoy to convert to a vessel (listening-only)"
+    )
+    parser.add_argument(
+        "--static-interval",
+        type=float,
+        default=config.STATIC_INTERVAL,
+        help="Interval for static scheduler in seconds (default: 1.0)"
     )
     return parser.parse_args()
 
@@ -138,6 +144,7 @@ def main():
     config.SEED = args.seed
     config.HEADLESS = args.headless
     config.IDEAL_CHANNEL = args.ideal
+    config.STATIC_INTERVAL = args.static_interval  # Add this line
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -227,9 +234,9 @@ def main():
         metrics.export_metrics_to_csv(summary, filename=args.result_file)
 
     # Compute and print the measured density
-    positions = [buoy.position for buoy in static_buoys]
-    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
-    measured_density = compute_average_density(positions, comm_range)
+    # positions = [buoy.position for buoy in static_buoys]
+    # comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
+    # measured_density = compute_average_density(positions, comm_range)
 
 if __name__ == "__main__":
     main()
