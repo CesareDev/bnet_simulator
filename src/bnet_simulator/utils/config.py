@@ -1,7 +1,7 @@
 # Beacon settings
-NEIGHBOR_TIMEOUT = 10.0  # seconds
+NEIGHBOR_TIMEOUT = 2.0  # seconds
 BEACON_MIN_INTERVAL = 1.0
-BEACON_MAX_INTERVAL = 10.0
+BEACON_MAX_INTERVAL = 15.0
 BIT_RATE = 1_000_000 # bits per second
 SPEED_OF_LIGHT = 3e8  # m/s
 

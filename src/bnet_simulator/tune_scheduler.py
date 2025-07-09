@@ -9,96 +9,34 @@ from tqdm import tqdm
 from bnet_simulator.utils import config
 
 def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob"):
-    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.8 # Use 90% of the range for safety
+    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9  # Use 80% of the range for safety
     k = neighbor_density
-    n_buoys = max(20, k + 1)
+    
+    # Use exactly k+1 buoys for the minimum needed to achieve density k
+    # Each buoy in a circle with k+1 buoys will have exactly k neighbors
+    n_buoys = k + 1
+    
     angle_step = 2 * math.pi / n_buoys
     theta = k * angle_step / 2
     radius = comm_range / (2 * math.sin(theta / 2))
     center_x = world_width / 2
     center_y = world_height / 2
     positions = []
+    
     for i in range(n_buoys):
         angle = i * angle_step
         x = center_x + radius * math.cos(angle)
         y = center_y + radius * math.sin(angle)
         positions.append((x, y))
-    return positions
-
-def arrange_buoys_with_vessel(world_width, world_height, buoy_count, range_type="high_prob"):
-    # if range_type == "max":
-    #     comm_range = config.COMMUNICATION_RANGE_MAX
-    # else:
-    #     comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
-    
-    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
-    # Use 75% of range to ensure reliable communication (was 90%)
-    safe_range = comm_range * 0.8
-    
-    # Place vessel at center
-    vessel_pos = (world_width / 2, world_height / 2)
-    
-    # Arrange buoys in a circle around the vessel
-    positions = [vessel_pos]  # First position is the vessel
-    
-    for i in range(buoy_count):
-        angle = 2 * math.pi * i / buoy_count
-        x = vessel_pos[0] + safe_range * math.cos(angle)
-        y = vessel_pos[1] + safe_range * math.sin(angle)
-        positions.append((x, y))
     
     return positions
-
-def generate_vessel_scenario(buoy_count=20, duration=300, headless=True, world_width=300, world_height=300):
-    range_type = "max" if not IDEAL else "high_prob"
-    positions = arrange_buoys_with_vessel(world_width, world_height, buoy_count, range_type)
-    
-    return {
-        "world_width": world_width,
-        "world_height": world_height,
-        "mobile_buoy_count": 0,
-        "fixed_buoy_count": len(positions),
-        "duration": duration,
-        "headless": headless,
-        "positions": positions,
-        "density": buoy_count,  # Approximate density metric
-        "has_vessel": True,
-        "vessel_index": 0  # First buoy is the vessel
-    }
-
-def generate_vessel_scenarios(
-    buoy_counts=range(2, 11),  # Range of buoy counts, from 2 to 10
-    duration=300,
-    headless=True,
-    world_width=300,
-    world_height=300
-):
-    range_type = "max" if not IDEAL else "high_prob"
-    scenarios = []
-    
-    for buoy_count in buoy_counts:
-        positions = arrange_buoys_with_vessel(world_width, world_height, buoy_count, range_type)
-        scenarios.append({
-            "world_width": world_width,
-            "world_height": world_height,
-            "mobile_buoy_count": 0,
-            "fixed_buoy_count": len(positions),
-            "duration": duration,
-            "headless": headless,
-            "positions": positions,
-            "density": buoy_count,  # Using buoy count as density metric
-            "has_vessel": True,
-            "vessel_index": 0  # First buoy is the vessel
-        })
-    
-    return scenarios
 
 def generate_density_scenarios(
-    densities=range(2, 11),
-    duration=120,
-    headless=True,
-    world_width=200,
-    world_height=200
+    densities,
+    duration,
+    headless,
+    world_width,
+    world_height
 ):
     range_type = "max" if not IDEAL else "high_prob"
     scenarios = []
@@ -247,27 +185,13 @@ def main():
     global IDEAL, BASE_PARAM_SETS, STATIC_INTERVAL
     IDEAL = args.ideal
     STATIC_INTERVAL = args.static_interval
-
-    if args.vessel:
-        # Run vessel scenarios with varying buoy counts
-        BASE_PARAM_SETS = generate_vessel_scenarios(
-            buoy_counts=range(2, 11),
-            duration=300,
-            headless=True,
-            world_width=300,
-            world_height=300
-        )
-        # Include interval in directory names
-        RESULTS_DIR = os.path.join("metrics", f"vessel_results_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
-        PLOTS_DIR = os.path.join("metrics", f"vessel_plots_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
-    else:
-        # Regular density scenarios
-        BASE_PARAM_SETS = generate_density_scenarios(
-            densities=range(2, 11), duration=300, headless=True, world_width=300, world_height=300
-        )
-        # Include interval in directory names
-        RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
-        PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
+    
+    # Regular density scenarios
+    duration = 900  # 10 minutes
+    BASE_PARAM_SETS = generate_density_scenarios(densities=range(2, 16), duration=duration, headless=True, world_width=500, world_height=500)
+    # Include interval in directory names
+    RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
+    PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
     
     os.makedirs(RESULTS_DIR, exist_ok=True)
     os.makedirs(PLOTS_DIR, exist_ok=True)

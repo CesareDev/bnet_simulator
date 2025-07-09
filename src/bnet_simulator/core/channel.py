@@ -11,6 +11,7 @@ class Channel:
         self.active_transmissions: List[Tuple[Beacon, float, float]] = []
         self.metrics = metrics
         self.seen_attempts: Set[Tuple[uuid.UUID, uuid.UUID, float]] = set()  # (receiver_id, sender_id, timestamp)
+        self.buoys = [] 
 
     def update(self, sim_time: float):
         self.active_transmissions = [
@@ -18,28 +19,39 @@ class Channel:
             if end > sim_time
         ]
 
+    def set_buoys(self, buoys):
+        self.buoys = buoys
+
     def broadcast(self, beacon: Beacon, sim_time: float) -> bool:
         if self.metrics:
             self.metrics.log_sent()
 
-        for existing, start, end in self.active_transmissions:
-            if beacon.sender_id == existing.sender_id:
-                continue
-            if start <= sim_time <= end and self.in_range(beacon.position, existing.position):
-                logging.log_error(f"Collision detected while broadcasting from {str(beacon.sender_id)[:6]}")
-                if self.metrics:
+        transmission_duration = beacon.size_bits() / config.BIT_RATE
+        transmission_end = sim_time + transmission_duration
+        
+        # Check for collisions with better overlap detection
+        colliding_beacons = self._detect_collisions(beacon, sim_time, transmission_end)
+        
+        if colliding_beacons:
+            logging.log_error(f"Collision detected while broadcasting from {str(beacon.sender_id)[:6]}")
+            if self.metrics:
+                # Log one collision for this beacon
+                self.metrics.log_collision()
+                
+                # Log one collision for each existing beacon it collided with
+                for _ in colliding_beacons:
                     self.metrics.log_collision()
-                return False  # Collision
-
-        trasmission_time = beacon.size_bits() / config.BIT_RATE
-        self.active_transmissions.append((beacon, sim_time, sim_time + trasmission_time))
+            return False  # Collision
+        
+        # Add to active transmissions
+        self.active_transmissions.append((beacon, sim_time, transmission_end))
         logging.log_info(f"Broadcasting beacon from {str(beacon.sender_id)[:6]}")
 
         # Track receivers in range
         receivers_in_range = [
             buoy for buoy in self.buoys
             if buoy.id != beacon.sender_id and self.in_range(beacon.position, buoy.position)
-        ] if hasattr(self, "buoys") else []
+        ]
         
         # Track vessel-specific targeting
         if self.metrics and self.metrics.vessel_id:
@@ -53,6 +65,22 @@ class Channel:
             self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
 
         return True
+
+    def _detect_collisions(self, beacon: Beacon, start_time: float, end_time: float) -> List[Beacon]:
+        colliding_beacons = []
+        
+        for existing_beacon, existing_start, existing_end in self.active_transmissions:
+            if existing_beacon.sender_id == beacon.sender_id:
+                continue
+                
+            # Check temporal and spatial overlap
+            time_overlap = existing_start < end_time and existing_end > start_time
+            spatial_overlap = self.in_range(beacon.position, existing_beacon.position)
+            
+            if time_overlap and spatial_overlap:
+                colliding_beacons.append(existing_beacon)
+        
+        return colliding_beacons
 
     def is_busy(self, position: Tuple[float, float], sim_time: float) -> bool:
         for beacon, start, end in self.active_transmissions:
@@ -121,10 +149,12 @@ class Channel:
                     self.metrics.log_vessel_received(beacon.sender_id)
             return received
         else:
-            # Collision at receiver — discard all
-            logging.log_error(f"Collision detected while receiving at {str(receiver_id)[:6]}")
+            # Collision at receiver — log one collision for each beacon involved
+            logging.log_error(f"Collision detected while receiving at {str(receiver_id)[:6]} with {len(received)} beacons")
             if self.metrics:
-                self.metrics.log_collision()
+                # Count one collision for each beacon involved in the collision
+                for _ in received:
+                    self.metrics.log_collision()
             return []
 
     def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> bool:

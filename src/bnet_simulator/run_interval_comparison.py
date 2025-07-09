@@ -2,11 +2,11 @@ import os
 import subprocess
 
 # Define intervals to test
-INTERVALS = [1.0, 2.0, 5.0]
+INTERVALS = [0.1]
 # Whether to use ideal channel
 IDEAL = True
 # Whether to run vessel scenario
-VESSEL = True
+VESSEL = False
 
 def main():
     print("Running scenarios with multiple static intervals...")

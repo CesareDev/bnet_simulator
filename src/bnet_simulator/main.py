@@ -221,6 +221,8 @@ def main():
 
     buoys = mobile_buoys + static_buoys
 
+    channel.set_buoys(buoys)
+
     # Create a simulator instance
     sim = Simulator(buoys, channel)
 
@@ -237,6 +239,7 @@ def main():
     # positions = [buoy.position for buoy in static_buoys]
     # comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
     # measured_density = compute_average_density(positions, comm_range)
+    # print(f"Measured density: {measured_density}")
 
 if __name__ == "__main__":
     main()
