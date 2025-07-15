@@ -2,7 +2,7 @@ import os
 import subprocess
 
 # Define intervals to test
-INTERVALS = [0.1]
+INTERVALS = [1.0]
 # Whether to use ideal channel
 IDEAL = True
 # Whether to run vessel scenario
@@ -41,6 +41,8 @@ def main():
         print(f"Plots saved to {plots_dir}")
         
     print("\nAll simulations complete!")
+
+    subprocess.run(["notify-send", "-e", "BNet Simulator", "All simulations complete! Check metrics directory for results."])
 
 if __name__ == "__main__":
     main()

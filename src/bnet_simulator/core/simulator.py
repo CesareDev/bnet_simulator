@@ -16,25 +16,23 @@ class Simulator:
         self.simulated_time = 0.0
         self.window = Window() if not config.HEADLESS else None
         
-        # Store all original buoys for adding/removing
+        # Store all original buoys for dynamic network changes
         self.all_buoys = buoys.copy()
         
-        # Variables for buoy variance
-        self.next_buoy_change = random.uniform(5, 15)  # First change after 5-15 seconds
-        self.first_change = True  # Add this flag to track first change
+        # Variables for network topology changes
+        self.next_buoy_change = random.uniform(5, 15)
+        self.first_change = True
 
     def start(self):
         self.running = True
         previous_time = time.time()
         dt = 1.0 / config.TARGET_FPS
         delta_real = dt
-        # Intercept keybord interrupts to stop the simulation
+        
         try:
             while self.running and self.simulated_time < config.SIMULATION_DURATION:
-
-                if not config.HEADLESS:
-                    if self.window.should_close():
-                        break
+                if not config.HEADLESS and self.window.should_close():
+                    break
 
                 if not config.HEADLESS:
                     self.window.poll_input()
@@ -61,15 +59,12 @@ class Simulator:
             self.running = False
 
     def update(self, dt: float):
-        # Add buoy variance functionality
         self.update_buoy_array(dt)
-        
         self.channel.update(self.simulated_time)
 
-        # Shuffle buoys for random order
+        # Shuffle for randomized processing order
         random.shuffle(self.buoys)
 
-        # Update buoys
         for buoy in self.buoys:
             buoy.update_position(dt)
             buoy.send_beacon(dt, self.simulated_time)
@@ -80,32 +75,23 @@ class Simulator:
         self.next_buoy_change -= dt
 
         if self.next_buoy_change <= 0:
-            # Get lists of active and inactive buoys
             active_buoys = self.buoys.copy()
             inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
             total_buoys = len(self.all_buoys)
 
-            # For first change, force removal. After that, randomize.
+            # First change always removes buoys, after that randomize add/remove
             if self.first_change or (random.random() >= 0.5 and len(active_buoys) > max(3, int(total_buoys * 0.2))):
-                # REMOVE MULTIPLE BUOYS - MORE AGGRESSIVE
-                # Lower minimum (20% instead of 25%)
-                min_buoys = max(3, int(total_buoys * 0.2))
+                # REMOVE BUOYS
+                min_buoys = max(3, int(total_buoys * 0.2))  # Ensure 20% minimum remain
 
                 if len(active_buoys) > min_buoys:
-                    # More aggressive removal (40-50% instead of 25-33%)
+                    # 40-50% removal rate
                     remove_percentage = 0.5 if self.first_change else 0.4
-
-                    # Determine how many buoys to remove (more aggressive)
                     max_to_remove = min(len(active_buoys) - min_buoys, 
                                       max(2, int(total_buoys * remove_percentage)))
                     
-                    # FIX: Ensure valid range for randint
-                    if max_to_remove <= 2:
-                        num_to_remove = max_to_remove  # Just use max if it's small
-                    else:
-                        num_to_remove = random.randint(1, max_to_remove)
+                    num_to_remove = max_to_remove if max_to_remove <= 2 else random.randint(1, max_to_remove)
 
-                    # Randomly select buoys to remove
                     buoys_to_remove = random.sample(active_buoys, num_to_remove)
                     for buoy in buoys_to_remove:
                         if buoy in self.buoys:  # Safety check
@@ -117,17 +103,11 @@ class Simulator:
                         logging.log_info("First buoy change: forced major removal operation")
                         self.first_change = False
             elif inactive_buoys:
-                # ADD MULTIPLE BUOYS - MORE AGGRESSIVE
-                # Add up to 40% of total buoys at once (instead of 25%)
-                max_to_add = min(len(inactive_buoys), max(2, int(total_buoys * 0.4)))
+                # ADD BUOYS
+                max_to_add = min(len(inactive_buoys), max(2, int(total_buoys * 0.4)))  # Up to 40% of total
                 
-                # FIX: Ensure valid range for randint
-                if max_to_add <= 2:
-                    num_to_add = max_to_add  # Just use max if it's small
-                else:
-                    num_to_add = random.randint(1, max_to_add)
+                num_to_add = max_to_add if max_to_add <= 2 else random.randint(1, max_to_add)
 
-                # Randomly select buoys to add
                 buoys_to_add = random.sample(inactive_buoys, num_to_add)
                 for buoy in buoys_to_add:
                     self.buoys.append(buoy)
@@ -135,8 +115,8 @@ class Simulator:
                 logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active")
                 self.first_change = False
 
-            # Schedule next change - MUCH more frequent changes (5-10s instead of 15-25s)
-            self.next_buoy_change = random.uniform(5, 10)
+            # Schedule next change (every 15-20 seconds)
+            self.next_buoy_change = random.uniform(15, 20)
 
     def is_outside_world(self, buoy: Buoy) -> bool:
         x, y = buoy.position

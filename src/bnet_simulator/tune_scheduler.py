@@ -188,7 +188,7 @@ def main():
     
     # Regular density scenarios
     duration = 900  # 10 minutes
-    BASE_PARAM_SETS = generate_density_scenarios(densities=range(2, 16), duration=duration, headless=True, world_width=500, world_height=500)
+    BASE_PARAM_SETS = generate_density_scenarios(densities=range(2, 30), duration=duration, headless=True, world_width=800, world_height=800)
     # Include interval in directory names
     RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
     PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))

@@ -7,125 +7,62 @@
 
 \begin{document}
 
-\section*{Dynamic Scheduler Formula}
-
-The dynamic scheduler computes the beacon interval for each buoy as follows:
-
-\[
-k = w_m \cdot S_{\text{motion}} + w_d \cdot S_{\text{density}} + w_c \cdot S_{\text{contact}} + w_g \cdot (1 - S_{\text{congestion}})
-\]
-
-\[
-\text{interval} = \text{min\_interval} + (1 - k) \cdot (\text{max\_interval} - \text{min\_interval})
-\]
+\section{Dynamic Beacon Scheduling Formula}
 
 \begin{itemize}
-    \item $w_m$ : \textbf{Motion weight} (\texttt{MOTION\_WEIGHT}) --- how much the node's speed influences the interval.
-    \item $w_d$ : \textbf{Density weight} (\texttt{DENSITY\_WEIGHT}) --- how much the local neighbor density influences the interval.
-    \item $w_c$ : \textbf{Contact weight} (\texttt{CONTACT\_WEIGHT}) --- how much the time since last contact influences the interval.
-    \item $w_g$ : \textbf{Congestion weight} (\texttt{CONGESTION\_WEIGHT}) --- how much the channel congestion influences the interval.
-    \item $S_{\text{motion}}$ : \textbf{Motion score}, normalized node speed: 
-    \[
-    S_{\text{motion}} = \min\left(\frac{\text{speed}}{\text{DEFAULT\_BUOY\_VELOCITY}}, 1.0\right)
-    \]
-    \item $S_{\text{density}}$ : \textbf{Density score}, computed as:
-    \[
-    S_{\text{density}} = f(\text{num\_neighbors}, \text{DENSITY\_MIDPOINT}, \text{DENSITY\_ALPHA})
-    \]
-    \item $S_{\text{contact}}$ : \textbf{Contact score}, computed as:
-    \[
-    S_{\text{contact}} = f(\Delta t, \text{CONTACT\_MIDPOINT}, \text{CONTACT\_ALPHA})
-    \]
-    where $\Delta t$ is the time since last contact.
-    \item $S_{\text{congestion}}$ : \textbf{Congestion score}, normalized collision rate:
-    \[
-    S_{\text{congestion}} = \min(\text{collision\_rate}, 1.0)
-    \]
-    \item $f(\cdot)$ : \textbf{Score function} (configurable as \texttt{sigmoid}, \texttt{tanh}, or \texttt{linear}):
-    \begin{align*}
-        \text{Sigmoid:} \quad & f(x, m, \alpha) = \frac{1}{1 + e^{-\alpha(x - m)}} \\
-        \text{Tanh:} \quad & f(x, m, \alpha) = 0.5 \left[1 + \tanh(\alpha(x - m))\right] \\
-        \text{Linear:} \quad & f(x, m, \alpha) = \max\left(0, \min\left(\frac{x}{m}, 1\right)\right)
-    \end{align*}
+    \item \textbf{Contact Score ($S_c$)}: Measures how recently neighbors were detected
+    \item \textbf{Density Factor ($D_f$)}: Measures how many neighbors are currently detected
 \end{itemize}
 
-\newpage
+\subsection{Contact Score}
+Contact score equals 1.0 when neighbors are detected, and decays linearly when no neighbors are present:
 
-% filepath: delivery_ratio_explanation.tex
+\begin{equation}
+S_c = 
+\begin{cases} 
+1.0 & \text{if } N_{neighbors} > 0 \\
+\max(0, 1 - \frac{t_{current} - t_{lastContact}}{30}) & \text{otherwise}
+\end{cases}
+\end{equation}
 
-\section*{Delivery Ratio Calculation in the Simulator}
+\subsection{Density Factor}
+Density factor increases linearly with the number of neighbors, up to a maximum of 10 neighbors:
 
-\subsection*{Definitions}
+\begin{equation}
+D_f = \min(1.0, \frac{N_{neighbors}}{10})
+\end{equation}
 
+\subsection{Interval Calculation}
+The beacon interval is calculated as follows:
+
+\begin{equation}
+\begin{aligned}
+I_{base} &= I_{min} + 0.7 \cdot (I_{max} - I_{min}) \\
+I_{contact} &= 0.6 \cdot S_c \cdot (I_{base} - I_{min}) \\
+I_{density} &= 0.4 \cdot D_f \cdot (I_{base} - I_{min}) \\
+I_{final} &= \max(I_{min}, \min(I_{base} - I_{contact} - I_{density}, I_{max} \cdot 0.8))
+\end{aligned}
+\end{equation}
+
+\subsection{Interpretation}
+This formula makes beacons more frequent (smaller interval) when:
 \begin{itemize}
-    \item \textbf{Potentially Sent ($N_\text{pot}$):} For each beacon transmission, the number of buoys within communication range of the sender at the time of transmission is counted. This number is summed over all beacon transmissions during the simulation.
-    \item \textbf{Actually Received ($N_\text{recv}$):} Each time a beacon is successfully received by a buoy (i.e., not lost due to collisions or channel effects), this counter is incremented.
+    \item Neighbors were recently detected (high $S_c$)
+    \item Many neighbors are present (high $D_f$)
 \end{itemize}
 
-\subsection*{Formula}
-
-\[
-\text{Delivery Ratio} = \frac{N_\text{recv}}{N_\text{pot}}
-\]
-
-where:
+And less frequent (larger interval) when:
 \begin{itemize}
-    \item $N_\text{recv}$ is the total number of successful beacon receptions.
-    \item $N_\text{pot}$ is the total number of potential receptions (i.e., the sum over all beacons sent of the number of receivers in range at the time of sending).
+    \item No neighbors have been detected for a while (low $S_c$)
+    \item Few neighbors are present (low $D_f$)
 \end{itemize}
 
-\subsection*{Example}
-
-Consider a scenario with three buoys: A, B, and C.
-
-\begin{itemize}
-    \item At time $t_1$, buoy A sends a beacon. Both B and C are in range, so $N_\text{pot}$ increases by 2.
-    \begin{itemize}
-        \item If both B and C receive the beacon, $N_\text{recv}$ increases by 2.
-        \item If only B receives it, $N_\text{recv}$ increases by 1.
-    \end{itemize}
-    \item At time $t_2$, buoy B sends a beacon. Only C is in range, so $N_\text{pot}$ increases by 1.
-    \begin{itemize}
-        \item If C receives it, $N_\text{recv}$ increases by 1.
-    \end{itemize}
-\end{itemize}
-
-Suppose after the simulation:
-\begin{itemize}
-    \item $N_\text{pot} = 3$ (A:2, B:1)
-    \item $N_\text{recv} = 2$ (A$\rightarrow$B: received, A$\rightarrow$C: lost, B$\rightarrow$C: received)
-\end{itemize}
-
-Then,
-\[
-\text{Delivery Ratio} = \frac{2}{3} \approx 0.67
-\]
-
-\subsection*{Ideal vs Realistic Channel}
-
-The simulator can operate in two different channel modes, controlled by a configuration parameter:
-
-\begin{itemize}
-    \item \textbf{Ideal Channel:} In this mode, every beacon that is transmitted and is within communication range of a receiver is always successfully delivered. There are no losses due to collisions, interference, or probabilistic effects.
-    \item \textbf{Realistic Channel:} In this mode, beacon delivery is subject to probabilistic loss (e.g., due to distance or channel conditions) and collisions. If multiple beacons arrive at a receiver simultaneously, a collision occurs and all involved beacons are lost.
-\end{itemize}
-
-\section*{Test Results and Delivery Ratio Analysis}
-
-\subsection*{Delivery Ratio vs Total Buoys}
-
+\section{Results}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\textwidth]{../test_plots/delivery_ratio.png}
-    \label{fig:delivery-ratio-vs-buoys}
-\end{figure}
-
-\subsection*{Delivery Ratio: Static vs Dynamic (Boxplot)}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.6\textwidth]{../test_plots/delivery_ratio_boxplot.png}
-    \label{fig:delivery-ratio-boxplot}
+    \includegraphics[width=0.9\textwidth]{img/delivery_ratio_interval1.0.png}
+    \caption{Delivery Ratio for Static Interval 1.0s}
+    \label{fig:delivery_ratio_interval1.0}
 \end{figure}
 
 \end{document}

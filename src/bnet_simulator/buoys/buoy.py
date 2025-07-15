@@ -45,10 +45,6 @@ class Buoy:
         self.want_to_send = False
         self.scheduler_decision_time = 0.0
 
-        # Collision detection
-        self.recent_collisions = []
-        self.collision_window = 10.0  # seconds
-
     def update_position(self, dt: float):
         if self.is_mobile:
             x, y = self.position
@@ -127,9 +123,6 @@ class Buoy:
             self.want_to_send = False
             self.state = BuoyState.RECEIVING
 
-            if not success:
-                self.record_collision(sim_time)
-
             return success
 
         return False
@@ -145,11 +138,6 @@ class Buoy:
                     break
             if not updated:
                 self.neighbors.append((beacon.sender_id, sim_time, beacon.position))
-
-    def record_collision(self, sim_time: float):
-        self.recent_collisions.append(sim_time)
-        # Remove old collisions
-        self.recent_collisions = [t for t in self.recent_collisions if sim_time - t <= self.collision_window]
 
     def __repr__(self):
         return f"<Buoy id={str(self.id)[:6]} pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"

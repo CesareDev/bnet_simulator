@@ -10,8 +10,11 @@ class Channel:
     def __init__(self, metrics: Metrics = None):
         self.active_transmissions: List[Tuple[Beacon, float, float]] = []
         self.metrics = metrics
+        self.buoys = []
         self.seen_attempts: Set[Tuple[uuid.UUID, uuid.UUID, float]] = set()  # (receiver_id, sender_id, timestamp)
-        self.buoys = [] 
+
+    def set_buoys(self, buoys):
+        self.buoys = buoys
 
     def update(self, sim_time: float):
         self.active_transmissions = [
@@ -19,68 +22,44 @@ class Channel:
             if end > sim_time
         ]
 
-    def set_buoys(self, buoys):
-        self.buoys = buoys
-
     def broadcast(self, beacon: Beacon, sim_time: float) -> bool:
         if self.metrics:
             self.metrics.log_sent()
 
-        transmission_duration = beacon.size_bits() / config.BIT_RATE
-        transmission_end = sim_time + transmission_duration
+        # Calculate the new transmission's time interval
+        transmission_time = beacon.size_bits() / config.BIT_RATE
+        new_end_time = sim_time + transmission_time
         
-        # Check for collisions with better overlap detection
-        colliding_beacons = self._detect_collisions(beacon, sim_time, transmission_end)
-        
-        if colliding_beacons:
-            logging.log_error(f"Collision detected while broadcasting from {str(beacon.sender_id)[:6]}")
-            if self.metrics:
-                # Log one collision for this beacon
-                self.metrics.log_collision()
-                
-                # Log one collision for each existing beacon it collided with
-                for _ in colliding_beacons:
+        # Check for collisions with any overlapping transmission
+        for existing, start, end in self.active_transmissions:
+            # Skip checking against beacons from the same sender
+            if beacon.sender_id == existing.sender_id:
+                continue
+            
+            # Check if there's any time overlap between the transmissions
+            # Two intervals [a,b] and [c,d] overlap if: a <= d AND c <= b
+            time_overlap = (sim_time <= end) and (start <= new_end_time)
+            
+            # Check if transmitters are within range of each other
+            if time_overlap and self.in_range(beacon.position, existing.position):
+                logging.log_error(f"Collision detected while broadcasting from {str(beacon.sender_id)[:6]}")
+                if self.metrics:
                     self.metrics.log_collision()
-            return False  # Collision
-        
-        # Add to active transmissions
-        self.active_transmissions.append((beacon, sim_time, transmission_end))
+                return False  # Collision
+
+        # No collisions detected, proceed with transmission
+        self.active_transmissions.append((beacon, sim_time, new_end_time))
         logging.log_info(f"Broadcasting beacon from {str(beacon.sender_id)[:6]}")
 
-        # Track receivers in range
         receivers_in_range = [
             buoy for buoy in self.buoys
             if buoy.id != beacon.sender_id and self.in_range(beacon.position, buoy.position)
         ]
-        
-        # Track vessel-specific targeting
-        if self.metrics and self.metrics.vessel_id:
-            for buoy in receivers_in_range:
-                if buoy.id == self.metrics.vessel_id:
-                    self.metrics.log_vessel_targeted(beacon.sender_id)
-                    break  # Only need to log once per broadcast
-        
         n_receivers = len(receivers_in_range)
         if self.metrics:
             self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
 
         return True
-
-    def _detect_collisions(self, beacon: Beacon, start_time: float, end_time: float) -> List[Beacon]:
-        colliding_beacons = []
-        
-        for existing_beacon, existing_start, existing_end in self.active_transmissions:
-            if existing_beacon.sender_id == beacon.sender_id:
-                continue
-                
-            # Check temporal and spatial overlap
-            time_overlap = existing_start < end_time and existing_end > start_time
-            spatial_overlap = self.in_range(beacon.position, existing_beacon.position)
-            
-            if time_overlap and spatial_overlap:
-                colliding_beacons.append(existing_beacon)
-        
-        return colliding_beacons
 
     def is_busy(self, position: Tuple[float, float], sim_time: float) -> bool:
         for beacon, start, end in self.active_transmissions:
@@ -139,20 +118,14 @@ class Channel:
 
         if len(received) <= 1:
             if self.metrics and len(received) == 1:
-                beacon = received[0]
-                self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, receiver_id)
-                self.metrics.log_actually_received(beacon.sender_id)
-                
-                # Track vessel-specific reception
-                if self.metrics.vessel_id and receiver_id == self.metrics.vessel_id:
-                    # Track that the vessel successfully received this beacon
-                    self.metrics.log_vessel_received(beacon.sender_id)
+                self.metrics.log_received(received[0].sender_id, received[0].timestamp, sim_time, receiver_id)
+                self.metrics.log_actually_received(received[0].sender_id)
             return received
         else:
-            # Collision at receiver — log one collision for each beacon involved
-            logging.log_error(f"Collision detected while receiving at {str(receiver_id)[:6]} with {len(received)} beacons")
+            # Collision at receiver — discard all
+            logging.log_error(f"Collision detected while receiving at {str(receiver_id)[:6]}")
             if self.metrics:
-                # Count one collision for each beacon involved in the collision
+                # Count collision for each beacon involved
                 for _ in received:
                     self.metrics.log_collision()
             return []
