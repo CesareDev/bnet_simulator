@@ -5,28 +5,49 @@ import subprocess
 import glob
 import time
 import math
+import random
 from tqdm import tqdm
 from bnet_simulator.utils import config
 
-def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob"):
-    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9  # Use 80% of the range for safety
+def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob", jitter=1.0):
+    """
+    Arrange buoys randomly within an area to achieve approximate neighbor density.
+    Uses random positions instead of a perfect circle to create more realistic scenarios.
+    """
+    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9  # Use 90% of the range for safety
     k = neighbor_density
     
-    # Use exactly k+1 buoys for the minimum needed to achieve density k
-    # Each buoy in a circle with k+1 buoys will have exactly k neighbors
+    # Use k+1 buoys for the minimum needed to achieve density k
     n_buoys = k + 1
     
-    angle_step = 2 * math.pi / n_buoys
-    theta = k * angle_step / 2
-    radius = comm_range / (2 * math.sin(theta / 2))
+    # Calculate the area size needed for this density
+    # For higher densities, we need a smaller area to keep buoys in range of each other
+    area_radius = comm_range * (1.5 - (0.5 * k / 30))  # Shrinks area as density increases
+    
+    # Ensure radius is reasonable - between 0.5 and 1.0 of comm_range
+    area_radius = max(comm_range * 0.5, min(comm_range, area_radius))
+    
     center_x = world_width / 2
     center_y = world_height / 2
     positions = []
     
+    # Use current time as seed for random generator
+    random.seed(time.time())
+    
+    # Generate random positions within the calculated area
     for i in range(n_buoys):
-        angle = i * angle_step
-        x = center_x + radius * math.cos(angle)
-        y = center_y + radius * math.sin(angle)
+        # Random angle and distance from center
+        angle = random.uniform(0, 2 * math.pi)
+        # Use square root for distance to ensure uniform distribution in circle
+        distance = math.sqrt(random.random()) * area_radius
+        
+        x = center_x + distance * math.cos(angle)
+        y = center_y + distance * math.sin(angle)
+        
+        # Ensure positions are within world bounds
+        x = max(10, min(world_width - 10, x))
+        y = max(10, min(world_height - 10, y))
+        
         positions.append((x, y))
     
     return positions

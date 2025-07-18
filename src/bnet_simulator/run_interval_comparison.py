@@ -9,10 +9,8 @@ IDEAL = True
 VESSEL = False
 
 def main():
-    print("Running scenarios with multiple static intervals...")
-    
     for interval in INTERVALS:
-        print(f"\nRunning simulations with static interval = {interval}s")
+        print(f"Running simulations with static interval = {interval}s")
         
         # Run tune_scheduler.py with the current interval
         cmd = [

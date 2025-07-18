@@ -1,68 +1,200 @@
 \documentclass{article}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usepackage{amsmath}
-\usepackage{graphicx}
 \usepackage{geometry}
-\usepackage{float}
-\geometry{margin=1in}
+
+\geometry{a4paper, margin=1in}
 
 \begin{document}
 
-\section{Dynamic Beacon Scheduling Formula}
+\title{Channel Class Pseudocode for Beacon Network Simulator}
+\author{Beacon Network Simulator}
+\date{\today}
+\maketitle
 
-\begin{itemize}
-    \item \textbf{Contact Score ($S_c$)}: Measures how recently neighbors were detected
-    \item \textbf{Density Factor ($D_f$)}: Measures how many neighbors are currently detected
-\end{itemize}
+\section{Channel Class}
 
-\subsection{Contact Score}
-Contact score equals 1.0 when neighbors are detected, and decays linearly when no neighbors are present:
+\begin{algorithm}
+\caption{Channel Initialization}
+\begin{algorithmic}[1]
+\Procedure{Initialize}{$metrics$}
+    \State $active\_transmissions \gets \emptyset$ \Comment{List of (beacon, start\_time, end\_time)}
+    \State $metrics \gets metrics$
+    \State $buoys \gets \emptyset$
+    \State $seen\_attempts \gets \emptyset$ \Comment{Set of (receiver\_id, sender\_id, timestamp)}
+\EndProcedure
 
-\begin{equation}
-S_c = 
-\begin{cases} 
-1.0 & \text{if } N_{neighbors} > 0 \\
-\max(0, 1 - \frac{t_{current} - t_{lastContact}}{30}) & \text{otherwise}
-\end{cases}
-\end{equation}
+\Procedure{SetBuoys}{$buoys$}
+    \State $this.buoys \gets buoys$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
-\subsection{Density Factor}
-Density factor increases linearly with the number of neighbors, up to a maximum of 10 neighbors:
+\begin{algorithm}
+\caption{Channel Update}
+\begin{algorithmic}[1]
+\Procedure{Update}{$sim\_time$}
+    \State $active\_transmissions \gets \{(b, start, end) \in active\_transmissions \mid end > sim\_time\}$ \Comment{Remove expired transmissions}
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
-\begin{equation}
-D_f = \min(1.0, \frac{N_{neighbors}}{10})
-\end{equation}
+\begin{algorithm}
+\caption{Channel Broadcast}
+\begin{algorithmic}[1]
+\Procedure{Broadcast}{$beacon, sim\_time$}
+    \If{$metrics \neq null$}
+        \State $metrics.log\_sent()$
+    \EndIf
+    
+    \State $transmission\_time \gets beacon.size\_bits() / BIT\_RATE$
+    \State $new\_end\_time \gets sim\_time + transmission\_time$
+    
+    \ForAll{$(existing, start, end) \in active\_transmissions$}
+        \If{$beacon.sender\_id = existing.sender\_id$}
+            \State \textbf{continue} \Comment{Skip checking same sender}
+        \EndIf
+        
+        \State $time\_overlap \gets (sim\_time \leq end) \land (start \leq new\_end\_time)$ \Comment{Check temporal overlap}
+        
+        \If{$time\_overlap \land \text{InRange}(beacon.position, existing.position)$}
+            \State $log\_error($"Collision detected"$)$
+            \If{$metrics \neq null$}
+                \State $metrics.log\_collision()$
+            \EndIf
+            \State \Return $false$ \Comment{Collision occurred}
+        \EndIf
+    \EndFor
+    
+    \State $active\_transmissions.append((beacon, sim\_time, new\_end\_time))$
+    \State $log\_info($"Broadcasting beacon"$)$
+    
+    \State $receivers\_in\_range \gets \{buoy \in buoys \mid buoy.id \neq beacon.sender\_id \land \text{InRange}(beacon.position, buoy.position)\}$
+    \State $n\_receivers \gets |receivers\_in\_range|$
+    
+    \If{$metrics \neq null$}
+        \State $metrics.log\_potentially\_sent(beacon.sender\_id, n\_receivers)$
+    \EndIf
+    
+    \State \Return $true$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
-\subsection{Interval Calculation}
-The beacon interval is calculated as follows:
+\begin{algorithm}
+\caption{Channel Is Busy}
+\begin{algorithmic}[1]
+\Procedure{IsBusy}{$position, sim\_time$}
+    \ForAll{$(beacon, start, end) \in active\_transmissions$}
+        \If{$start \leq sim\_time \leq end \land \text{InRange}(position, beacon.position)$}
+            \State \Return $true$
+        \EndIf
+    \EndFor
+    \State \Return $false$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
-\begin{equation}
-\begin{aligned}
-I_{base} &= I_{min} + 0.7 \cdot (I_{max} - I_{min}) \\
-I_{contact} &= 0.6 \cdot S_c \cdot (I_{base} - I_{min}) \\
-I_{density} &= 0.4 \cdot D_f \cdot (I_{base} - I_{min}) \\
-I_{final} &= \max(I_{min}, \min(I_{base} - I_{contact} - I_{density}, I_{max} \cdot 0.8))
-\end{aligned}
-\end{equation}
+\begin{algorithm}
+\caption{Channel Receive All}
+\begin{algorithmic}[1]
+\Procedure{ReceiveAll}{$receiver\_id, receiver\_position, sim\_time$}
+    \State $received \gets \emptyset$
+    
+    \ForAll{$(beacon, start, end) \in active\_transmissions$}
+        \If{$beacon.sender\_id = receiver\_id$}
+            \State \textbf{continue} \Comment{Skip beacons from self}
+        \EndIf
+        
+        \State $key \gets (receiver\_id, beacon.sender\_id, beacon.timestamp)$
+        \If{$key \in seen\_attempts$}
+            \State \textbf{continue} \Comment{Already processed this beacon}
+        \EndIf
+        
+        \State $distance \gets \text{EuclideanDistance}(receiver\_position, beacon.position)$
+        
+        \If{$IDEAL\_CHANNEL$}
+            \If{$distance > COMMUNICATION\_RANGE\_HIGH\_PROB$}
+                \State \textbf{continue} \Comment{Out of range}
+            \EndIf
+            
+            \State $propagation\_delay \gets distance / SPEED\_OF\_LIGHT$
+            \State $arrival\_time \gets start + propagation\_delay$
+            
+            \If{$sim\_time < arrival\_time$}
+                \State \textbf{continue} \Comment{Not yet arrived}
+            \EndIf
+            
+            \State $seen\_attempts.add(key)$
+            \State $received.append(beacon)$
+        \Else
+            \If{$distance > COMMUNICATION\_RANGE\_MAX$}
+                \State \textbf{continue} \Comment{Out of range}
+            \EndIf
+            
+            \State $propagation\_delay \gets distance / SPEED\_OF\_LIGHT$
+            \State $arrival\_time \gets start + propagation\_delay$
+            
+            \If{$sim\_time < arrival\_time$}
+                \State \textbf{continue} \Comment{Not yet arrived}
+            \EndIf
+            
+            \State $seen\_attempts.add(key)$
+            
+            \If{$distance \leq COMMUNICATION\_RANGE\_HIGH\_PROB$}
+                \If{$random() < DELIVERY\_PROB\_HIGH$}
+                    \State $received.append(beacon)$
+                \ElsIf{$metrics \neq null$}
+                    \State $metrics.log\_lost()$
+                \EndIf
+            \ElsIf{$distance \leq COMMUNICATION\_RANGE\_MAX$}
+                \If{$random() < DELIVERY\_PROB\_LOW$}
+                    \State $received.append(beacon)$
+                \Else
+                    \State $log\_error($"Packet lost"$)$
+                    \If{$metrics \neq null$}
+                        \State $metrics.log\_lost()$
+                    \EndIf
+                \EndIf
+            \EndIf
+        \EndIf
+    \EndFor
+    
+    \If{$|received| \leq 1$}
+        \If{$metrics \neq null \land |received| = 1$}
+            \State $metrics.log\_received(received[0].sender\_id, received[0].timestamp, sim\_time, receiver\_id)$
+            \State $metrics.log\_actually\_received(received[0].sender\_id)$
+        \EndIf
+        \State \Return $received$
+    \Else
+        \State $log\_error($"Collision at receiver"$)$
+        \If{$metrics \neq null$}
+            \ForAll{$beacon \in received$}
+                \State $metrics.log\_collision()$
+            \EndFor
+        \EndIf
+        \State \Return $\emptyset$ \Comment{All beacons lost in collision}
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
-\subsection{Interpretation}
-This formula makes beacons more frequent (smaller interval) when:
-\begin{itemize}
-    \item Neighbors were recently detected (high $S_c$)
-    \item Many neighbors are present (high $D_f$)
-\end{itemize}
-
-And less frequent (larger interval) when:
-\begin{itemize}
-    \item No neighbors have been detected for a while (low $S_c$)
-    \item Few neighbors are present (low $D_f$)
-\end{itemize}
-
-\section{Results}
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.9\textwidth]{img/delivery_ratio_interval1.0.png}
-    \caption{Delivery Ratio for Static Interval 1.0s}
-    \label{fig:delivery_ratio_interval1.0}
-\end{figure}
+\begin{algorithm}
+\caption{Channel In Range}
+\begin{algorithmic}[1]
+\Procedure{InRange}{$pos1, pos2$}
+    \State $dx \gets pos1.x - pos2.x$
+    \State $dy \gets pos1.y - pos2.y$
+    \State $distance \gets \sqrt{dx^2 + dy^2}$
+    
+    \If{$IDEAL\_CHANNEL$}
+        \State \Return $distance \leq COMMUNICATION\_RANGE\_HIGH\_PROB$
+    \Else
+        \State \Return $distance \leq COMMUNICATION\_RANGE\_MAX$
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \end{document}

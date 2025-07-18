@@ -100,7 +100,7 @@ class Metrics:
             "Avg Latency": avg_latency,
             "Avg Scheduler Latency": self.avg_scheduler_latency(),
             "Delivery Ratio": self.delivery_ratio(),
-            "Collision Rate": self.beacons_collided / self.beacons_sent if self.beacons_sent else 0,
+            "Collision Rate": self.beacons_collided / self.potentially_sent if self.potentially_sent else 0,
             "Avg Reaction Latency": (
                 sum(self.reaction_latencies) / len(self.reaction_latencies)
                 if self.reaction_latencies else 0
