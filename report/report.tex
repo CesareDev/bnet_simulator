@@ -1,39 +1,35 @@
 \documentclass{article}
-\usepackage{algorithm}
-\usepackage{algpseudocode}
 \usepackage{amsmath}
 
+\title{Beacon Interval Formula}
+\author{}
+\date{}
+
 \begin{document}
+\maketitle
 
-\title{Channel Class Pseudocode for Beacon Network Simulator}
-\section{Dynamic Beacon Scheduling Algorithm}
+\section*{Formula}
 
-The interval $I$ between consecutive beacon transmissions is computed as:
+The beacon interval is calculated based on network density:
 
-\begin{equation}
-I = I_{\text{base}} - I_{\text{contact}} + I_{\text{density}}
-\end{equation}
+\subsection*{Parameters}
+\begin{itemize}
+    \item $n$: Number of neighbors
+    \item $D_{max} = 15$: Maximum density threshold
+    \item $I_{min}$: Minimum beacon interval
+    \item $I_{max}$: Maximum beacon interval
+\end{itemize}
 
-\noindent where:
-
+\subsection*{Equation}
 \begin{align}
-I_{\text{base}} &= I_{\text{min}} + 0.7 \cdot (I_{\text{max}} - I_{\text{min}}) \\
-I_{\text{contact}} &= 0.5 \cdot C_s \cdot (I_{\text{base}} - I_{\text{min}}) \\
-I_{\text{density}} &= 0.6 \cdot D_f \cdot (I_{\text{max}} - I_{\text{base}})
+\rho &= \min\left(1, \frac{n}{D_{max}}\right) \\
+I &= I_{min} + \rho \cdot (I_{max} - I_{min})
 \end{align}
 
-The contact score $C_s$ measures recency of neighbor communication:
-\begin{equation}
-C_s = \max\left(0, 1 - \frac{\Delta t}{20}\right)
-\end{equation}
-where $\Delta t$ is time (in seconds) since most recent neighbor contact. The density factor $D_f$ reflects local network congestion:
-\begin{equation}
-D_f = \min\left(1, \frac{N}{15}\right)
-\end{equation}
-where $N$ is the number of neighbors in communication range. The finale interval $I_{\text{final}}$ is computed as:
-
-\begin{equation}
-I_{\text{final}} = \max(I_{\text{min}}, \min(I, 0.9 \cdot (I_{\text{max}} - I_{\text{min}})))
-\end{equation}
+Where:
+\begin{itemize}
+    \item $\rho$: Density factor (0-1)
+    \item $I$: Resulting beacon interval
+\end{itemize}
 
 \end{document}

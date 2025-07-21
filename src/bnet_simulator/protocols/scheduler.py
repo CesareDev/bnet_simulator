@@ -56,43 +56,21 @@ class BeaconScheduler:
         neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
         current_time: float,
     ) -> float:
-        N_neighbors = len(neighbors)
+        # Count number of neighbors
+        n_neighbors = len(neighbors)
 
-        # Contact score: 1 for recent contact, 0 for long time since contact
-        CONTACT_THRESHOLD = 20.0  # seconds
+        # Define what constitutes high density
+        max_density = 15.0  # Consider 15 neighbors as "high density"
 
-        if neighbors:
-            # Find the most recent neighbor contact
-            last_contact = max((ts for _, ts, _ in neighbors), default=current_time)
-            delta = current_time - last_contact
+        # Simple linear scaling: more neighbors = longer interval
+        # 0 neighbors -> min_interval
+        # max_density neighbors -> max_interval
+        density_factor = min(1.0, n_neighbors / max_density)
 
-            contact_score = max(0.0, 1.0 - (delta / CONTACT_THRESHOLD))
-        else:
-            contact_score = 0.0
+        # Linear interpolation between min and max interval based on density
+        interval = self.min_interval + density_factor * (self.max_interval - self.min_interval)
 
-        # CHANGE 1: Increase max density consideration
-        max_density = 15.0  # Consider 15 neighbors as "high density" (was 10)
-        density_factor = min(1.0, N_neighbors / max_density)
-
-        base_percent = 0.7
-        base_interval = self.min_interval + base_percent * (self.max_interval - self.min_interval)
-
-        # CHANGE 2: Reduce contact weight slightly
-        contact_adjustment = 0.5 * contact_score * (base_interval - self.min_interval)  # Was 0.6
-
-        # CHANGE 3: REVERSE density adjustment direction and increase weight
-        # Now INCREASES interval as density increases
-        density_adjustment = 0.6 * density_factor * (self.max_interval - base_interval)  # Was 0.4
-
-        # CHANGE 4: Density now ADDS to interval instead of subtracting
-        interval = base_interval - contact_adjustment + density_adjustment  # Note the + sign
-
-        # CHANGE 5: Allow higher upper bound
-        bounded_max = self.min_interval + 0.9 * (self.max_interval - self.min_interval)  # Was 0.8
-
-        # CHANGE 6: Add small random jitter to prevent synchronization
-        # jitter = random.uniform(-0.05, 0.05) * (self.max_interval - self.min_interval)
-
-        new_interval = max(self.min_interval, min(interval, bounded_max))
+        # Ensure interval stays within bounds
+        new_interval = max(self.min_interval, min(interval, self.max_interval))
 
         return new_interval
