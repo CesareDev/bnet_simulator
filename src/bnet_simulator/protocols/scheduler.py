@@ -30,7 +30,7 @@ class BeaconScheduler:
     def should_send_static(self) -> bool:
         if self.elapsed_time >= self.next_static_interval:
             self.elapsed_time = 0.0
-            self.next_static_interval = config.STATIC_INTERVAL + random.uniform(-0.1, 0.1)
+            self.next_static_interval = config.STATIC_INTERVAL # + random.uniform(-0.1, 0.1)
             return True
         return False
 
@@ -57,33 +57,42 @@ class BeaconScheduler:
         current_time: float,
     ) -> float:
         N_neighbors = len(neighbors)
-        
+
         # Contact score: 1 for recent contact, 0 for long time since contact
         CONTACT_THRESHOLD = 20.0  # seconds
-        
+
         if neighbors:
             # Find the most recent neighbor contact
             last_contact = max((ts for _, ts, _ in neighbors), default=current_time)
             delta = current_time - last_contact
-            
+
             contact_score = max(0.0, 1.0 - (delta / CONTACT_THRESHOLD))
         else:
             contact_score = 0.0
-        
-        max_density = 10.0  # Consider 10 neighbors as "high density"
+
+        # CHANGE 1: Increase max density consideration
+        max_density = 15.0  # Consider 15 neighbors as "high density" (was 10)
         density_factor = min(1.0, N_neighbors / max_density)
-        
+
         base_percent = 0.7
         base_interval = self.min_interval + base_percent * (self.max_interval - self.min_interval)
-        
-        contact_adjustment = 0.6 * contact_score * (base_interval - self.min_interval)
-        
-        density_adjustment = 0.4 * density_factor * (base_interval - self.min_interval)
-        
-        interval = base_interval - contact_adjustment - density_adjustment
-        
-        bounded_max = self.min_interval + 0.8 * (self.max_interval - self.min_interval)
-        
+
+        # CHANGE 2: Reduce contact weight slightly
+        contact_adjustment = 0.5 * contact_score * (base_interval - self.min_interval)  # Was 0.6
+
+        # CHANGE 3: REVERSE density adjustment direction and increase weight
+        # Now INCREASES interval as density increases
+        density_adjustment = 0.6 * density_factor * (self.max_interval - base_interval)  # Was 0.4
+
+        # CHANGE 4: Density now ADDS to interval instead of subtracting
+        interval = base_interval - contact_adjustment + density_adjustment  # Note the + sign
+
+        # CHANGE 5: Allow higher upper bound
+        bounded_max = self.min_interval + 0.9 * (self.max_interval - self.min_interval)  # Was 0.8
+
+        # CHANGE 6: Add small random jitter to prevent synchronization
+        # jitter = random.uniform(-0.05, 0.05) * (self.max_interval - self.min_interval)
+
         new_interval = max(self.min_interval, min(interval, bounded_max))
-        
+
         return new_interval

@@ -8,7 +8,8 @@ from bnet_simulator.utils import logging, config
 
 class Channel:
     def __init__(self, metrics: Metrics = None):
-        self.active_transmissions: List[Tuple[Beacon, float, float]] = []
+        # Format: (beacon, start_time, end_time, potential_receiver_count, processed_count)
+        self.active_transmissions: List[Tuple[Beacon, float, float, int, int]] = []
         self.metrics = metrics
         self.buoys = []
         self.seen_attempts: Set[Tuple[uuid.UUID, uuid.UUID, float]] = set()  # (receiver_id, sender_id, timestamp)
@@ -17,10 +18,23 @@ class Channel:
         self.buoys = buoys
 
     def update(self, sim_time: float):
-        self.active_transmissions = [
-            (b, start, end) for b, start, end in self.active_transmissions
-            if end > sim_time
-        ]
+        expired_indices = []
+        for i, (beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
+            if end <= sim_time:  # Transmission has finished
+                expired_indices.append(i)
+
+                # Count receivers that never processed this beacon as lost
+                if self.metrics:
+                    # Calculate how many receivers never got it
+                    lost_count = potential_count - processed_count
+                    for _ in range(lost_count):
+                        self.metrics.log_lost()
+                    if lost_count > 0:
+                        logging.log_info(f"Beacon from {str(beacon.sender_id)[:6]} expired with {lost_count} unreached receivers")
+
+        # Remove expired transmissions (in reverse order)
+        for idx in sorted(expired_indices, reverse=True):
+            self.active_transmissions.pop(idx)
 
     def broadcast(self, beacon: Beacon, sim_time: float) -> bool:
         if self.metrics:
@@ -29,28 +43,8 @@ class Channel:
         # Calculate the new transmission's time interval
         transmission_time = beacon.size_bits() / config.BIT_RATE
         new_end_time = sim_time + transmission_time
-        
-        # Check for collisions with any overlapping transmission
-        for existing, start, end in self.active_transmissions:
-            # Skip checking against beacons from the same sender
-            if beacon.sender_id == existing.sender_id:
-                continue
-            
-            # Check if there's any time overlap between the transmissions
-            # Two intervals [a,b] and [c,d] overlap if: a <= d AND c <= b
-            time_overlap = (sim_time <= end) and (start <= new_end_time)
-            
-            # Check if transmitters are within range of each other
-            if time_overlap and self.in_range(beacon.position, existing.position):
-                logging.log_error(f"Collision detected while broadcasting from {str(beacon.sender_id)[:6]}")
-                if self.metrics:
-                    self.metrics.log_collision()
-                return False  # Collision
 
-        # No collisions detected, proceed with transmission
-        self.active_transmissions.append((beacon, sim_time, new_end_time))
-        logging.log_info(f"Broadcasting beacon from {str(beacon.sender_id)[:6]}")
-
+        # Find potential receivers BEFORE collision detection
         receivers_in_range = [
             buoy for buoy in self.buoys
             if buoy.id != beacon.sender_id and self.in_range(beacon.position, buoy.position)
@@ -59,21 +53,60 @@ class Channel:
         if self.metrics:
             self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
 
+        # Check for collisions with any overlapping transmission
+        collision_indexes = []  # Track which transmissions collide
+
+        for i, (existing, start, end, _, _) in enumerate(self.active_transmissions):
+            # Skip checking against beacons from the same sender
+            if beacon.sender_id == existing.sender_id:
+                continue
+            
+            # Check if there's any time overlap between the transmissions
+            # Two intervals [a,b] and [c,d] overlap if: a <= d AND c <= b
+            time_overlap = (sim_time <= end) and (start <= new_end_time)
+
+            # Check if transmitters are within range of each other
+            if time_overlap and self.in_range(beacon.position, existing.position):
+                logging.log_error(f"Collision detected between {str(beacon.sender_id)[:6]} and {str(existing.sender_id)[:6]}")
+                collision_indexes.append(i)
+                if self.metrics:
+                    self.metrics.log_collision()
+
+        # If there were collisions, remove the collided transmissions
+        if collision_indexes:
+            # Remove in reverse order to avoid index shifting problems
+            for idx in sorted(collision_indexes, reverse=True):
+                removed_beacon, _, _, _, _ = self.active_transmissions.pop(idx)
+                logging.log_error(f"Removed collided transmission from {str(removed_beacon.sender_id)[:6]}")
+
+            # Count collision for current beacon too
+            if self.metrics:
+                self.metrics.log_collision()
+
+            return False  # The new beacon also failed due to collision
+
+        # No collisions detected, proceed with transmission
+        # Add with potential receivers count and 0 processed count
+        self.active_transmissions.append((beacon, sim_time, new_end_time, n_receivers, 0))
+        logging.log_info(f"Broadcasting beacon from {str(beacon.sender_id)[:6]}")
+
         return True
 
     def is_busy(self, position: Tuple[float, float], sim_time: float) -> bool:
-        for beacon, start, end in self.active_transmissions:
+        for beacon, start, end, _, _ in self.active_transmissions:
             if start <= sim_time <= end and self.in_range(position, beacon.position):
                 return True
         return False
 
     def receive_all(self, receiver_id: uuid.UUID, receiver_position: Tuple[float, float], sim_time: float) -> List[Beacon]:
         received = []
-
-        for beacon, start, end in self.active_transmissions:
+        
+        for i, (beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
+            # Skip if sender is the same as receiver
             if beacon.sender_id == receiver_id:
                 continue
 
+            # Check if already processed by this receiver
             key = (receiver_id, beacon.sender_id, beacon.timestamp)
             if key in self.seen_attempts:
                 continue  # Already processed this beacon for this receiver
@@ -87,20 +120,33 @@ class Channel:
                 # Ideal: only receive if <= 70m, always successful
                 if distance > config.COMMUNICATION_RANGE_HIGH_PROB:
                     continue  # Out of range for ideal channel
+                    
                 propagation_delay = distance / config.SPEED_OF_LIGHT
                 arrival_time = end + propagation_delay
                 if not (start <= sim_time < arrival_time):
                     continue  # Not yet arrived
+                    
+                # Mark as processed
                 self.seen_attempts.add(key)
+                # Increment processed count
+                self.active_transmissions[i] = (beacon, start, end, potential_count, processed_count + 1)
+                
                 received.append(beacon)            
             else:
                 if distance > config.COMMUNICATION_RANGE_MAX:
                     continue # Out of range
+                    
                 propagation_delay = distance / config.SPEED_OF_LIGHT
                 arrival_time = end + propagation_delay
                 if not (start <= sim_time < arrival_time):
                     continue # Not yet arrived
+                    
+                # Mark as processed regardless of outcome
                 self.seen_attempts.add(key)
+                
+                # Increment processed count regardless of outcome
+                self.active_transmissions[i] = (beacon, start, end, potential_count, processed_count + 1)
+                
                 # Realistic: probabilistic delivery and collisions
                 if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
                     if random.random() < config.DELIVERY_PROB_HIGH:
