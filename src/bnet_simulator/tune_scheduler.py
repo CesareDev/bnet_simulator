@@ -100,11 +100,6 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
     for i, scenario in enumerate(BASE_PARAM_SETS):
         seed = scenario_seeds[i] if scenario_seeds else int(time.time())
         
-        # Handle vessel scenarios
-        vessel_args = []
-        if scenario.get("has_vessel", False):
-            vessel_args = ["--vessel-index", str(scenario.get("vessel_index", 0))]
-        
         # Setup static scenario
         static_positions_file = f"positions_static_{i}.json"
         positions_files.append(static_positions_file)
@@ -112,7 +107,7 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
             json.dump(scenario["positions"], f)
         static_result_file = os.path.join(
             results_dir,
-            f"static_{'vessel_' if scenario.get('has_vessel', False) else ''}density{scenario['density']}_n{scenario['fixed_buoy_count']}.csv"
+            f"static_density{scenario['density']}_n{scenario['fixed_buoy_count']}.csv"
         )
         static_cmd = BASE_CMD + [
             "--mode", "static",
@@ -125,8 +120,8 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
             "--result-file", static_result_file,
             "--positions-file", static_positions_file,
             "--density", str(scenario["density"]),
-            "--static-interval", str(STATIC_INTERVAL),  # Add this line
-        ] + vessel_args
+            "--static-interval", str(STATIC_INTERVAL),
+        ]
         
         if scenario.get("headless"):
             static_cmd.append("--headless")
@@ -142,7 +137,7 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
             json.dump(scenario["positions"], f)
         dynamic_result_file = os.path.join(
             results_dir,
-            f"dynamic_{'vessel_' if scenario.get('has_vessel', False) else ''}density{scenario['density']}_n{scenario['fixed_buoy_count']}.csv"
+            f"dynamic_density{scenario['density']}_n{scenario['fixed_buoy_count']}.csv"
         )
         dynamic_cmd = BASE_CMD + [
             "--mode", "dynamic",
@@ -156,7 +151,7 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
             "--headless",
             "--positions-file", dynamic_positions_file,
             "--density", str(scenario["density"]),
-        ] + vessel_args
+        ]
         
         if IDEAL:
             dynamic_cmd.append("--ideal")
@@ -192,11 +187,6 @@ def main():
         help="Use ideal channel conditions (no loss)"
     )
     parser.add_argument(
-        "--vessel",
-        action='store_true',
-        help="Run scenario with a vessel (listening-only buoy)"
-    )
-    parser.add_argument(
         "--static-interval",
         type=float,
         default=1.0,
@@ -208,8 +198,8 @@ def main():
     STATIC_INTERVAL = args.static_interval
     
     # Regular density scenarios
-    duration = 300  # 5 minutes
-    BASE_PARAM_SETS = generate_density_scenarios(densities=range(1, 2), duration=duration, headless=True, world_width=800, world_height=800)
+    duration = 600  # 10 minutes
+    BASE_PARAM_SETS = generate_density_scenarios(densities=range(2, 30), duration=duration, headless=True, world_width=800, world_height=800)
     # Include interval in directory names
     RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
     PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))

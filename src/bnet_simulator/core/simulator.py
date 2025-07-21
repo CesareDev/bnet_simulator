@@ -1,130 +1,108 @@
 import time
-from typing import List
+import heapq
+import uuid
+from typing import List, Dict, Tuple, Optional, Callable
 import random
 from bnet_simulator.buoys.buoy import Buoy
 from bnet_simulator.core.channel import Channel
-from bnet_simulator.gui.window import Window
-from bnet_simulator.utils.metrics import Metrics
+from bnet_simulator.core.events import EventType  # Import from new events module
 from bnet_simulator.utils import logging, config
+
+class Event:
+    def __init__(self, time: float, event_type: EventType, target_obj, data: Optional[Dict] = None):
+        self.time = time
+        self.event_type = event_type
+        self.target_obj = target_obj  # Object that will handle this event
+        self.data = data or {}
+    
+    def __repr__(self):
+        target_id = getattr(self.target_obj, 'id', id(self.target_obj))
+        return f"Event({self.time:.2f}, {self.event_type.name}, {str(target_id)[:6]})"
 
 class Simulator:
     def __init__(self, buoys: List[Buoy], channel: Channel):
         self.buoys = buoys
         self.channel = channel
-        self.channel.buoys = self.buoys
+        self.channel.set_buoys(self.buoys)
+        self.channel.simulator = self  # Allow channel to schedule events
         self.running = False
         self.simulated_time = 0.0
-        self.window = Window() if not config.HEADLESS else None
         
-        # Store all original buoys for dynamic network changes
-        self.all_buoys = buoys.copy()
+        # Set simulator reference in all buoys
+        for buoy in self.buoys:
+            buoy.simulator = self  # Allow buoys to schedule events
         
-        # Variables for network topology changes
-        self.next_buoy_change = random.uniform(5, 15)
-        self.first_change = True
+        # Event queue (priority queue for events)
+        self.event_queue = []
+        self.event_counter = 0  # Used to ensure FIFO for same-time events
+        
+        # Schedule initial events
+        self._schedule_initial_events()
+
+    def schedule_event(self, time: float, event_type: EventType, target_obj, data: Optional[Dict] = None) -> None:
+        """Schedule a new event to be processed"""
+        event = Event(time, event_type, target_obj, data)
+        epsilon = self.event_counter * 1e-10  # Small value to maintain FIFO for same-time events
+        self.event_counter += 1
+        heapq.heappush(self.event_queue, (event.time + epsilon, self.event_counter, event))
+    
+    def _get_next_event(self) -> Optional[Event]:
+        """Get the next event from the queue"""
+        if not self.event_queue:
+            return None
+        _, _, event = heapq.heappop(self.event_queue)
+        return event
+
+    def _schedule_initial_events(self):
+        """Schedule the initial events to start the simulation"""
+        # Schedule initial events for each buoy
+        for buoy in self.buoys:
+            # Initial scheduler check with random offset to prevent synchronization
+            initial_offset = random.uniform(0, 1.0)
+            self.schedule_event(initial_offset, EventType.SCHEDULER_CHECK, buoy)
+            
+            # Initial neighbor cleanup
+            self.schedule_event(config.NEIGHBOR_TIMEOUT, EventType.NEIGHBOR_CLEANUP, buoy)
+            
+            # Schedule movement updates for mobile buoys
+            if buoy.is_mobile:
+                self.schedule_event(0.1, EventType.BUOY_MOVEMENT, buoy)
+        
+        # Schedule first channel update
+        self.schedule_event(1.0, EventType.CHANNEL_UPDATE, self.channel)
 
     def start(self):
+        """Start the simulation with event-driven approach"""
         self.running = True
-        previous_time = time.time()
-        dt = 1.0 / config.TARGET_FPS
-        delta_real = dt
+        real_time_start = time.time()
         
         try:
+            # Main event loop
             while self.running and self.simulated_time < config.SIMULATION_DURATION:
-                if not config.HEADLESS and self.window.should_close():
+                # Get next event
+                event = self._get_next_event()
+                if not event:
+                    logging.log_info("No more events to process.")
                     break
-
-                if not config.HEADLESS:
-                    self.window.poll_input()
-
-                start_time = time.time()
-                delta_real = start_time - previous_time
-                previous_time = start_time
-                self.simulated_time += delta_real
-
-                self.update(delta_real)
-
-                if not config.HEADLESS:
-                    self.window.draw(self.buoys)
-
-                elapsed_time = time.time() - start_time
-                sleep_time = dt - elapsed_time
-                if sleep_time > 0.0:
-                    time.sleep(sleep_time)
-
-            if not config.HEADLESS:
-                self.window.close()
+                
+                # Update simulation time to event time
+                self.simulated_time = event.time
+                
+                # Dispatch the event to the target object
+                if hasattr(event.target_obj, 'handle_event'):
+                    event.target_obj.handle_event(event, self.simulated_time)
+                else:
+                    logging.log_error(f"Target object has no handle_event method: {event.target_obj}")
+                
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
             self.running = False
-
-    def update(self, dt: float):
-        self.update_buoy_array(dt)
-        self.channel.update(self.simulated_time)
-
-        # Shuffle for randomized processing order
-        random.shuffle(self.buoys)
-
-        for buoy in self.buoys:
-            buoy.update_position(dt)
-            buoy.send_beacon(dt, self.simulated_time)
-            buoy.receive_beacon(self.simulated_time)
-            buoy.cleanup_neighbors(self.simulated_time)
-
-    def update_buoy_array(self, dt: float):
-        self.next_buoy_change -= dt
-
-        if self.next_buoy_change <= 0:
-            active_buoys = self.buoys.copy()
-            inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
-            total_buoys = len(self.all_buoys)
-
-            # First change always removes buoys, after that randomize add/remove
-            if self.first_change or (random.random() >= 0.5 and len(active_buoys) > max(3, int(total_buoys * 0.2))):
-                # REMOVE BUOYS
-                min_buoys = max(3, int(total_buoys * 0.2))  # Ensure 20% minimum remain
-
-                if len(active_buoys) > min_buoys:
-                    # 40-50% removal rate
-                    remove_percentage = 0.5 if self.first_change else 0.4
-                    max_to_remove = min(len(active_buoys) - min_buoys, 
-                                      max(2, int(total_buoys * remove_percentage)))
-                    
-                    num_to_remove = max_to_remove if max_to_remove <= 2 else random.randint(1, max_to_remove)
-
-                    buoys_to_remove = random.sample(active_buoys, num_to_remove)
-                    for buoy in buoys_to_remove:
-                        if buoy in self.buoys:  # Safety check
-                            self.buoys.remove(buoy)
-
-                    logging.log_info(f"Removed {num_to_remove} buoys, now {len(self.buoys)} active")
-
-                    if self.first_change:
-                        logging.log_info("First buoy change: forced major removal operation")
-                        self.first_change = False
-            elif inactive_buoys:
-                # ADD BUOYS
-                max_to_add = min(len(inactive_buoys), max(2, int(total_buoys * 0.4)))  # Up to 40% of total
-                
-                num_to_add = max_to_add if max_to_add <= 2 else random.randint(1, max_to_add)
-
-                buoys_to_add = random.sample(inactive_buoys, num_to_add)
-                for buoy in buoys_to_add:
-                    self.buoys.append(buoy)
-
-                logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active")
-                self.first_change = False
-
-            # Schedule next change (every 15-20 seconds)
-            self.next_buoy_change = random.uniform(15, 20)
-
-    def is_outside_world(self, buoy: Buoy) -> bool:
-        x, y = buoy.position
-        margin = config.COMMUNICATION_RANGE_MAX
-        can_remove = x < -margin or x > config.WORLD_WIDTH + margin or y < -margin or y > config.WORLD_HEIGHT + margin
-        if can_remove:
-            logging.log_info(f"Removing buoy {str(buoy.id)[:6]} because it is outside world bounds")
-        return can_remove
+            
+        # Report simulation performance
+        real_time_end = time.time()
+        real_duration = real_time_end - real_time_start
+        sim_speedup = self.simulated_time / real_duration if real_duration > 0 else float('inf')
+        logging.log_info(f"Simulation complete. {self.simulated_time:.2f}s simulated in {real_duration:.2f}s real time (speedup: {sim_speedup:.2f}x)")
 
     def __repr__(self):
-        return f"<Simulator buoys={self.buoys}>"
+        return f"<Simulator buoys={len(self.buoys)}>"

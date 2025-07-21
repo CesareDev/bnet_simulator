@@ -4,7 +4,7 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 from bnet_simulator.core.simulator import Simulator
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.buoys.buoy import Buoy
-from bnet_simulator.buoys.vessel import Vessel  # Import the new Vessel class
+# Removed Vessel import
 from bnet_simulator.utils import config
 from bnet_simulator.utils.metrics import Metrics
 import random
@@ -85,12 +85,7 @@ def parse_args():
         action='store_true',
         help="Use ideal channel conditions (no loss)"
     )
-    parser.add_argument(
-        "--vessel-index",
-        type=int,
-        default=None,
-        help="Index of the buoy to convert to a vessel (listening-only)"
-    )
+    # Removed vessel-index argument
     parser.add_argument(
         "--static-interval",
         type=float,
@@ -144,7 +139,7 @@ def main():
     config.SEED = args.seed
     config.HEADLESS = args.headless
     config.IDEAL_CHANNEL = args.ideal
-    config.STATIC_INTERVAL = args.static_interval  # Add this line
+    config.STATIC_INTERVAL = args.static_interval
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -168,8 +163,8 @@ def main():
     # Instantiate the buoys
     mobile_buoys = []
     for i in range(config.MOBILE_BUOY_COUNT):
-        if args.vessel_index is not None and i == args.vessel_index:
-            vessel = Vessel(
+        mobile_buoys.append(
+            Buoy(
                 channel=channel,
                 position=random_position(),
                 is_mobile=True,
@@ -177,47 +172,20 @@ def main():
                 velocity=random_velocity(),
                 metrics=metrics
             )
-            mobile_buoys.append(vessel)
-            # Set vessel ID in metrics
-            if metrics:
-                metrics.vessel_id = vessel.id
-        else:
-            mobile_buoys.append(
-                Buoy(
-                    channel=channel,
-                    position=random_position(),
-                    is_mobile=True,
-                    battery=config.DEFAULT_BATTERY,
-                    velocity=random_velocity(),
-                    metrics=metrics
-                )
-            )
+        )
             
     static_buoys = []
     for i in range(config.FIXED_BUOY_COUNT):
         pos = positions[i] if positions else random_position()
-        if args.vessel_index is not None and i + config.MOBILE_BUOY_COUNT == args.vessel_index:
-            vessel = Vessel(
+        static_buoys.append(
+            Buoy(
                 channel=channel,
                 position=pos,
                 is_mobile=False,
                 battery=config.DEFAULT_BATTERY,
                 metrics=metrics
             )
-            static_buoys.append(vessel)
-            # Set vessel ID in metrics
-            if metrics:
-                metrics.vessel_id = vessel.id
-        else:
-            static_buoys.append(
-                Buoy(
-                    channel=channel,
-                    position=pos,
-                    is_mobile=False,
-                    battery=config.DEFAULT_BATTERY,
-                    metrics=metrics
-                )
-            )
+        )
 
     buoys = mobile_buoys + static_buoys
 
