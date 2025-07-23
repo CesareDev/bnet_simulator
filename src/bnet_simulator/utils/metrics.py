@@ -37,8 +37,8 @@ class Metrics:
                     self.reaction_latencies.append(latency)
                     self.discovery_times[receiver_id][sender_id] = receive_time
 
-    def log_lost(self):
-        self.beacons_lost += 1
+    def log_lost(self, count=1):
+        self.beacons_lost += count
 
     def log_collision(self):
         self.beacons_collided += 1
