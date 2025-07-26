@@ -105,10 +105,12 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
         positions_files.append(static_positions_file)
         with open(static_positions_file, "w") as f:
             json.dump(scenario["positions"], f)
+        
         static_result_file = os.path.join(
             results_dir,
             f"static_density{scenario['density']}_n{scenario['fixed_buoy_count']}.csv"
         )
+            
         static_cmd = BASE_CMD + [
             "--mode", "static",
             "--seed", str(seed),
@@ -127,6 +129,7 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
             static_cmd.append("--headless")
         if IDEAL:
             static_cmd.append("--ideal")
+            
         all_procs.append(subprocess.Popen(static_cmd))
         time.sleep(0.1)
         
@@ -135,10 +138,12 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
         positions_files.append(dynamic_positions_file)
         with open(dynamic_positions_file, "w") as f:
             json.dump(scenario["positions"], f)
+            
         dynamic_result_file = os.path.join(
             results_dir,
             f"dynamic_density{scenario['density']}_n{scenario['fixed_buoy_count']}.csv"
         )
+            
         dynamic_cmd = BASE_CMD + [
             "--mode", "dynamic",
             "--seed", str(seed),
@@ -155,6 +160,7 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
         
         if IDEAL:
             dynamic_cmd.append("--ideal")
+            
         all_procs.append(subprocess.Popen(dynamic_cmd))
         time.sleep(0.1)
     
@@ -193,16 +199,31 @@ def main():
         help="Static interval value (default: 1.0)"
     )
     args = parser.parse_args()
+    
     global IDEAL, BASE_PARAM_SETS, STATIC_INTERVAL
     IDEAL = args.ideal
     STATIC_INTERVAL = args.static_interval
     
+    # Make static interval available to config
+    config.STATIC_INTERVAL = STATIC_INTERVAL
+    config.IDEAL_CHANNEL = IDEAL
+    
+    # Set directory names based on interval and ideal flag
+    interval_str = str(int(STATIC_INTERVAL))
+    ideal_suffix = "_ideal" if IDEAL else ""
+    
     # Regular density scenarios
-    duration = 180  # 10 minutes
-    BASE_PARAM_SETS = generate_density_scenarios(densities=range(2, 11), duration=duration, headless=True, world_width=800, world_height=800)
-    # Include interval in directory names
-    RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
-    PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{int(STATIC_INTERVAL)}" + ("_ideal" if IDEAL else ""))
+    print(f"Running density sweep experiment with interval={STATIC_INTERVAL}s...")
+    duration = 900  # 15 minutes
+    BASE_PARAM_SETS = generate_density_scenarios(
+        densities=range(2, 30), 
+        duration=duration, 
+        headless=True, 
+        world_width=800, 
+        world_height=800
+    )
+    RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{interval_str}{ideal_suffix}")
+    PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{interval_str}{ideal_suffix}")
     
     os.makedirs(RESULTS_DIR, exist_ok=True)
     os.makedirs(PLOTS_DIR, exist_ok=True)
@@ -220,14 +241,16 @@ def main():
     else:
         print("Found existing CSV files for both static and dynamic, skipping simulations.")
 
-    # Uncommented plotting section
+    # Plot results
     print("Plotting results...")
-    subprocess.run([
+    plot_cmd = [
         "uv", "run", "python", "src/bnet_simulator/plot_metrics.py",
         "--results-dir", RESULTS_DIR,
         "--plot-dir", PLOTS_DIR,
-        "--interval", str(STATIC_INTERVAL)  # Pass interval to plotting script
-    ])
+        "--interval", str(STATIC_INTERVAL)
+    ]
+        
+    subprocess.run(plot_cmd)
     print("All simulations complete.")
 
 if __name__ == "__main__":

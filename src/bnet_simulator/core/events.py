@@ -11,3 +11,4 @@ class EventType(Enum):
     NEIGHBOR_CLEANUP = auto()      # Check for expired neighbors
     BUOY_MOVEMENT = auto()         # Update buoy position
     CHANNEL_UPDATE = auto()        # Clean up expired transmissions
+    BUOY_ARRAY_UPDATE = auto()     # Update the array of buoys

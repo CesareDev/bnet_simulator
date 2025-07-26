@@ -28,6 +28,11 @@ class Simulator:
         self.running = False
         self.simulated_time = 0.0
         
+        # For dynamic buoy array updates
+        self.all_buoys = buoys.copy()
+        self.first_change = True
+        self.next_buoy_change = 0
+        
         for buoy in self.buoys:
             buoy.simulator = self
         
@@ -58,6 +63,81 @@ class Simulator:
                 self.schedule_event(0.1, EventType.BUOY_MOVEMENT, buoy)
         
         self.schedule_event(1.0, EventType.CHANNEL_UPDATE, self.channel)
+        
+        # Schedule first buoy array update at 30 seconds
+        self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
+
+    def update_buoy_array(self, event, sim_time: float):
+        """Handle dynamic buoy array updates"""
+        self._update_buoy_array_random(sim_time)
+
+    def _update_buoy_array_random(self, sim_time: float):
+        """Random buoy add/remove functionality"""
+        active_buoys = self.buoys.copy()
+        inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
+        total_buoys = len(self.all_buoys)
+
+        # First change always removes buoys, after that randomize add/remove
+        if self.first_change or (random.random() >= 0.5 and len(active_buoys) > max(3, int(total_buoys * 0.2))):
+            # REMOVE BUOYS
+            min_buoys = max(3, int(total_buoys * 0.2))  # Ensure 20% minimum remain
+
+            if len(active_buoys) > min_buoys:
+                # 40-50% removal rate
+                remove_percentage = 0.5 if self.first_change else 0.4
+                max_to_remove = min(len(active_buoys) - min_buoys, 
+                                  max(2, int(total_buoys * remove_percentage)))
+                
+                num_to_remove = max_to_remove if max_to_remove <= 2 else random.randint(1, max_to_remove)
+                buoys_to_remove = random.sample(active_buoys, num_to_remove)
+                
+                # Remove these buoys
+                for buoy in buoys_to_remove:
+                    if buoy in self.buoys:  # Safety check
+                        self.buoys.remove(buoy)
+                        logging.log_info(f"Removed buoy {str(buoy.id)[:6]} at {sim_time:.2f}s")
+
+                # Update channel with new buoy list
+                self.channel.set_buoys(self.buoys)
+                logging.log_info(f"Removed {num_to_remove} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
+
+                if self.first_change:
+                    logging.log_info("First buoy change: forced major removal operation")
+                    self.first_change = False
+        elif inactive_buoys:
+            # ADD BUOYS
+            max_to_add = min(len(inactive_buoys), max(2, int(total_buoys * 0.4)))  # Up to 40% of total
+            
+            num_to_add = max_to_add if max_to_add <= 2 else random.randint(1, max_to_add)
+            buoys_to_add = random.sample(inactive_buoys, num_to_add)
+            
+            # Add these buoys
+            for buoy in buoys_to_add:
+                self.buoys.append(buoy)
+                # Make sure the buoy knows about this simulator
+                buoy.simulator = self
+                # Schedule initial events for this buoy
+                initial_offset = random.uniform(0, 1.0) 
+                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
+                self.schedule_event(sim_time + config.NEIGHBOR_TIMEOUT, EventType.NEIGHBOR_CLEANUP, buoy)
+                if hasattr(buoy, 'is_mobile') and buoy.is_mobile:
+                    self.schedule_event(sim_time + 0.1, EventType.BUOY_MOVEMENT, buoy)
+                
+                logging.log_info(f"Added buoy {str(buoy.id)[:6]} at {sim_time:.2f}s")
+                
+            # Update channel with new buoy list
+            self.channel.set_buoys(self.buoys)
+            logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
+            self.first_change = False
+
+        # Schedule next change (every 15-20 seconds)
+        next_change_time = sim_time + random.uniform(15, 20)
+        self.schedule_event(next_change_time, EventType.BUOY_ARRAY_UPDATE, self)
+
+    def handle_event(self, event, sim_time: float):
+        """Handle simulator-directed events"""
+        if event.event_type == EventType.BUOY_ARRAY_UPDATE:
+            self.update_buoy_array(event, sim_time)
 
     def start(self):
         self.running = True
@@ -79,7 +159,11 @@ class Simulator:
                     logging.log_info(f"Time: {self.simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
                 
                 try:
-                    event.target_obj.handle_event(event, self.simulated_time)
+                    # Direct events to the simulator itself if target is self
+                    if event.target_obj == self:
+                        self.handle_event(event, self.simulated_time)
+                    else:
+                        event.target_obj.handle_event(event, self.simulated_time)
                 except Exception as e:
                     logging.log_error(f"Error handling event {event}: {str(e)}")
                     

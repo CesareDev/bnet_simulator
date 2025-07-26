@@ -13,10 +13,10 @@ class Metrics:
         self.reaction_latencies = []
         self.delivered_beacons = set()
         self.scheduler_latencies = []
-        self.potentially_sent = 0  # Total "sent" (sum over all senders × receivers in range)
-        self.actually_received = 0  # Total "received" (sum over all receivers)
-        self.potentially_sent_per_sender = {}  # sender_id -> count
-        self.actually_received_per_sender = {}  # sender_id -> count
+        self.potentially_sent = 0
+        self.actually_received = 0
+        self.potentially_sent_per_sender = {}
+        self.actually_received_per_sender = {}
         self.density = density
 
     def log_sent(self):

@@ -141,19 +141,6 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         plt.savefig(os.path.join(plot_dir, "collision_rate_block_by_density.png"))
     plt.close()
 
-def detect_data_type(results_dir):
-    """Detect if the results directory contains regular density data"""
-    files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
-    
-    # Check for regular density data
-    for f in files:
-        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
-        if "Density" in df.index and "Delivery Ratio" in df.index:
-            return "density"
-    
-    # Default to density
-    return "density"
-
 def extract_interval_from_dirname(dirname):
     """Extract interval value from directory name if present"""
     match = re.search(r'interval(\d+)', dirname)

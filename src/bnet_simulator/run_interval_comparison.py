@@ -2,7 +2,7 @@ import os
 import subprocess
 
 # Define intervals to test
-INTERVALS = [1.0]
+INTERVALS = [0.2]
 # Whether to use ideal channel
 IDEAL = True
 
@@ -23,8 +23,11 @@ def main():
         subprocess.run(cmd)
         
         # Get directory names for results and plots
-        results_dir = os.path.join("metrics", f"tune_results_interval{int(interval)}" + ("_ideal" if IDEAL else ""))
-        plots_dir = os.path.join("metrics", f"tune_plots_interval{int(interval)}" + ("_ideal" if IDEAL else ""))
+        interval_str = str(int(interval))
+        ideal_suffix = "_ideal" if IDEAL else ""
+        
+        results_dir = os.path.join("metrics", f"tune_results_interval{interval_str}{ideal_suffix}")
+        plots_dir = os.path.join("metrics", f"tune_plots_interval{interval_str}{ideal_suffix}")
         
         print(f"Completed scenario with interval = {interval}s")
         print(f"Results saved to {results_dir}")

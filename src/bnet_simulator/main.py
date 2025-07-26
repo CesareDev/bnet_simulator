@@ -4,7 +4,6 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 from bnet_simulator.core.simulator import Simulator
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.buoys.buoy import Buoy
-# Removed Vessel import
 from bnet_simulator.utils import config
 from bnet_simulator.utils.metrics import Metrics
 import random
@@ -85,7 +84,6 @@ def parse_args():
         action='store_true',
         help="Use ideal channel conditions (no loss)"
     )
-    # Removed vessel-index argument
     parser.add_argument(
         "--static-interval",
         type=float,
@@ -139,7 +137,9 @@ def main():
     config.SEED = args.seed
     config.HEADLESS = args.headless
     config.IDEAL_CHANNEL = args.ideal
-    config.STATIC_INTERVAL = args.static_interval
+    # Make static interval available to config
+    if args.static_interval:
+        config.STATIC_INTERVAL = args.static_interval
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -188,26 +188,19 @@ def main():
         )
 
     buoys = mobile_buoys + static_buoys
-
     channel.set_buoys(buoys)
 
     # Create a simulator instance
-    sim = Simulator(buoys, channel)
+    simulator = Simulator(buoys, channel)
 
-    # Start the simulation (simulation time is defined in the config file)
-    sim.start()
+    # Start the simulation
+    simulator.start()
 
-    summary = metrics.summary(sim.simulated_time) if metrics else None
+    summary = metrics.summary(simulator.simulated_time) if metrics else None
 
     # Export metrics to CSV
     if metrics:
         metrics.export_metrics_to_csv(summary, filename=args.result_file)
-
-    # Compute and print the measured density
-    # positions = [buoy.position for buoy in static_buoys]
-    # comm_range = config.COMMUNICATION_RANGE_HIGH_PROB
-    # measured_density = compute_average_density(positions, comm_range)
-    # print(f"Measured density: {measured_density}")
 
 if __name__ == "__main__":
     main()
