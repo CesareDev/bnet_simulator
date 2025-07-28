@@ -88,7 +88,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         
         # Include interval in filename if provided
         if interval:
-            plt.savefig(os.path.join(plot_dir, f"delivery_ratio_interval{interval}.png"))
+            plt.savefig(os.path.join(plot_dir, f"delivery_ratio_interval{int(interval*10)}.png"))
         else:
             plt.savefig(os.path.join(plot_dir, "delivery_ratio_block_by_density.png"))
         plt.close()
@@ -136,17 +136,146 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     plt.tight_layout()
     
     if interval:
-        plt.savefig(os.path.join(plot_dir, f"collision_rate_interval{interval}.png"))
+        plt.savefig(os.path.join(plot_dir, f"collision_rate_interval{int(interval*10)}.png"))
     else:
         plt.savefig(os.path.join(plot_dir, "collision_rate_block_by_density.png"))
+    plt.close()
+    
+    # Also create grouped plots if there's enough data
+    if len(densities) > 5:
+        plot_grouped_by_density(df, coll_df, plot_dir, interval)
+
+def plot_grouped_by_density(pdr_df, coll_df, plot_dir, interval=None):
+    """Plot metrics with densities grouped in ranges of 5 (1-5, 6-10, etc.)"""
+    
+    # Function to assign density group
+    def get_density_group(density):
+        # Group into ranges of 5 (1-5, 6-10, 11-15, etc.)
+        return f"{5*((int(density)-1)//5) + 1}-{5*((int(density)-1)//5) + 5}"
+    
+    # Add density group column
+    pdr_df['DensityGroup'] = pdr_df['Density'].apply(get_density_group)
+    coll_df['DensityGroup'] = coll_df['Density'].apply(get_density_group)
+    
+    # Group by density group and scheduler type
+    grouped_pdr = pdr_df.groupby(['DensityGroup', 'Scheduler']).mean().reset_index()
+    grouped_coll = coll_df.groupby(['DensityGroup', 'Scheduler']).mean().reset_index()
+    
+    # Get unique density groups and ensure they're sorted correctly
+    def sort_key(group):
+        return int(group.split('-')[0])  # Sort by the lower bound of each group
+    
+    density_groups = sorted(grouped_pdr['DensityGroup'].unique(), key=sort_key)
+    schedulers = ["static", "dynamic"]
+    
+    # Always use SBP and ACAB names
+    scheduler_labels = {"static": "SBP", "dynamic": "ACAB"}
+    color_map = {"static": "tab:blue", "dynamic": "tab:green"}
+    
+    # PLOT 1: Delivery Ratio (Grouped)
+    bar_width = 0.35
+    x = np.arange(len(density_groups))
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    for i, sched in enumerate(schedulers):
+        pdrs = []
+        for grp in density_groups:
+            row = grouped_pdr[(grouped_pdr["DensityGroup"] == grp) & (grouped_pdr["Scheduler"] == sched)]
+            pdrs.append(row["PDR"].values[0] if not row.empty else 0)
+        ax.bar(x + i * bar_width, pdrs, bar_width, label=scheduler_labels[sched], color=color_map[sched])
+    
+    ax.set_xlabel("Local Density Groups (neighbors in range)")
+    ax.set_ylabel("Average Delivery Ratio")
+    
+    # Add interval to title if provided
+    if interval:
+        ax.set_title(f"Delivery Ratio vs Density Groups (Static Interval: {interval}s)")
+    else:
+        ax.set_title("Delivery Ratio vs Density Groups")
+        
+    ax.set_xticks(x + bar_width/2)
+    ax.set_xticklabels(density_groups)
+    ax.legend()
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+    plt.tight_layout()
+    
+    # Include interval in filename if provided
+    if interval:
+        plt.savefig(os.path.join(plot_dir, f"delivery_ratio_grouped_interval{int(interval*10)}.png"))
+    else:
+        plt.savefig(os.path.join(plot_dir, "delivery_ratio_grouped.png"))
+    plt.close()
+    
+    # PLOT 2: Collision Rate (Grouped)
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    for i, sched in enumerate(schedulers):
+        rates = []
+        for grp in density_groups:
+            row = grouped_coll[(grouped_coll["DensityGroup"] == grp) & (grouped_coll["Scheduler"] == sched)]
+            rates.append(row["CollisionRate"].values[0] if not row.empty else 0)
+        ax.bar(x + i * bar_width, rates, bar_width, label=scheduler_labels[sched], color=color_map[sched])
+    
+    ax.set_xlabel("Local Density Groups (neighbors in range)")
+    ax.set_ylabel("Average Collision Rate")
+    
+    if interval:
+        ax.set_title(f"Collision Rate vs Density Groups (Static Interval: {interval}s)")
+    else:
+        ax.set_title("Collision Rate vs Density Groups")
+        
+    ax.set_xticks(x + bar_width/2)
+    ax.set_xticklabels(density_groups)
+    ax.legend()
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+    plt.tight_layout()
+    
+    if interval:
+        plt.savefig(os.path.join(plot_dir, f"collision_rate_grouped_interval{int(interval*10)}.png"))
+    else:
+        plt.savefig(os.path.join(plot_dir, "collision_rate_grouped.png"))
     plt.close()
 
 def extract_interval_from_dirname(dirname):
     """Extract interval value from directory name if present"""
     match = re.search(r'interval(\d+)', dirname)
     if match:
-        return int(match.group(1))
+        # Convert back to float by dividing by 10
+        interval_value = int(match.group(1))
+        # Check if this is a converted decimal (value < 10)
+        if interval_value < 10:
+            return interval_value / 10.0  # Convert back to decimal (2 → 0.2)
+        return interval_value
     return None
+
+def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
+    modes = [("static", "tab:blue"), ("dynamic", "tab:green")]
+    plt.figure(figsize=(10, 6))
+    found = False
+
+    for mode, color in modes:
+        csv_file = os.path.join(results_dir, f"{mode}_ramp_timeseries.csv")
+        if os.path.exists(csv_file):
+            df = pd.read_csv(csv_file)
+            plt.plot(df["time"], df["delivery_ratio"], label=mode.capitalize(), color=color)
+            found = True
+
+    if not found:
+        print("No ramp timeseries files found for plotting.")
+        return
+
+    plt.xlabel("Time (s)")
+    plt.ylabel("Delivery Ratio")
+    if interval:
+        plt.title(f"Delivery Ratio vs Time (Ramp Scenario, Static Interval: {interval}s)")
+    else:
+        plt.title("Delivery Ratio vs Time (Ramp Scenario)")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(plot_file)
+    plt.close()
 
 def main():
     import argparse
@@ -159,7 +288,6 @@ def main():
     results_dir = args.results_dir or os.environ.get("RESULTS_DIR", "tune_results")
     plot_dir = args.plot_dir or os.environ.get("PLOT_DIR", "tune_plots")
 
-    # Try to extract interval from directory name if not provided
     interval = args.interval
     if interval is None:
         interval = extract_interval_from_dirname(results_dir)
@@ -174,7 +302,11 @@ def main():
 
     print("Plotting standard metrics...")
     plot_block_by_density(results_dir, plot_dir, interval=interval)
-    
+
+    print("Plotting delivery ratio vs time for ramp scenarios...")
+    plot_file = os.path.join(plot_dir, "delivery_ratio_vs_time_ramp.png")
+    plot_delivery_ratio_vs_time(results_dir, plot_file, interval=interval)
+
     print("Plots saved to:", plot_dir)
 
 if __name__ == "__main__":

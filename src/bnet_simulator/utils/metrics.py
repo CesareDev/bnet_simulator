@@ -18,6 +18,7 @@ class Metrics:
         self.potentially_sent_per_sender = {}
         self.actually_received_per_sender = {}
         self.density = density
+        self.time_series = []
 
     def log_sent(self):
         self.beacons_sent += 1
@@ -57,9 +58,16 @@ class Metrics:
         self.actually_received += 1
         self.actually_received_per_sender[sender_id] = self.actually_received_per_sender.get(sender_id, 0) + 1
 
+    def log_timepoint(self, sim_time, n_buoys):
+        self.time_series.append({
+            "time": sim_time,
+            "delivery_ratio": self.delivery_ratio(),
+            "n_buoys": n_buoys
+        })
+
     def delivery_ratio(self):
         return self.actually_received / self.potentially_sent if self.potentially_sent else 0
-
+    
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
         base_summary = {
@@ -114,3 +122,22 @@ class Metrics:
             for key, value in summary.items():
                 writer.writerow([key, value])
         logging.log_info(f"Metrics exported to {filepath}")
+
+    def export_time_series(self, filename=None):
+        import pandas as pd
+        if filename is None:
+            results_dir = os.path.join("metrics", "tune_results")
+            os.makedirs(results_dir, exist_ok=True)
+            filename = (
+                f"{config.SCHEDULER_TYPE}_"
+                f"{int(config.WORLD_WIDTH)}x{int(config.WORLD_HEIGHT)}_"
+                f"mob{config.MOBILE_BUOY_COUNT}_fix{config.FIXED_BUOY_COUNT}_timeseries.csv"
+            )
+            filepath = os.path.join(results_dir, filename)
+        else:
+            filepath = filename
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        df = pd.DataFrame(self.time_series)
+        df.to_csv(filepath, index=False)
+        logging.log_info(f"Time series exported to {filepath}")

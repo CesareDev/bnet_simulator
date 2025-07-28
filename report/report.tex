@@ -1,35 +1,87 @@
 \documentclass{article}
 \usepackage{amsmath}
+\usepackage{amssymb}
 
-\title{Beacon Interval Formula}
+\title{Dynamic Beacon Scheduler (ACAB)}
 \author{}
 \date{}
 
 \begin{document}
 \maketitle
 
-\section*{Formula}
+\section{Formula (only density)}
 
-The beacon interval is calculated based on network density:
+\subsection{Normalized Density Factor}
+First, we calculate a normalized density factor $f$ based on the number of neighbors:
 
-\subsection*{Parameters}
-\begin{itemize}
-    \item $n$: Number of neighbors
-    \item $D_{max} = 15$: Maximum density threshold
-    \item $I_{min}$: Minimum beacon interval
-    \item $I_{max}$: Maximum beacon interval
-\end{itemize}
-
-\subsection*{Equation}
-\begin{align}
-\rho &= \min\left(1, \frac{n}{D_{max}}\right) \\
-I &= I_{min} + \rho \cdot (I_{max} - I_{min})
-\end{align}
+\begin{equation}
+f = \min(1, \frac{N}{N_{th}})
+\end{equation}
 
 Where:
 \begin{itemize}
-    \item $\rho$: Density factor (0-1)
-    \item $I$: Resulting beacon interval
+    \item $N$ is the current number of neighbors
+    \item $N_{th}$ is the threshold (set to 15)
 \end{itemize}
+
+\subsection{Squared Factor}
+Next, we square the factor to increase the effect of density:
+
+\begin{equation}
+F_q = f \times f
+\end{equation}
+
+\subsection{Base Interval}
+The base interval is calculated as:
+
+\begin{equation}
+BI = BI_{min} + F_q \times (BI_{max} - BI_{min})
+\end{equation}
+
+Where:
+\begin{itemize}
+    \item $BI_{min}$ is the minimum interval (0.2s or 0.5s)
+    \item $BI_{max}$ is the maximum interval (5.0s)
+\end{itemize}
+
+\subsection{Jitter}
+A random jitter is applied between -0.5 and 0.5:
+
+\begin{equation}
+BI_{final} = BI \times (1 + jitter)
+\end{equation}
+
+\subsection{Final Bounds}
+The final interval is constrained:
+
+\begin{equation}
+BI_{final} = \max(BI_{min}, \min(BI_{final}, BI_{max}))
+\end{equation}
+
+\section{Formula (density + contact)}
+
+The contact score is:
+
+\begin{equation}
+Cs = \max(0, 1 - \frac{\Delta t}{20})
+\end{equation}
+
+where $\Delta t$ is the time (in seconds) since the most recent neighbor contact. The final score is a weighted sum of density and contact scores:
+
+\begin{equation}
+S = w_d \cdot f + w_c \cdot Cs
+\end{equation}
+
+where $w_d$ and $w_c$ are weights (for example, $w_d = 0.7$, $w_c = 0.3$). Then, as before, the interval is:
+
+\begin{equation}
+F_q = S^2
+\end{equation}
+
+\begin{equation}
+BI = BI_{min} + F_q \times (BI_{max} - BI_{min})
+\end{equation}
+
+Jitter and bounds are applied as in the previous formula.
 
 \end{document}

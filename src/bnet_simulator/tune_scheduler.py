@@ -9,11 +9,7 @@ import random
 from tqdm import tqdm
 from bnet_simulator.utils import config
 
-def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob", jitter=1.0):
-    """
-    Arrange buoys randomly within an area to achieve approximate neighbor density.
-    Uses random positions instead of a perfect circle to create more realistic scenarios.
-    """
+def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob"):
     comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9  # Use 90% of the range for safety
     k = neighbor_density
     
@@ -61,6 +57,21 @@ def generate_density_scenarios(
 ):
     range_type = "max" if not IDEAL else "high_prob"
     scenarios = []
+    # insert the scenario for the ramp
+    if RAMP:
+        positions = arrange_buoys_exact_density(world_width, world_height, 39, range_type=range_type)
+        scenarios.append({
+            "world_width": world_width,
+            "world_height": world_height,
+            "mobile_buoy_count": 0,
+            "fixed_buoy_count": len(positions),
+            "duration": duration,
+            "headless": headless,
+            "positions": positions,
+            "ramp": True,
+            "density": 1
+        })
+        return scenarios
     for d in densities:
         positions = arrange_buoys_exact_density(world_width, world_height, d, range_type=range_type)
         scenarios.append({
@@ -127,6 +138,10 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
         
         if scenario.get("headless"):
             static_cmd.append("--headless")
+        if scenario.get("ramp"):
+            static_cmd.append("--ramp")
+            result_file_path = os.path.join(results_dir, "static_ramp_timeseries.csv")
+            static_cmd[static_cmd.index("--result-file") + 1] = result_file_path
         if IDEAL:
             static_cmd.append("--ideal")
             
@@ -153,26 +168,23 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
             "--fixed-buoy-count", str(scenario["fixed_buoy_count"]),
             "--duration", str(scenario["duration"]),
             "--result-file", dynamic_result_file,
-            "--headless",
             "--positions-file", dynamic_positions_file,
             "--density", str(scenario["density"]),
+            "--static-interval", str(STATIC_INTERVAL),
         ]
         
+        if scenario.get("headless"):
+            dynamic_cmd.append("--headless")
+        if scenario.get("ramp"):
+            dynamic_cmd.append("--ramp")
+            result_file_path = os.path.join(results_dir, "dynamic_ramp_timeseries.csv")
+            dynamic_cmd[dynamic_cmd.index("--result-file") + 1] = result_file_path
         if IDEAL:
             dynamic_cmd.append("--ideal")
             
         all_procs.append(subprocess.Popen(dynamic_cmd))
         time.sleep(0.1)
-    
-    # Wait for all processes to complete
-    max_duration = max(scenario["duration"] for scenario in BASE_PARAM_SETS)
-    total_sims = len(all_procs)
-    print(f"Running {total_sims} simulations in parallel...")
-    with tqdm(total=max_duration, desc="Simulating all scenarios", unit="s") as pbar:
-        for _ in range(max_duration):
-            time.sleep(1)
-            pbar.update(1)
-    
+
     # Wait for any stragglers to finish
     for proc in all_procs:
         proc.wait()
@@ -182,58 +194,101 @@ def run_all_scenarios_parallel(scenario_seeds, results_dir):
         if os.path.exists(file):
             os.remove(file)
     
+    total_sims = len(all_procs)    
     print(f"All {total_sims} simulations completed.")
 
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--ideal",
-        action='store_true',
-        help="Use ideal channel conditions (no loss)"
-    )
-    parser.add_argument(
-        "--static-interval",
-        type=float,
-        default=1.0,
-        help="Static interval value (default: 1.0)"
-    )
+    parser.add_argument("--ideal", action='store_true', help="Use ideal channel conditions (no loss)")
+    parser.add_argument("--static-interval", type=float, default=1.0, help="Static interval value (default: 1.0)")
+    parser.add_argument("--ramp", action='store_true', help="Use ramp scenario (buoy count increases)")
     args = parser.parse_args()
-    
-    global IDEAL, BASE_PARAM_SETS, STATIC_INTERVAL
+
+    global IDEAL, BASE_PARAM_SETS, STATIC_INTERVAL, RAMP
     IDEAL = args.ideal
     STATIC_INTERVAL = args.static_interval
-    
-    # Make static interval available to config
+    RAMP = args.ramp
+
     config.STATIC_INTERVAL = STATIC_INTERVAL
+    config.BEACON_MIN_INTERVAL = STATIC_INTERVAL
     config.IDEAL_CHANNEL = IDEAL
-    
-    # Set directory names based on interval and ideal flag
-    interval_str = str(int(STATIC_INTERVAL))
+
+    interval_str = str(int(STATIC_INTERVAL * 10))
     ideal_suffix = "_ideal" if IDEAL else ""
-    
-    # Regular density scenarios
-    print(f"Running density sweep experiment with interval={STATIC_INTERVAL}s...")
-    duration = 900  # 15 minutes
-    BASE_PARAM_SETS = generate_density_scenarios(
-        densities=range(2, 30), 
-        duration=duration, 
-        headless=True, 
-        world_width=800, 
-        world_height=800
-    )
+    ramp_suffix = "_ramp" if RAMP else ""
+
+    duration = 300  # 5 minutes
+
+    if RAMP:
+        RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{interval_str}{ideal_suffix}{ramp_suffix}")
+        PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{interval_str}{ideal_suffix}{ramp_suffix}")
+        os.makedirs(RESULTS_DIR, exist_ok=True)
+        os.makedirs(PLOTS_DIR, exist_ok=True)
+
+        BASE_PARAM_SETS = generate_density_scenarios(
+            densities=[39],  # 40 buoys (start with 2, add up to 40)
+            duration=duration,
+            headless=True,
+            world_width=800,
+            world_height=800
+        )
+        scenario = BASE_PARAM_SETS[0]
+        for mode in ["static", "dynamic"]:
+            result_file = os.path.join(RESULTS_DIR, f"{mode}_ramp_timeseries.csv")
+            positions_file = f"positions_{mode}_ramp.json"
+            with open(positions_file, "w") as f:
+                json.dump(scenario["positions"], f)
+            cmd = [
+                "uv", "run", "python", "src/bnet_simulator/main.py",
+                "--mode", mode,
+                "--seed", str(int(time.time())),
+                "--world-width", str(scenario["world_width"]),
+                "--world-height", str(scenario["world_height"]),
+                "--mobile-buoy-count", str(scenario["mobile_buoy_count"]),
+                "--fixed-buoy-count", str(scenario["fixed_buoy_count"]),
+                "--duration", str(scenario["duration"]),
+                "--result-file", result_file,
+                "--positions-file", positions_file,
+                "--static-interval", str(STATIC_INTERVAL),
+                "--ramp"
+            ]
+            if IDEAL:
+                cmd.append("--ideal")
+            print(f"Running: {' '.join(cmd)}")
+            subprocess.run(cmd)
+            if os.path.exists(positions_file):
+                os.remove(positions_file)
+
+        print("Plotting results...")
+        plot_cmd = [
+            "uv", "run", "python", "src/bnet_simulator/plot_metrics.py",
+            "--results-dir", RESULTS_DIR,
+            "--plot-dir", PLOTS_DIR,
+            "--interval", str(STATIC_INTERVAL)
+        ]
+        subprocess.run(plot_cmd)
+        print("All ramp simulations complete.")
+        return
+
+    # Non-ramp scenario (density sweep)
     RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{interval_str}{ideal_suffix}")
     PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{interval_str}{ideal_suffix}")
-    
     os.makedirs(RESULTS_DIR, exist_ok=True)
     os.makedirs(PLOTS_DIR, exist_ok=True)
 
+    BASE_PARAM_SETS = generate_density_scenarios(
+        densities=range(2, 40),
+        duration=duration,
+        headless=True,
+        world_width=800,
+        world_height=800
+    )
     scenario_seeds = [int(time.time()) + i for i in range(len(BASE_PARAM_SETS))]
 
-    # Check if we need to run any simulations
     need_static = not results_exist(RESULTS_DIR, "static")
     need_dynamic = not results_exist(RESULTS_DIR, "dynamic")
-    
+
     if need_static or need_dynamic:
         print("Running simulations in parallel...")
         run_all_scenarios_parallel(scenario_seeds, RESULTS_DIR)
@@ -241,7 +296,6 @@ def main():
     else:
         print("Found existing CSV files for both static and dynamic, skipping simulations.")
 
-    # Plot results
     print("Plotting results...")
     plot_cmd = [
         "uv", "run", "python", "src/bnet_simulator/plot_metrics.py",
@@ -249,7 +303,6 @@ def main():
         "--plot-dir", PLOTS_DIR,
         "--interval", str(STATIC_INTERVAL)
     ]
-        
     subprocess.run(plot_cmd)
     print("All simulations complete.")
 

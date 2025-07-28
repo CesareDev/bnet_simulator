@@ -90,6 +90,11 @@ def parse_args():
         default=config.STATIC_INTERVAL,
         help="Interval for static scheduler in seconds (default: 1.0)"
     )
+    parser.add_argument(
+        "--ramp",
+        action='store_true',
+        help="Use ramp scenario (default: False)"
+    )
     return parser.parse_args()
 
 def random_position():
@@ -124,6 +129,14 @@ def compute_average_density(positions, comm_range):
         densities.append(count)
     avg_density = sum(densities) / len(densities)
     return math.ceil(avg_density)
+
+def in_range_position(center_x, center_y, radius):
+    angle = random.uniform(0, 2 * math.pi)
+    r = random.uniform(0, radius)
+    return (
+        center_x + r * math.cos(angle),
+        center_y + r * math.sin(angle)
+    )
 
 def main():
     # Parse command line arguments
@@ -160,7 +173,6 @@ def main():
     # Instantiate a channel
     channel = Channel(metrics=metrics)
 
-    # Instantiate the buoys
     mobile_buoys = []
     for i in range(config.MOBILE_BUOY_COUNT):
         mobile_buoys.append(
@@ -173,7 +185,7 @@ def main():
                 metrics=metrics
             )
         )
-            
+
     static_buoys = []
     for i in range(config.FIXED_BUOY_COUNT):
         pos = positions[i] if positions else random_position()
@@ -191,16 +203,19 @@ def main():
     channel.set_buoys(buoys)
 
     # Create a simulator instance
-    simulator = Simulator(buoys, channel)
+    simulator = Simulator(buoys, channel, metrics, args.ramp)
 
     # Start the simulation
     simulator.start()
 
-    summary = metrics.summary(simulator.simulated_time) if metrics else None
-
     # Export metrics to CSV
-    if metrics:
+    if metrics and not args.ramp:
+        summary = metrics.summary(simulator.simulated_time) if metrics else None
         metrics.export_metrics_to_csv(summary, filename=args.result_file)
+
+    if args.ramp:
+        # Export time series data for ramp scenario
+        metrics.export_time_series(args.result_file)
 
 if __name__ == "__main__":
     main()

@@ -7,7 +7,7 @@ class BeaconScheduler:
     def __init__(
         self,
         min_interval: float = config.BEACON_MIN_INTERVAL,
-        max_interval: float = config.BEACON_MAX_INTERVAL,
+        max_interval: float = config.BEACON_MAX_INTERVAL
     ):
         self.min_interval = min_interval
         self.max_interval = max_interval
@@ -20,9 +20,10 @@ class BeaconScheduler:
     
     def get_next_check_interval(self) -> float:
         if config.SCHEDULER_TYPE == "static":
-            return max(0.1, config.STATIC_INTERVAL * 0.1)
+            return config.STATIC_INTERVAL
         else:
-            return max(0.1, self.min_interval * 0.2)
+            # Use the most recently computed dynamic interval, or min_interval if not set
+            return self.next_dynamic_interval if self.next_dynamic_interval is not None else self.min_interval
 
     def should_send(self, battery, velocity, neighbors, current_time):
         if config.SCHEDULER_TYPE == "static":
@@ -64,8 +65,36 @@ class BeaconScheduler:
         neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
         current_time: float,
     ) -> float:
+        # Density factor
         n_neighbors = len(neighbors)
-        max_density = 15.0
-        density_factor = min(1.0, n_neighbors / max_density)
-        interval = self.min_interval + density_factor * (self.max_interval - self.min_interval)
-        return max(self.min_interval, min(interval, self.max_interval))
+        NEIGHBORS_THRESHOLD = 15
+        density_score = min(1.0, n_neighbors / NEIGHBORS_THRESHOLD)
+
+        # Contact score: 1 for recent contact, 0 for long time since contact
+        # CONTACT_THRESHOLD = 20.0  # seconds
+        # if neighbors:
+        #     # Find the most recent neighbor contact
+        #     last_contact = max((ts for _, ts, _ in neighbors), default=current_time)
+        #     delta = current_time - last_contact
+        #     contact_score = max(0.0, 1.0 - (delta / CONTACT_THRESHOLD))
+        # else:
+        #     contact_score = 0.0
+
+        # Weighted combination (density only)
+        combined = density_score  # Only density, no contact score
+
+        # Square the factor to get Fq = combined^2
+        fq = combined * combined
+
+        # Calculate base interval BI = BImin + Fq × (BImax - BImin)
+        bi_min = config.STATIC_INTERVAL
+        bi = bi_min + fq * (self.max_interval - bi_min)
+
+        # Add random jitter between -0.5 and 0.5
+        jitter = random.uniform(-0.5, 0.5)
+
+        # Calculate final interval with jitter: BIfinal = BI × (1 + jitter)
+        bi_final = bi * (1 + jitter)
+
+        # Ensure the interval stays within reasonable bounds
+        return max(self.min_interval, min(bi_final, self.max_interval))

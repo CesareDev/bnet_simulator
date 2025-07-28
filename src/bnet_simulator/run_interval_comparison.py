@@ -2,9 +2,13 @@ import os
 import subprocess
 
 # Define intervals to test
-INTERVALS = [0.2]
+INTERVALS = [0.25, 0.5]
+
 # Whether to use ideal channel
 IDEAL = True
+
+# Increasing scenario
+RAMP = False
 
 def main():
     for interval in INTERVALS:
@@ -18,16 +22,17 @@ def main():
         
         if IDEAL:
             cmd.append("--ideal")
+        if RAMP:
+            cmd.append("--ramp")
             
-        # This will run simulations and create plots in their own directories
         subprocess.run(cmd)
         
-        # Get directory names for results and plots
-        interval_str = str(int(interval))
+        interval_str = str(int(interval * 10))
         ideal_suffix = "_ideal" if IDEAL else ""
+        ramp_suffix = "_ramp" if RAMP else ""
         
-        results_dir = os.path.join("metrics", f"tune_results_interval{interval_str}{ideal_suffix}")
-        plots_dir = os.path.join("metrics", f"tune_plots_interval{interval_str}{ideal_suffix}")
+        results_dir = os.path.join("metrics", f"tune_results_interval{interval_str}{ideal_suffix}{ramp_suffix}")
+        plots_dir = os.path.join("metrics", f"tune_plots_interval{interval_str}{ideal_suffix}{ramp_suffix}")
         
         print(f"Completed scenario with interval = {interval}s")
         print(f"Results saved to {results_dir}")

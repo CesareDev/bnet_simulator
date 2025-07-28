@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Tuple, List
 import uuid
-import sys
 
 @dataclass
 class Beacon:
@@ -14,7 +13,8 @@ class Beacon:
 
     def size_bytes(self) -> int:
         # Base size + size per neighbor
-        return 16 + 1 + 8 + 4 + (16 + 4 + 8) * len(self.neighbors) + 4
+        # return 16 + 1 + 8 + 4 + (16 + 4 + 8) * len(self.neighbors) + 4
+        return 500 # Fixed
 
     def size_bits(self) -> int:
         return self.size_bytes() * 8

@@ -1,8 +1,8 @@
 import time
 import heapq
-import uuid
-from typing import List, Dict, Tuple, Optional, Callable
+from typing import List, Dict, Optional
 import random
+from bnet_simulator.utils.metrics import Metrics
 from bnet_simulator.buoys.buoy import Buoy
 from bnet_simulator.core.channel import Channel
 from bnet_simulator.core.events import EventType
@@ -20,25 +20,32 @@ class Event:
         return f"Event({self.time:.2f}, {self.event_type.name}, {str(target_id)[:6]})"
 
 class Simulator:
-    def __init__(self, buoys: List[Buoy], channel: Channel):
+    def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, ramp: bool = False):
         self.buoys = buoys
         self.channel = channel
+        self.metrics = metrics
+        self.ramp = ramp
+        self.all_buoys = buoys.copy()
+        self.first_change = True
+        self.next_buoy_change = 0
+
+        # Start with only 2 buoys active if ramp scenario
+        if ramp:
+            self.buoys = self.all_buoys[:2]
+        else:
+            self.buoys = buoys
+
         self.channel.set_buoys(self.buoys)
         self.channel.simulator = self
         self.running = False
         self.simulated_time = 0.0
-        
-        # For dynamic buoy array updates
-        self.all_buoys = buoys.copy()
-        self.first_change = True
-        self.next_buoy_change = 0
-        
+
         for buoy in self.buoys:
             buoy.simulator = self
-        
+
         self.event_queue = []
         self.event_counter = 0
-        
+
         self._schedule_initial_events()
 
     def schedule_event(self, time: float, event_type: EventType, target_obj, data: Optional[Dict] = None) -> None:
@@ -68,11 +75,12 @@ class Simulator:
         self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
 
     def update_buoy_array(self, event, sim_time: float):
-        """Handle dynamic buoy array updates"""
-        self._update_buoy_array_random(sim_time)
+        if self.ramp:
+            self._update_buoy_array_ramp(sim_time)
+        else:
+            self._update_buoy_array_random(sim_time)
 
     def _update_buoy_array_random(self, sim_time: float):
-        """Random buoy add/remove functionality"""
         active_buoys = self.buoys.copy()
         inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
         total_buoys = len(self.all_buoys)
@@ -134,8 +142,25 @@ class Simulator:
         next_change_time = sim_time + random.uniform(15, 20)
         self.schedule_event(next_change_time, EventType.BUOY_ARRAY_UPDATE, self)
 
+    def _update_buoy_array_ramp(self, sim_time: float):
+        active_buoys = self.buoys.copy()
+        inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
+        current_count = len(active_buoys)
+        if current_count < len(self.all_buoys):
+            # Add a buoy
+            if inactive_buoys:
+                buoy = inactive_buoys[0]
+                self.buoys.append(buoy)
+                buoy.simulator = self
+                initial_offset = random.uniform(0, 1.0)
+                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
+                self.schedule_event(sim_time + config.NEIGHBOR_TIMEOUT, EventType.NEIGHBOR_CLEANUP, buoy)
+        # Update channel with new buoy list
+        self.channel.set_buoys(self.buoys)
+        # Schedule next change in 10s
+        self.schedule_event(sim_time + 10, EventType.BUOY_ARRAY_UPDATE, self)
+
     def handle_event(self, event, sim_time: float):
-        """Handle simulator-directed events"""
         if event.event_type == EventType.BUOY_ARRAY_UPDATE:
             self.update_buoy_array(event, sim_time)
 
@@ -166,7 +191,10 @@ class Simulator:
                         event.target_obj.handle_event(event, self.simulated_time)
                 except Exception as e:
                     logging.log_error(f"Error handling event {event}: {str(e)}")
-                    
+                
+                if self.ramp and int(self.simulated_time) % 5 == 0 and self.simulated_time > 0:
+                    self.metrics.log_timepoint(self.simulated_time, len(self.buoys))
+
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
             self.running = False
