@@ -28,6 +28,7 @@ class Simulator:
         self.all_buoys = buoys.copy()
         self.first_change = True
         self.next_buoy_change = 0
+        self.ramp_direction = 1  # 1 for increment, -1 for decrement
 
         # Start with only 2 buoys active if ramp scenario
         if ramp:
@@ -146,19 +147,33 @@ class Simulator:
         active_buoys = self.buoys.copy()
         inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
         current_count = len(active_buoys)
-        if current_count < len(self.all_buoys):
-            # Add a buoy
-            if inactive_buoys:
-                buoy = inactive_buoys[0]
-                self.buoys.append(buoy)
-                buoy.simulator = self
-                initial_offset = random.uniform(0, 1.0)
-                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-                self.schedule_event(sim_time + config.NEIGHBOR_TIMEOUT, EventType.NEIGHBOR_CLEANUP, buoy)
-        # Update channel with new buoy list
-        self.channel.set_buoys(self.buoys)
-        # Schedule next change in 10s
-        self.schedule_event(sim_time + 10, EventType.BUOY_ARRAY_UPDATE, self)
+        total_buoys = len(self.all_buoys)
+        buoys_to_add = total_buoys - 2
+        duration = config.SIMULATION_DURATION
+        add_interval = duration / (2 * buoys_to_add) if buoys_to_add > 0 else duration  # 2x for up+down
+
+        if self.ramp_direction == 1:  # Incrementing
+            if current_count < total_buoys:
+                if inactive_buoys:
+                    buoy = inactive_buoys[0]
+                    self.buoys.append(buoy)
+                    buoy.simulator = self
+                    initial_offset = random.uniform(0, 1.0)
+                    self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
+                    self.schedule_event(sim_time + config.NEIGHBOR_TIMEOUT, EventType.NEIGHBOR_CLEANUP, buoy)
+                self.channel.set_buoys(self.buoys)
+                self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
+            else:
+                # Switch to decrementing
+                self.ramp_direction = -1
+                self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
+        else:  # Decrementing
+            if current_count > 2:
+                buoy = active_buoys[-1]
+                self.buoys.remove(buoy)
+                self.channel.set_buoys(self.buoys)
+                self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
+            # When reaching 2, stop scheduling further changes
 
     def handle_event(self, event, sim_time: float):
         if event.event_type == EventType.BUOY_ARRAY_UPDATE:

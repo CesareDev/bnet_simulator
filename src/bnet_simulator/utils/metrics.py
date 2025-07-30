@@ -103,8 +103,7 @@ class Metrics:
 
     def export_metrics_to_csv(self, summary, filename=None):
         if filename is None:
-            # Default: save to metrics/tune_results/
-            results_dir = os.path.join("metrics", "tune_results")
+            results_dir = os.path.join("metrics", "test_results")
             os.makedirs(results_dir, exist_ok=True)
             filename = (
                 f"{config.SCHEDULER_TYPE}_"
@@ -126,7 +125,7 @@ class Metrics:
     def export_time_series(self, filename=None):
         import pandas as pd
         if filename is None:
-            results_dir = os.path.join("metrics", "tune_results")
+            results_dir = os.path.join("metrics", "test_results")
             os.makedirs(results_dir, exist_ok=True)
             filename = (
                 f"{config.SCHEDULER_TYPE}_"

@@ -83,6 +83,7 @@ class Buoy:
             return
             
         if self.channel.is_busy(self.position, sim_time):
+            # Small delay (10ms) before retrying channel sense to avoid immediate busy-wait and allow event queue to advance
             self.simulator.schedule_event(
                 sim_time + 0.01, EventType.CHANNEL_SENSE, self
             )
@@ -221,3 +222,15 @@ class Buoy:
 
     def __repr__(self):
         return f"<Buoy id={str(self.id)[:6]} pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"
+    
+    # CSMA/CA Transmission Cycle Example:
+#
+# Step                | Time (s) | State        | Action
+# --------------------|----------|--------------|----------------------------------------
+# Scheduler Check     | 0.00     | RECEIVING    | Decide to send, schedule channel sense
+# Channel Sense       | 0.00     | WAITING_DIFS | Channel free, schedule DIFS
+# DIFS Completion     | 0.05     | BACKOFF      | Channel free, random backoff, schedule backoff completion
+# Backoff Completion  | 0.17     | RECEIVING    | Channel free, schedule transmission start
+# Transmission Start  | 0.17     | RECEIVING    | Send beacon, record scheduler latency
+#
+# If the channel is busy at any step, the buoy retries sensing after a short delay.

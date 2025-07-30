@@ -6,46 +6,33 @@ import glob
 import time
 import math
 import random
-from tqdm import tqdm
 from bnet_simulator.utils import config
 
-def arrange_buoys_exact_density(world_width, world_height, neighbor_density, range_type="high_prob"):
-    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9  # Use 90% of the range for safety
+TOTAL_BUOY = 50
+DURATION = 1800 # 30 minutes
+
+def arrange_buoys_exact_density(world_width, world_height, neighbor_density):
+    # Use a wider range for non-ideal channel
+    if not IDEAL:
+        comm_range = config.COMMUNICATION_RANGE_MAX * 0.9
+    else:
+        comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9
     k = neighbor_density
-    
-    # Use k+1 buoys for the minimum needed to achieve density k
     n_buoys = k + 1
-    
-    # Calculate the area size needed for this density
-    # For higher densities, we need a smaller area to keep buoys in range of each other
-    area_radius = comm_range * (1.5 - (0.5 * k / 30))  # Shrinks area as density increases
-    
-    # Ensure radius is reasonable - between 0.5 and 1.0 of comm_range
+    area_radius = comm_range * (1.5 - (0.5 * k / 30))
     area_radius = max(comm_range * 0.5, min(comm_range, area_radius))
-    
     center_x = world_width / 2
     center_y = world_height / 2
     positions = []
-    
-    # Use current time as seed for random generator
     random.seed(time.time())
-    
-    # Generate random positions within the calculated area
     for i in range(n_buoys):
-        # Random angle and distance from center
         angle = random.uniform(0, 2 * math.pi)
-        # Use square root for distance to ensure uniform distribution in circle
         distance = math.sqrt(random.random()) * area_radius
-        
         x = center_x + distance * math.cos(angle)
         y = center_y + distance * math.sin(angle)
-        
-        # Ensure positions are within world bounds
         x = max(10, min(world_width - 10, x))
         y = max(10, min(world_height - 10, y))
-        
         positions.append((x, y))
-    
     return positions
 
 def generate_density_scenarios(
@@ -55,11 +42,10 @@ def generate_density_scenarios(
     world_width,
     world_height
 ):
-    range_type = "max" if not IDEAL else "high_prob"
     scenarios = []
     # insert the scenario for the ramp
     if RAMP:
-        positions = arrange_buoys_exact_density(world_width, world_height, 39, range_type=range_type)
+        positions = arrange_buoys_exact_density(world_width, world_height, densities[0])
         scenarios.append({
             "world_width": world_width,
             "world_height": world_height,
@@ -73,7 +59,7 @@ def generate_density_scenarios(
         })
         return scenarios
     for d in densities:
-        positions = arrange_buoys_exact_density(world_width, world_height, d, range_type=range_type)
+        positions = arrange_buoys_exact_density(world_width, world_height, d)
         scenarios.append({
             "world_width": world_width,
             "world_height": world_height,
@@ -218,47 +204,54 @@ def main():
     ideal_suffix = "_ideal" if IDEAL else ""
     ramp_suffix = "_ramp" if RAMP else ""
 
-    duration = 300  # 5 minutes
+    duration = DURATION
 
     if RAMP:
-        RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{interval_str}{ideal_suffix}{ramp_suffix}")
-        PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{interval_str}{ideal_suffix}{ramp_suffix}")
+        RESULTS_DIR = os.path.join("metrics", f"test_results_interval{interval_str}{ideal_suffix}{ramp_suffix}")
+        PLOTS_DIR = os.path.join("metrics", f"test_plots_interval{interval_str}{ideal_suffix}{ramp_suffix}")
         os.makedirs(RESULTS_DIR, exist_ok=True)
         os.makedirs(PLOTS_DIR, exist_ok=True)
 
         BASE_PARAM_SETS = generate_density_scenarios(
-            densities=[39],  # 40 buoys (start with 2, add up to 40)
+            densities=[TOTAL_BUOY - 1],
             duration=duration,
             headless=True,
             world_width=800,
             world_height=800
         )
         scenario = BASE_PARAM_SETS[0]
-        for mode in ["static", "dynamic"]:
-            result_file = os.path.join(RESULTS_DIR, f"{mode}_ramp_timeseries.csv")
-            positions_file = f"positions_{mode}_ramp.json"
-            with open(positions_file, "w") as f:
-                json.dump(scenario["positions"], f)
-            cmd = [
-                "uv", "run", "python", "src/bnet_simulator/main.py",
-                "--mode", mode,
-                "--seed", str(int(time.time())),
-                "--world-width", str(scenario["world_width"]),
-                "--world-height", str(scenario["world_height"]),
-                "--mobile-buoy-count", str(scenario["mobile_buoy_count"]),
-                "--fixed-buoy-count", str(scenario["fixed_buoy_count"]),
-                "--duration", str(scenario["duration"]),
-                "--result-file", result_file,
-                "--positions-file", positions_file,
-                "--static-interval", str(STATIC_INTERVAL),
-                "--ramp"
-            ]
-            if IDEAL:
-                cmd.append("--ideal")
-            print(f"Running: {' '.join(cmd)}")
-            subprocess.run(cmd)
-            if os.path.exists(positions_file):
-                os.remove(positions_file)
+
+        # Check if ramp results already exist
+        static_ramp_file = os.path.join(RESULTS_DIR, "static_ramp_timeseries.csv")
+        dynamic_ramp_file = os.path.join(RESULTS_DIR, "dynamic_ramp_timeseries.csv")
+        if os.path.exists(static_ramp_file) and os.path.exists(dynamic_ramp_file):
+            print("Ramp results already exist, skipping simulation.")
+        else:
+            for mode in ["static", "dynamic"]:
+                result_file = os.path.join(RESULTS_DIR, f"{mode}_ramp_timeseries.csv")
+                positions_file = f"positions_{mode}_ramp.json"
+                with open(positions_file, "w") as f:
+                    json.dump(scenario["positions"], f)
+                cmd = [
+                    "uv", "run", "python", "src/bnet_simulator/main.py",
+                    "--mode", mode,
+                    "--seed", str(int(time.time())),
+                    "--world-width", str(scenario["world_width"]),
+                    "--world-height", str(scenario["world_height"]),
+                    "--mobile-buoy-count", str(scenario["mobile_buoy_count"]),
+                    "--fixed-buoy-count", str(scenario["fixed_buoy_count"]),
+                    "--duration", str(scenario["duration"]),
+                    "--result-file", result_file,
+                    "--positions-file", positions_file,
+                    "--static-interval", str(STATIC_INTERVAL),
+                    "--ramp"
+                ]
+                if IDEAL:
+                    cmd.append("--ideal")
+                print(f"Running: {' '.join(cmd)}")
+                subprocess.run(cmd)
+                if os.path.exists(positions_file):
+                    os.remove(positions_file)
 
         print("Plotting results...")
         plot_cmd = [
@@ -272,13 +265,12 @@ def main():
         return
 
     # Non-ramp scenario (density sweep)
-    RESULTS_DIR = os.path.join("metrics", f"tune_results_interval{interval_str}{ideal_suffix}")
-    PLOTS_DIR = os.path.join("metrics", f"tune_plots_interval{interval_str}{ideal_suffix}")
+    RESULTS_DIR = os.path.join("metrics", f"test_results_interval{interval_str}{ideal_suffix}")
+    PLOTS_DIR = os.path.join("metrics", f"test_plots_interval{interval_str}{ideal_suffix}")
     os.makedirs(RESULTS_DIR, exist_ok=True)
     os.makedirs(PLOTS_DIR, exist_ok=True)
-
     BASE_PARAM_SETS = generate_density_scenarios(
-        densities=range(2, 40),
+        densities=range(2, TOTAL_BUOY),  # 2 to 39 buoys, or 50 for ideal
         duration=duration,
         headless=True,
         world_width=800,

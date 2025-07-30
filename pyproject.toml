@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-test = "bnet_simulator.run_interval_comparison:main"
+test = "bnet_simulator.run:main"
 
 [build-system]
 requires = ["hatchling"]
