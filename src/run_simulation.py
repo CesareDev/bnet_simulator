@@ -5,18 +5,19 @@ import time
 import math
 import random
 
-IDEAL = True               # Use ideal channel conditions (no loss)
+IDEAL = True # Use ideal channel conditions (no loss)
 
-DENSITIES = [5, 10]  # Buoy densities to simulate
-INTERVALS = [0.25, 0.5]  # Static scheduler intervals to test
-DURATION = 300             # Simulation duration in seconds
+DENSITIES = [5, 10, 20] # Buoy densities to simulate
+INTERVALS = [0.25, 0.5] # Static scheduler intervals to test
+DURATION = 500 # Simulation duration in seconds
+RANDOM_POS = False # Use random buoy positions instead of density-based
 
-RAMP = False               # Use ramp scenario (buoy count increases over time)
-TOTAL_BUOY = 50            # Maximum number of buoys for ramp scenario
+RAMP = False # Use ramp scenario (buoy count increases over time)
+TOTAL_BUOY = 30 # Maximum number of buoys for ramp scenario
 
-WORLD_WIDTH = 800          # World width
-WORLD_HEIGHT = 800         # World height
-HEADLESS = True            # Run without GUI
+WORLD_WIDTH = 800 # World width
+WORLD_HEIGHT = 800 # World height
+HEADLESS = True # Run without GUI
 
 def arrange_buoys_for_density(density):
     # Determine communication range based on ideal setting
@@ -39,6 +40,15 @@ def arrange_buoys_for_density(density):
         y = center_y + distance * math.sin(angle)
         x = max(10, min(WORLD_WIDTH - 10, x))
         y = max(10, min(WORLD_HEIGHT - 10, y))
+        positions.append((x, y))
+    return positions
+
+def arrange_buoys_randomly(n_buoys):
+    positions = []
+    random.seed(time.time())
+    for _ in range(n_buoys):
+        x = random.uniform(10, WORLD_WIDTH - 10)
+        y = random.uniform(10, WORLD_HEIGHT - 10)
         positions.append((x, y))
     return positions
 
@@ -76,7 +86,7 @@ def run_simulation(mode, interval, density, positions, results_dir):
         cmd.append("--ideal")
     
     # Run simulation
-    print(f"Running {mode} simulation with interval={interval}s, density={density}...")
+    print(f"Running {mode} simulation with interval={interval}s...")
     subprocess.run(cmd)
     
     # Clean up
@@ -108,13 +118,19 @@ def main():
         
         if RAMP:
             # For ramp scenario, we only need one density
-            positions = arrange_buoys_for_density(TOTAL_BUOY - 1)
+            if RANDOM_POS:
+                positions = arrange_buoys_randomly(TOTAL_BUOY - 1)
+            else:
+                positions = arrange_buoys_for_density(TOTAL_BUOY - 1)
             run_simulation("static", interval, TOTAL_BUOY - 1, positions, results_dir)
             run_simulation("dynamic", interval, TOTAL_BUOY - 1, positions, results_dir)
         else:
             # For density sweep, run each density
             for density in DENSITIES:
-                positions = arrange_buoys_for_density(density)
+                if RANDOM_POS:
+                    positions = arrange_buoys_randomly(density)
+                else:
+                    positions = arrange_buoys_for_density(density)
                 run_simulation("static", interval, density, positions, results_dir)
                 run_simulation("dynamic", interval, density, positions, results_dir)
         
