@@ -16,7 +16,7 @@ wheels/
 *.csv
 *.png
 
-# Training parameters
+# JSON files
 *.json
 
 # Latex files

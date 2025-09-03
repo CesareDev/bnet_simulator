@@ -104,7 +104,7 @@ def main():
         os.makedirs(results_dir, exist_ok=True)
         os.makedirs(plots_dir, exist_ok=True)
         
-        print(f"\nRunning simulations with interval = {interval}s")
+        print(f"Running simulations with interval = {interval}s")
         
         if RAMP:
             # For ramp scenario, we only need one density

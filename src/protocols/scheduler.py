@@ -1,7 +1,7 @@
 import random
 import uuid
 from typing import Tuple, List
-from utils import config, logging
+from utils import config
 
 class BeaconScheduler:
     def __init__(

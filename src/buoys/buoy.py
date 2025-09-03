@@ -2,7 +2,7 @@ import uuid
 import random
 import math
 from enum import Enum
-from typing import List, Tuple, Dict, Optional
+from typing import Tuple
 from protocols.scheduler import BeaconScheduler
 from protocols.beacon import Beacon
 from core.events import EventType
@@ -151,45 +151,47 @@ class Buoy:
         beacon = event.data.get("beacon")
         if not beacon:
             return
-        
-        # Define a collision window (10 microseconds)
-        COLLISION_WINDOW = 1e-5
-        
-        # Check for collision with other transmissions at this receiver
+    
+        # Skip collision check if already done at channel level
         collision = False
-        for tx_beacon, start, end, _, _ in self.channel.active_transmissions:
-            # Skip the beacon we're currently processing
-            if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
-                continue
+        collision_checked = event.data.get("collision_checked", False)
+    
+        if not collision_checked:
+            # Define a collision window (10 microseconds)
+            COLLISION_WINDOW = 1e-5
             
-            # Only consider transmissions that have started
-            if sim_time < start:
-                continue
+            # Check for collision with other transmissions at this receiver
+            for tx_beacon, start, end, _, _ in self.channel.active_transmissions:
+                # Skip the beacon we're currently processing
+                if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
+                    continue
+            
+                # Only consider transmissions that have started
+                if sim_time < start:
+                    continue
                 
-            # Calculate when this transmission's wavefront reached this receiver
-            dx = self.position[0] - tx_beacon.position[0]
-            dy = self.position[1] - tx_beacon.position[1]
-            distance = math.hypot(dx, dy)
+                # Calculate when this transmission's wavefront reached this receiver
+                dx = self.position[0] - tx_beacon.position[0]
+                dy = self.position[1] - tx_beacon.position[1]
+                distance = math.hypot(dx, dy)
             
-            # Only consider transmissions within reception range
-            if distance > config.COMMUNICATION_RANGE_MAX:
-                continue
+                # Only consider transmissions within reception range
+                if distance > config.COMMUNICATION_RANGE_MAX:
+                    continue
                 
-            propagation_delay = distance / config.SPEED_OF_LIGHT
-            arrival_time = end + propagation_delay
+                propagation_delay = distance / config.SPEED_OF_LIGHT
+                arrival_time = end + propagation_delay
             
-            # If another transmission arrives within the collision window, mark as collision
-            if abs(arrival_time - sim_time) < COLLISION_WINDOW:
-                logging.log_error(f"Collision detected at receiver {str(self.id)[:6]} between {str(beacon.sender_id)[:6]} and {str(tx_beacon.sender_id)[:6]}")
-                collision = True
-                break
-        
-        # If collision detected, log as lost and don't process
+                # If another transmission arrives within the collision window, mark as collision
+                if abs(arrival_time - sim_time) < COLLISION_WINDOW:
+                    logging.log_error(f"Collision detected at receiver {str(self.id)[:6]} between {str(beacon.sender_id)[:6]} and {str(tx_beacon.sender_id)[:6]}")
+                    collision = True
+                    break
+    
+        # If collision detected, don't process (already counted as lost in channel.py)
         if collision:
-            if self.metrics:
-                self.metrics.log_lost(1)
             return
-        
+    
         # No collision - process the reception normally
         updated = False
         for i, (nid, _, _) in enumerate(self.neighbors):
@@ -199,22 +201,22 @@ class Buoy:
                 break
         if not updated:
             self.neighbors.append((beacon.sender_id, sim_time, beacon.position))
-        
+    
         key = (self.id, beacon.sender_id, beacon.timestamp)
         if key not in self.channel.seen_attempts:
             self.channel.seen_attempts.add(key)
-            
+        
             # Update successful reception count in active_transmissions
             for i, (tx_beacon, start, end, potential_count, processed_count) in enumerate(self.channel.active_transmissions):
                 if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
                     self.channel.active_transmissions[i] = (tx_beacon, start, end, potential_count, processed_count + 1)
                     break
-            
+        
             # Log successful reception
             if self.metrics:
                 self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, self.id)
                 self.metrics.log_actually_received(beacon.sender_id)
-    
+
     def _handle_neighbor_cleanup(self, event, sim_time: float):
         self.neighbors = [
             (nid, ts, pos) for nid, ts, pos in self.neighbors

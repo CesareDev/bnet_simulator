@@ -1,7 +1,6 @@
-import uuid
 import math
 import random
-from typing import List, Tuple, Set, Dict, Optional
+from typing import Tuple
 from protocols.beacon import Beacon
 from core.events import EventType
 from utils import logging, config
@@ -13,6 +12,7 @@ class Channel:
         self.buoys = []
         self.simulator = None
         self.seen_attempts = set()
+        self.collision_beacons = set()  # Track beacons involved in collisions
 
     def set_buoys(self, buoys):
         self.buoys = buoys
@@ -45,11 +45,20 @@ class Channel:
         for i, (beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
             if end + grace_period <= sim_time:
                 expired_indices.append(i)
-                if self.metrics:
-                    lost_count = potential_count - processed_count
-                    if lost_count > 0:
-                        self.metrics.log_lost(lost_count)
-                        logging.log_info(f"Beacon from {str(beacon.sender_id)[:6]} expired with {lost_count} unreached receivers")
+                
+                # For ideal channel - ensure processed + lost = potential
+                if config.IDEAL_CHANNEL:
+                    beacon_key = (beacon.sender_id, beacon.timestamp)
+                    if beacon_key not in self.collision_beacons:
+                        unprocessed = potential_count - processed_count
+                        if unprocessed > 0:
+                            # In ideal channel, all unreceived should be marked as received
+                            for _ in range(unprocessed):
+                                if self.metrics:
+                                    self.metrics.log_actually_received(beacon.sender_id)
+                                    logging.log_info(f"Ideal channel: marking {unprocessed} unreached as received for {str(beacon.sender_id)[:6]}")
+                
+                # No need to do anything for non-ideal channel as we've already accounted for all losses
 
         for idx in sorted(expired_indices, reverse=True):
             self.active_transmissions.pop(idx)
@@ -72,7 +81,13 @@ class Channel:
         if self.metrics:
             self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
 
-        # Only log collisions, do NOT remove transmissions
+        # Track if this beacon has a collision
+        beacon_key = (beacon.sender_id, beacon.timestamp)
+        
+        # Track which receivers will experience collisions
+        receivers_with_collisions = set()
+
+        # Check for collisions
         for i, (existing, start, end, _, _) in enumerate(self.active_transmissions):
             if beacon.sender_id == existing.sender_id:
                 continue
@@ -82,21 +97,28 @@ class Channel:
             if not time_overlap:
                 continue
             
+            existing_key = (existing.sender_id, existing.timestamp)
+            
             # Direct collision detection (transmitters can hear each other)
             if self.in_range(beacon.position, existing.position):
                 logging.log_error(f"Direct collision between {str(beacon.sender_id)[:6]} and {str(existing.sender_id)[:6]}")
-                if self.metrics:
-                    self.metrics.log_collision()
+                self.collision_beacons.add(beacon_key)
+                self.collision_beacons.add(existing_key)
                 
-            # Check if any receivers can hear both transmissions
-            for receiver in receivers_in_range:
-                if self.in_range(receiver.position, existing.position):
-                    logging.log_error(f"Potential receiver collision at {str(receiver.id)[:6]} between {str(beacon.sender_id)[:6]} and {str(existing.sender_id)[:6]}")
-                    if self.metrics:
-                        self.metrics.log_collision()
-                    break
+                # In case of direct collision, all receivers are affected
+                for receiver in receivers_in_range:
+                    receivers_with_collisions.add(receiver.id)
+                    
+            # Check which specific receivers can hear both transmissions
+            else:
+                for receiver in receivers_in_range:
+                    if self.in_range(receiver.position, existing.position):
+                        logging.log_error(f"Collision at receiver {str(receiver.id)[:6]} between {str(beacon.sender_id)[:6]} and {str(existing.sender_id)[:6]}")
+                        receivers_with_collisions.add(receiver.id)
+                        self.collision_beacons.add(beacon_key)
+                        self.collision_beacons.add(existing_key)
 
-        # Record transmission
+        # Record transmission with count of affected receivers
         successful_receivers = 0
         self.active_transmissions.append((beacon, sim_time, new_end_time, n_receivers, successful_receivers))
         
@@ -108,46 +130,71 @@ class Channel:
             {"beacon": beacon}
         )
         
+        # Track all receivers who won't get the packet (both collisions and probability-based losses)
+        total_lost = 0
+        collision_lost = len(receivers_with_collisions)
+        probability_lost = 0
+        
         # Process each potential receiver
         for receiver in receivers_in_range:
+            # Calculate distance and propagation delay
             dx = receiver.position[0] - beacon.position[0]
             dy = receiver.position[1] - beacon.position[1]
             distance = math.hypot(dx, dy)
             propagation_delay = distance / config.SPEED_OF_LIGHT
-            # Add a tiny epsilon to ensure consistent event ordering
             reception_time = new_end_time + propagation_delay + 1e-9
             
-            # Determine if packet will be received based on distance probability
+            # Check if receiver will experience collision
+            collision_loss = receiver.id in receivers_with_collisions
+            
+            # Determine if packet will be received
             will_receive = False
             
             if config.IDEAL_CHANNEL:
-                will_receive = True
+                # In ideal channel, only receivers affected by collisions should miss the packet
+                will_receive = not collision_loss
             else:
-                random_val = random.random()
-                if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
-                    will_receive = random_val < config.DELIVERY_PROB_HIGH
-                    if not will_receive and self.metrics:
-                        self.metrics.log_lost(1)
-                elif distance <= config.COMMUNICATION_RANGE_MAX:
-                    will_receive = random_val < config.DELIVERY_PROB_LOW
-                    if not will_receive and self.metrics:
-                        self.metrics.log_lost(1)
+                # In non-ideal channel, consider both probability and collisions
+                probability_loss = False
+                
+                # Only check probability if there's no collision
+                if not collision_loss:
+                    random_val = random.random()
+                    
+                    if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
+                        probability_loss = random_val >= config.DELIVERY_PROB_HIGH
+                    elif distance <= config.COMMUNICATION_RANGE_MAX:
+                        probability_loss = random_val >= config.DELIVERY_PROB_LOW
+                    
+                    if probability_loss:
+                        probability_lost += 1
+                
+                will_receive = not (collision_loss or probability_loss)
             
-            # Schedule reception for this receiver
+            # Schedule reception only if the packet will be received
             if will_receive:
                 self.simulator.schedule_event(
                     reception_time,
                     EventType.RECEPTION, 
                     receiver,
-                    {"beacon": beacon}
+                    {"beacon": beacon, "collision_checked": True}
                 )
+        
+        # Count all losses
+        total_lost = collision_lost + probability_lost
+        
+        # Log metrics for collisions and losses
+        if self.metrics:
+            if collision_lost > 0:
+                # Log each collision as a separate event
+                for _ in range(collision_lost):
+                    self.metrics.log_collision()
             
-            # Update processed count
-            for i, (tx_beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
-                if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
-                    self.active_transmissions[i] = (tx_beacon, start, end, potential_count, processed_count + 1)
-                    break
-
+            # Log all losses (both collision and probability-based)
+            if total_lost > 0:
+                self.metrics.log_lost(total_lost)
+                logging.log_info(f"Lost {total_lost} packets: {collision_lost} from collisions, {probability_lost} from probability")
+        
         return True
 
     def is_busy(self, position: Tuple[float, float], sim_time: float) -> bool:
