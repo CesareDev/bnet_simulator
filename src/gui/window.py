@@ -1,7 +1,7 @@
 import pygame
 from typing import List
-from bnet_simulator.buoys.buoy import Buoy
-from bnet_simulator.utils import config
+from buoys.buoy import Buoy
+from utils import config
 
 class Window:
     def __init__(self):

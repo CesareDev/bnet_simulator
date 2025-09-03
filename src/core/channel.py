@@ -2,9 +2,9 @@ import uuid
 import math
 import random
 from typing import List, Tuple, Set, Dict, Optional
-from bnet_simulator.protocols.beacon import Beacon
-from bnet_simulator.core.events import EventType
-from bnet_simulator.utils import logging, config
+from protocols.beacon import Beacon
+from core.events import EventType
+from utils import logging, config
 
 class Channel:
     def __init__(self, metrics = None):
@@ -38,9 +38,11 @@ class Channel:
 
     def update(self, sim_time: float):
         expired_indices = []
-        grace_period = 2.0
+        # Use max propagation delay for grace period
+        max_delay = config.COMMUNICATION_RANGE_MAX / config.SPEED_OF_LIGHT
+        grace_period = max_delay + 1e-6  # Small epsilon to account for floating point errors
         
-        for i, (beacon, _, end, potential_count, processed_count) in enumerate(self.active_transmissions):
+        for i, (beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
             if end + grace_period <= sim_time:
                 expired_indices.append(i)
                 if self.metrics:
@@ -70,50 +72,35 @@ class Channel:
         if self.metrics:
             self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
 
-        collision_indexes = []
+        # Only log collisions, do NOT remove transmissions
         for i, (existing, start, end, _, _) in enumerate(self.active_transmissions):
             if beacon.sender_id == existing.sender_id:
                 continue
             
+            # Check for time overlap
             time_overlap = (sim_time <= end) and (start <= new_end_time)
             if not time_overlap:
                 continue
             
+            # Direct collision detection (transmitters can hear each other)
             if self.in_range(beacon.position, existing.position):
                 logging.log_error(f"Direct collision between {str(beacon.sender_id)[:6]} and {str(existing.sender_id)[:6]}")
-                collision_indexes.append(i)
                 if self.metrics:
                     self.metrics.log_collision()
-                continue
                 
+            # Check if any receivers can hear both transmissions
             for receiver in receivers_in_range:
                 if self.in_range(receiver.position, existing.position):
-                    logging.log_error(f"Receiver collision at {str(receiver.id)[:6]} between {str(beacon.sender_id)[:6]} and {str(existing.sender_id)[:6]}")
-                    if i not in collision_indexes:
-                        collision_indexes.append(i)
+                    logging.log_error(f"Potential receiver collision at {str(receiver.id)[:6]} between {str(beacon.sender_id)[:6]} and {str(existing.sender_id)[:6]}")
                     if self.metrics:
                         self.metrics.log_collision()
                     break
 
-        if collision_indexes:
-            total_collision_losses = n_receivers
-            for idx in sorted(collision_indexes, reverse=True):
-                removed_beacon, start, end, potential_count, processed_count = self.active_transmissions[idx]
-                remaining_receivers = potential_count - processed_count
-                total_collision_losses += remaining_receivers
-                logging.log_error(f"Removed collided transmission from {str(removed_beacon.sender_id)[:6]} with {remaining_receivers} unreached receivers")
-                self.active_transmissions.pop(idx)
-
-            if self.metrics:
-                self.metrics.log_collision()
-                self.metrics.log_lost(total_collision_losses)
-                logging.log_info(f"Collision resulted in {total_collision_losses} lost packet opportunities")
-            
-            return False
-
+        # Record transmission
         successful_receivers = 0
         self.active_transmissions.append((beacon, sim_time, new_end_time, n_receivers, successful_receivers))
         
+        # Schedule transmission end
         self.simulator.schedule_event(
             new_end_time, 
             EventType.TRANSMISSION_END, 
@@ -121,13 +108,16 @@ class Channel:
             {"beacon": beacon}
         )
         
+        # Process each potential receiver
         for receiver in receivers_in_range:
             dx = receiver.position[0] - beacon.position[0]
             dy = receiver.position[1] - beacon.position[1]
             distance = math.hypot(dx, dy)
             propagation_delay = distance / config.SPEED_OF_LIGHT
-            reception_time = new_end_time + propagation_delay
+            # Add a tiny epsilon to ensure consistent event ordering
+            reception_time = new_end_time + propagation_delay + 1e-9
             
+            # Determine if packet will be received based on distance probability
             will_receive = False
             
             if config.IDEAL_CHANNEL:
@@ -143,6 +133,7 @@ class Channel:
                     if not will_receive and self.metrics:
                         self.metrics.log_lost(1)
             
+            # Schedule reception for this receiver
             if will_receive:
                 self.simulator.schedule_event(
                     reception_time,
@@ -151,6 +142,7 @@ class Channel:
                     {"beacon": beacon}
                 )
             
+            # Update processed count
             for i, (tx_beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
                 if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
                     self.active_transmissions[i] = (tx_beacon, start, end, potential_count, processed_count + 1)
@@ -162,20 +154,27 @@ class Channel:
         for beacon, start, end, _, _ in self.active_transmissions:
             if start <= sim_time <= end:
                 sender_position = beacon.position
+                
+                # Calculate distance to the transmitter
                 dx = position[0] - sender_position[0]
                 dy = position[1] - sender_position[1]
                 distance = math.hypot(dx, dy)
+                
+                # Calculate how far the signal wavefront has traveled
+                wavefront_radius = config.SPEED_OF_LIGHT * (sim_time - start)
+                
+                # Node can sense transmission only if:
+                # 1. It's within the detection range (carrier sense)
+                # 2. The wavefront has reached this position
                 detection_range = config.COMMUNICATION_RANGE_HIGH_PROB
-                if distance <= detection_range:
+                if distance <= wavefront_radius and distance <= detection_range:
                     return True
-
+                
         return False
 
     def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> bool:
         dx = pos1[0] - pos2[0]
         dy = pos1[1] - pos2[1]
         distance = math.hypot(dx, dy)
-        if config.IDEAL_CHANNEL:
-            return distance <= config.COMMUNICATION_RANGE_HIGH_PROB
-        else:
-            return distance <= config.COMMUNICATION_RANGE_MAX
+        # Always use COMMUNICATION_RANGE_MAX as maximum range
+        return distance <= config.COMMUNICATION_RANGE_MAX

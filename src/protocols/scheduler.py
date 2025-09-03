@@ -1,7 +1,7 @@
 import random
 import uuid
 from typing import Tuple, List
-from bnet_simulator.utils import config, logging
+from utils import config, logging
 
 class BeaconScheduler:
     def __init__(

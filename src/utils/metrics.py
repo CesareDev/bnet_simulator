@@ -1,6 +1,6 @@
 import os
 import csv
-from bnet_simulator.utils import logging, config
+from utils import logging, config
 
 class Metrics:
     def __init__(self, density=None):

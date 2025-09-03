@@ -2,7 +2,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from bnet_simulator.utils import config
+from utils import config
 
 COLORS = {
     'INFO': '\033[92m',     # Green

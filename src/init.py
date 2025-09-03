@@ -1,11 +1,11 @@
 import os
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
-from bnet_simulator.core.simulator import Simulator
-from bnet_simulator.core.channel import Channel
-from bnet_simulator.buoys.buoy import Buoy
-from bnet_simulator.utils import config
-from bnet_simulator.utils.metrics import Metrics
+from core.simulator import Simulator
+from core.channel import Channel
+from buoys.buoy import Buoy
+from utils import config
+from utils.metrics import Metrics
 import random
 import time
 import argparse

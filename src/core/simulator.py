@@ -2,11 +2,11 @@ import time
 import heapq
 from typing import List, Dict, Optional
 import random
-from bnet_simulator.utils.metrics import Metrics
-from bnet_simulator.buoys.buoy import Buoy
-from bnet_simulator.core.channel import Channel
-from bnet_simulator.core.events import EventType
-from bnet_simulator.utils import logging, config
+from utils.metrics import Metrics
+from buoys.buoy import Buoy
+from core.channel import Channel
+from core.events import EventType
+from utils import logging, config
 
 class Event:
     def __init__(self, time: float, event_type: EventType, target_obj, data: Optional[Dict] = None):
@@ -150,30 +150,20 @@ class Simulator:
         total_buoys = len(self.all_buoys)
         buoys_to_add = total_buoys - 2
         duration = config.SIMULATION_DURATION
-        add_interval = duration / (2 * buoys_to_add) if buoys_to_add > 0 else duration  # 2x for up+down
-
-        if self.ramp_direction == 1:  # Incrementing
-            if current_count < total_buoys:
-                if inactive_buoys:
-                    buoy = inactive_buoys[0]
-                    self.buoys.append(buoy)
-                    buoy.simulator = self
-                    initial_offset = random.uniform(0, 1.0)
-                    self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-                    self.schedule_event(sim_time + config.NEIGHBOR_TIMEOUT, EventType.NEIGHBOR_CLEANUP, buoy)
-                self.channel.set_buoys(self.buoys)
-                self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
-            else:
-                # Switch to decrementing
-                self.ramp_direction = -1
-                self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
-        else:  # Decrementing
-            if current_count > 2:
-                buoy = active_buoys[-1]
-                self.buoys.remove(buoy)
-                self.channel.set_buoys(self.buoys)
-                self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
-            # When reaching 2, stop scheduling further changes
+        add_interval = duration / buoys_to_add if buoys_to_add > 0 else duration
+    
+        # Only incrementing: add buoys until all are active, then stop
+        if current_count < total_buoys:
+            if inactive_buoys:
+                buoy = inactive_buoys[0]
+                self.buoys.append(buoy)
+                buoy.simulator = self
+                # Use smaller initial offset to avoid large randomization
+                initial_offset = random.uniform(0, 0.01)
+                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
+                self.schedule_event(sim_time + config.NEIGHBOR_TIMEOUT, EventType.NEIGHBOR_CLEANUP, buoy)
+            self.channel.set_buoys(self.buoys)
+            self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
 
     def handle_event(self, event, sim_time: float):
         if event.event_type == EventType.BUOY_ARRAY_UPDATE:
