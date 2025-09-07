@@ -28,7 +28,6 @@ class Simulator:
         self.all_buoys = buoys.copy()
         self.first_change = True
         self.next_buoy_change = 0
-        self.ramp_direction = 1  # 1 for increment, -1 for decrement
 
         # Start with only 2 buoys active if ramp scenario
         if ramp:

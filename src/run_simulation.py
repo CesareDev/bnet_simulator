@@ -4,24 +4,24 @@ import subprocess
 import time
 import math
 import random
+from utils import config
 
 IDEAL = True # Use ideal channel conditions (no loss)
-
-DENSITIES = [5, 10, 20] # Buoy densities to simulate
-INTERVALS = [0.25, 0.5] # Static scheduler intervals to test
-DURATION = 500 # Simulation duration in seconds
-RANDOM_POS = False # Use random buoy positions instead of density-based
-
+RANDOM_POS = True # Use random buoy positions instead of density-based
 RAMP = False # Use ramp scenario (buoy count increases over time)
-TOTAL_BUOY = 30 # Maximum number of buoys for ramp scenario
+HEADLESS = True # Run without GUI
 
+TOTAL_BUOY = 30 # Maximum number of buoys for ramp scenario
+DENSITIES = range(5, TOTAL_BUOY, 5) # Buoy densities to simulate
+INTERVALS = [0.25, 0.5] # Static scheduler intervals to test
+
+DURATION = 500 # Simulation duration in seconds
 WORLD_WIDTH = 800 # World width
 WORLD_HEIGHT = 800 # World height
-HEADLESS = True # Run without GUI
 
 def arrange_buoys_for_density(density):
     # Determine communication range based on ideal setting
-    comm_range = 70 * 0.9 if IDEAL else 100 * 0.9
+    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9 if IDEAL else config.COMMUNICATION_RANGE_MAX * 0.9
     
     # Calculate parameters for positioning
     n_buoys = density + 1
