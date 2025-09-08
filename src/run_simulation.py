@@ -11,13 +11,13 @@ RANDOM_POS = True # Use random buoy positions instead of density-based
 RAMP = False # Use ramp scenario (buoy count increases over time)
 HEADLESS = True # Run without GUI
 
-TOTAL_BUOY = 30 # Maximum number of buoys for ramp scenario
-DENSITIES = range(5, TOTAL_BUOY, 5) # Buoy densities to simulate
+TOTAL_BUOY = 200 # Maximum number of buoys for ramp scenario
+DENSITIES = range(10, TOTAL_BUOY + 1, 10) # Buoy densities to simulate
 INTERVALS = [0.25, 0.5] # Static scheduler intervals to test
 
-DURATION = 500 # Simulation duration in seconds
-WORLD_WIDTH = 800 # World width
-WORLD_HEIGHT = 800 # World height
+DURATION = 600 # Simulation duration in seconds
+WORLD_WIDTH = 1200 # World width
+WORLD_HEIGHT = 1200 # World height
 
 def arrange_buoys_for_density(density):
     # Determine communication range based on ideal setting
@@ -86,7 +86,7 @@ def run_simulation(mode, interval, density, positions, results_dir):
         cmd.append("--ideal")
     
     # Run simulation
-    print(f"Running {mode} simulation with interval={interval}s...")
+    print(f"Running {mode} simulation with interval={interval}s and {density} density")
     subprocess.run(cmd)
     
     # Clean up
@@ -119,11 +119,11 @@ def main():
         if RAMP:
             # For ramp scenario, we only need one density
             if RANDOM_POS:
-                positions = arrange_buoys_randomly(TOTAL_BUOY - 1)
+                positions = arrange_buoys_randomly(TOTAL_BUOY)
             else:
-                positions = arrange_buoys_for_density(TOTAL_BUOY - 1)
-            run_simulation("static", interval, TOTAL_BUOY - 1, positions, results_dir)
-            run_simulation("dynamic", interval, TOTAL_BUOY - 1, positions, results_dir)
+                positions = arrange_buoys_for_density(TOTAL_BUOY)
+            run_simulation("static", interval, TOTAL_BUOY, positions, results_dir)
+            run_simulation("dynamic", interval, TOTAL_BUOY, positions, results_dir)
         else:
             # For density sweep, run each density
             for density in DENSITIES:
