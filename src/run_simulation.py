@@ -4,6 +4,7 @@ import subprocess
 import time
 import math
 import random
+from multiprocessing import Pool
 from utils import config
 
 IDEAL = True # Use ideal channel conditions (no loss)
@@ -11,13 +12,16 @@ RANDOM_POS = True # Use random buoy positions instead of density-based
 RAMP = False # Use ramp scenario (buoy count increases over time)
 HEADLESS = True # Run without GUI
 
-TOTAL_BUOY = 200 # Maximum number of buoys for ramp scenario
-DENSITIES = range(10, TOTAL_BUOY + 1, 10) # Buoy densities to simulate
+TOTAL_BUOY = 30 # Maximum number of buoys for ramp scenario
+DENSITIES = range(5, TOTAL_BUOY + 1, 5) # Buoy densities to simulate
 INTERVALS = [0.25, 0.5] # Static scheduler intervals to test
 
 DURATION = 600 # Simulation duration in seconds
 WORLD_WIDTH = 1200 # World width
 WORLD_HEIGHT = 1200 # World height
+
+# Number of parallel processes to use (adjust based on your CPU)
+NUM_PROCESSES = 4
 
 def arrange_buoys_for_density(density):
     # Determine communication range based on ideal setting
@@ -53,8 +57,9 @@ def arrange_buoys_randomly(n_buoys):
     return positions
 
 def run_simulation(mode, interval, density, positions, results_dir):
-    # Create positions file
-    positions_file = f"positions_{mode}_{density}.json"
+    # Create positions file with unique filename to avoid conflicts in parallel execution
+    unique_id = f"{mode}_{density}_{int(time.time() * 1000) % 10000}"
+    positions_file = f"positions_{unique_id}.json"
     with open(positions_file, "w") as f:
         json.dump(positions, f)
     
@@ -93,6 +98,14 @@ def run_simulation(mode, interval, density, positions, results_dir):
     if os.path.exists(positions_file):
         os.remove(positions_file)
 
+def simulation_worker(args):
+    mode, interval, density, positions, results_dir = args
+    run_simulation(mode, interval, density, positions, results_dir)
+
+def run_simulations_parallel(tasks):
+    with Pool(processes=NUM_PROCESSES) as pool:
+        pool.map(simulation_worker, tasks)
+
 def plot_results(results_dir, plots_dir, interval):
     plot_cmd = ["uv", "run", "src/plot_metrics.py",
                 "--results-dir", results_dir,
@@ -122,19 +135,29 @@ def main():
                 positions = arrange_buoys_randomly(TOTAL_BUOY)
             else:
                 positions = arrange_buoys_for_density(TOTAL_BUOY)
+                
+            # For ramp, run serially since we only have two simulations
             run_simulation("static", interval, TOTAL_BUOY, positions, results_dir)
             run_simulation("dynamic", interval, TOTAL_BUOY, positions, results_dir)
         else:
-            # For density sweep, run each density
+            # For density sweep, create tasks for parallel execution
+            tasks = []
+            
             for density in DENSITIES:
                 if RANDOM_POS:
                     positions = arrange_buoys_randomly(density)
                 else:
                     positions = arrange_buoys_for_density(density)
-                run_simulation("static", interval, density, positions, results_dir)
-                run_simulation("dynamic", interval, density, positions, results_dir)
+                
+                # Add both static and dynamic tasks for this density
+                tasks.append(("static", interval, density, positions, results_dir))
+                tasks.append(("dynamic", interval, density, positions, results_dir))
+            
+            # Run all tasks in parallel
+            print(f"Running {len(tasks)} simulations in parallel using {NUM_PROCESSES} processes")
+            run_simulations_parallel(tasks)
         
-        # Plot results
+        # Plot results (after all simulations for this interval are done)
         print(f"Plotting results for interval = {interval}s")
         plot_results(results_dir, plots_dir, interval)
         
