@@ -12,8 +12,8 @@ RANDOM_POS = True # Use random buoy positions instead of density-based
 RAMP = False # Use ramp scenario (buoy count increases over time)
 HEADLESS = True # Run without GUI
 
-TOTAL_BUOY = 30 # Maximum number of buoys for ramp scenario
-DENSITIES = range(5, TOTAL_BUOY + 1, 5) # Buoy densities to simulate
+TOTAL_BUOY = 300 # Maximum number of buoys for ramp scenario
+DENSITIES = range(10, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
 INTERVALS = [0.25, 0.5] # Static scheduler intervals to test
 
 DURATION = 600 # Simulation duration in seconds
