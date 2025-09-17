@@ -13,7 +13,8 @@ RAMP = False # Use ramp scenario (buoy count increases over time)
 HEADLESS = True # Run without GUI
 
 TOTAL_BUOY = 300 # Maximum number of buoys for ramp scenario
-DENSITIES = range(20, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
+#DENSITIES = range(20, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
+DENSITIES = [10]
 INTERVALS = [0.25] # Static scheduler intervals to test
 
 DURATION = 600 # Simulation duration in seconds
@@ -117,7 +118,20 @@ def main():
     # Process each interval
     for interval in INTERVALS:
         # Create directories
-        interval_str = str(int(interval * 10))
+        # Original: interval_str = str(int(interval * 10))
+        # Modified to preserve precision:
+        if interval < 1:
+            # For values like 0.25, use 25 or 2_5
+            interval_str = str(int(interval * 100))
+            if interval * 100 % 10 == 0:
+                # For 0.2, 0.3, etc. just use "2", "3"
+                interval_str = str(int(interval * 10))
+            else:
+                # For 0.25, 0.75, etc. use "2_5", "7_5"
+                interval_str = f"{int(interval * 10)}_{int(interval * 100) % 10}"
+        else:
+            interval_str = str(int(interval))
+            
         ideal_suffix = "_ideal" if IDEAL else ""
         ramp_suffix = "_ramp" if RAMP else ""
         

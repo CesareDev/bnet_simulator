@@ -348,12 +348,25 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
     plt.close()
 
 def extract_interval_from_dirname(dirname):
-    match = re.search(r'interval(\d+)', dirname)
+    # Original regex: r'interval(\d+)'
+    # Updated to capture decimals with optional underscore separator
+    match = re.search(r'interval(\d+(?:_\d+)?)', dirname)
     if match:
-        interval_value = int(match.group(1))
-        if interval_value < 10:
-            return interval_value / 10.0
-        return interval_value
+        interval_str = match.group(1).replace('_', '.')
+        # Convert to float directly instead of int conversion
+        try:
+            # Check if it's a potential decimal value (e.g., 25 for 0.25)
+            if int(interval_str) < 10:
+                return float(interval_str) / 10.0
+            else:
+                # Handle cases where underscore might be used (e.g., 2_5 for 0.25)
+                return float(interval_str)
+        except ValueError:
+            # Fall back to the old method if parsing fails
+            interval_value = int(match.group(1))
+            if interval_value < 10:
+                return interval_value / 10.0
+            return interval_value
     return None
 
 def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
@@ -445,7 +458,10 @@ def main():
     interval = args.interval
     if interval is None:
         interval = extract_interval_from_dirname(results_dir)
-
+    else:
+        # Ensure exact float value is preserved when passed via command line
+        interval = float(interval)
+        
     print(f"Loading results from: {results_dir}")
     print(f"Saving plots to: {plot_dir}")
     if interval:
