@@ -46,6 +46,7 @@ class Simulator:
         self.event_queue = []
         self.event_counter = 0
 
+        self.calculate_avg_neighbors()
         self._schedule_initial_events()
 
     def schedule_event(self, time: float, event_type: EventType, target_obj, data: Optional[Dict] = None) -> None:
@@ -210,3 +211,28 @@ class Simulator:
 
     def __repr__(self):
         return f"<Simulator buoys={len(self.buoys)}>"
+    
+    def calculate_avg_neighbors(self):
+        if not self.buoys:
+            return
+            
+        total_neighbors = 0
+        transmission_range = config.COMMUNICATION_RANGE_MAX
+        
+        for buoy in self.buoys:
+            neighbor_count = 0
+            for other_buoy in self.buoys:
+                if buoy.id != other_buoy.id:
+                    # Calculate distance between buoys
+                    dx = buoy.position[0] - other_buoy.position[0]
+                    dy = buoy.position[1] - other_buoy.position[1]
+                    distance = (dx**2 + dy**2)**0.5
+                    
+                    if distance <= transmission_range:
+                        neighbor_count += 1
+            total_neighbors += neighbor_count
+        
+        avg_neighbors = total_neighbors / len(self.buoys)
+        
+        # Store in metrics
+        self.metrics.set_avg_neighbors(avg_neighbors)

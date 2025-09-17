@@ -198,6 +198,13 @@ def get_density_dataframes(data_dir):
             pdr = float(df.loc["B-PDR", "Value"]) if "B-PDR" in df.index else float(df.loc["Delivery Ratio", "Value"])
             pdr_std = float(df.loc["B-PDR", "StdDev"]) if "B-PDR" in df.index else float(df.loc["Delivery Ratio", "StdDev"])
             
+            # Extract average neighbors if available
+            avg_neighbors = None
+            if "Average Neighbors" in df.index:
+                avg_neighbors = float(df.loc["Average Neighbors", "Value"])
+            elif "Avg Neighbors" in df.index:
+                avg_neighbors = float(df.loc["Avg Neighbors", "Value"])
+            
             # Determine scheduler type
             if "Scheduler Type" in df.index:
                 sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
@@ -208,13 +215,20 @@ def get_density_dataframes(data_dir):
             else:
                 sched_type = "unknown"
                 
-            pdr_data.append((density, pdr, pdr_std, sched_type))
+            pdr_data.append((density, pdr, pdr_std, sched_type, avg_neighbors))
             
         if "Density" in df.index and "Collision Rate" in df.index:
             density = float(df.loc["Density", "Value"])
             collision_rate = float(df.loc["Collision Rate", "Value"])
             collision_std = float(df.loc["Collision Rate", "StdDev"])
             
+            # Extract average neighbors if available
+            avg_neighbors = None
+            if "Average Neighbors" in df.index:
+                avg_neighbors = float(df.loc["Average Neighbors", "Value"])
+            elif "Avg Neighbors" in df.index:
+                avg_neighbors = float(df.loc["Avg Neighbors", "Value"])
+            
             # Determine scheduler type
             if "Scheduler Type" in df.index:
                 sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
@@ -225,11 +239,11 @@ def get_density_dataframes(data_dir):
             else:
                 sched_type = "unknown"
                 
-            collision_data.append((density, collision_rate, collision_std, sched_type))
+            collision_data.append((density, collision_rate, collision_std, sched_type, avg_neighbors))
     
     # Create dataframes
-    pdr_df = pd.DataFrame(pdr_data, columns=["Density", "B-PDR", "StdDev", "Scheduler"])
-    coll_df = pd.DataFrame(collision_data, columns=["Density", "CollisionRate", "StdDev", "Scheduler"])
+    pdr_df = pd.DataFrame(pdr_data, columns=["Density", "B-PDR", "StdDev", "Scheduler", "AvgNeighbors"])
+    coll_df = pd.DataFrame(collision_data, columns=["Density", "CollisionRate", "StdDev", "Scheduler", "AvgNeighbors"])
     
     return pdr_df, coll_df
 
@@ -254,6 +268,13 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     x = np.arange(len(densities))
     
     fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Add second y-axis for average neighbors
+    ax2 = ax.twinx()
+    ax2.set_ylabel("Average Neighbors", color="red")
+    ax2.tick_params(axis='y', labelcolor="red")
+    ax2.grid(False)
+    
     for i, sched in enumerate(schedulers):
         values = []
         errors = []
@@ -271,16 +292,58 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
         ax.errorbar(x + i * bar_width, values, yerr=errors, fmt='none', 
                    ecolor='black', capsize=5, alpha=0.7)
     
-    ax.set_xlabel("Local Density (neighbors in range)")
+    # Plot average neighbors as a connected line across all densities
+    avg_neighbors_data = {}
+    for d in densities:
+        # Use the average from both schedulers since it should be roughly the same
+        rows = pdr_df[pdr_df["Density"] == d]
+        if not rows.empty and not rows["AvgNeighbors"].isna().all():
+            avg_neighbors_data[d] = rows["AvgNeighbors"].mean()
+    
+    if avg_neighbors_data:
+        # Prepare data points for the line
+        density_points = []
+        neighbor_values = []
+        
+        # Collect data points in order of density
+        for d in densities:
+            if d in avg_neighbors_data:
+                density_points.append(d)
+                neighbor_values.append(avg_neighbors_data[d])
+        
+        # Only proceed if we have points to plot
+        if density_points:
+            # Convert density values to x-positions for plotting
+            x_positions = [list(densities).index(d) for d in density_points]
+            
+            # Plot the connected line
+            ax2.plot(x_positions, neighbor_values, color='red', marker='o', 
+                   linestyle='-', linewidth=2, label='Avg Neighbors')
+            
+            # Add text labels at each point
+            for i, (x_pos, value) in enumerate(zip(x_positions, neighbor_values)):
+                ax2.text(x_pos, value, f"{value:.1f}", color='red', 
+                       ha='center', va='bottom', fontsize=8)
+            
+            # Set y-limits for average neighbors axis
+            max_avg_neighbors = max(neighbor_values)
+            ax2.set_ylim(0, max_avg_neighbors * 1.2)
+    
+    ax.set_xlabel("Total Buoys")
     ax.set_ylabel("B-PDR")
     if interval:
-        ax.set_title(f"B-PDR vs Local Density (Static Interval: {interval}s)")
+        ax.set_title(f"B-PDR vs Buoy Count (Static Interval: {interval}s)")
     else:
-        ax.set_title("B-PDR vs Local Density")
+        ax.set_title("B-PDR vs Buoy Count")
     ax.set_xticks(x + bar_width/2)
     ax.set_xticklabels([str(int(d)) for d in densities])
-    ax.legend()
+    
+    # Create a combined legend
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
     ax.grid(axis="y", linestyle="--", alpha=0.6)
+    
     plt.tight_layout()
     
     if interval:
@@ -296,6 +359,13 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     
     # Create collision rate by density plot with error bars
     fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Add second y-axis for average neighbors
+    ax2 = ax.twinx()
+    ax2.set_ylabel("Average Neighbors", color="red")
+    ax2.tick_params(axis='y', labelcolor="red")
+    ax2.grid(False)
+    
     for i, sched in enumerate(schedulers):
         values = []
         errors = []
@@ -313,16 +383,51 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
         ax.errorbar(x + i * bar_width, values, yerr=errors, fmt='none', 
                    ecolor='black', capsize=5, alpha=0.7)
     
-    ax.set_xlabel("Local Density (neighbors in range)")
+    # Plot average neighbors as a connected line across all densities
+    if avg_neighbors_data:
+        # Prepare data points for the line
+        density_points = []
+        neighbor_values = []
+        
+        # Collect data points in order of density
+        for d in densities:
+            if d in avg_neighbors_data:
+                density_points.append(d)
+                neighbor_values.append(avg_neighbors_data[d])
+        
+        # Only proceed if we have points to plot
+        if density_points:
+            # Convert density values to x-positions for plotting
+            x_positions = [list(densities).index(d) for d in density_points]
+            
+            # Plot the connected line
+            ax2.plot(x_positions, neighbor_values, color='red', marker='o', 
+                   linestyle='-', linewidth=2, label='Avg Neighbors')
+            
+            # Add text labels at each point
+            for i, (x_pos, value) in enumerate(zip(x_positions, neighbor_values)):
+                ax2.text(x_pos, value, f"{value:.1f}", color='red', 
+                       ha='center', va='bottom', fontsize=8)
+            
+            # Set y-limits for average neighbors axis
+            max_avg_neighbors = max(neighbor_values)
+            ax2.set_ylim(0, max_avg_neighbors * 1.2)
+    
+    ax.set_xlabel("Total Buoys")
     ax.set_ylabel("Collision Rate")
     if interval:
-        ax.set_title(f"Collision Rate vs Local Density (Static Interval: {interval}s)")
+        ax.set_title(f"Collision Rate vs Buoy Count (Static Interval: {interval}s)")
     else:
-        ax.set_title("Collision Rate vs Local Density")
+        ax.set_title("Collision Rate vs Buoy Count")
     ax.set_xticks(x + bar_width/2)
     ax.set_xticklabels([str(int(d)) for d in densities])
-    ax.legend()
+    
+    # Create a combined legend
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
     ax.grid(axis="y", linestyle="--", alpha=0.6)
+    
     plt.tight_layout()
     
     if interval:
@@ -343,12 +448,14 @@ def plot_grouped_by_density_with_errors(pdr_df, coll_df, plot_dir, interval=None
     # Group the data and calculate means and standard deviations
     pdr_grouped = pdr_df.groupby(['DensityGroup', 'Scheduler']).agg({
         'B-PDR': 'mean',
-        'StdDev': 'mean'  # Average the standard deviations
+        'StdDev': 'mean',  # Average the standard deviations
+        'AvgNeighbors': 'mean'  # Average the neighbor counts within groups
     }).reset_index()
     
     coll_grouped = coll_df.groupby(['DensityGroup', 'Scheduler']).agg({
         'CollisionRate': 'mean',
-        'StdDev': 'mean'  # Average the standard deviations
+        'StdDev': 'mean',  # Average the standard deviations
+        'AvgNeighbors': 'mean'  # Average the neighbor counts within groups
     }).reset_index()
     
     def sort_key(group):
@@ -364,6 +471,13 @@ def plot_grouped_by_density_with_errors(pdr_df, coll_df, plot_dir, interval=None
     
     # Create B-PDR by density group plot with error bars
     fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Create secondary y-axis for average neighbors
+    ax2 = ax.twinx()
+    ax2.set_ylabel("Average Neighbors", color="red")
+    ax2.tick_params(axis='y', labelcolor="red")
+    ax2.grid(False)
+    
     for i, sched in enumerate(schedulers):
         values = []
         errors = []
@@ -381,16 +495,46 @@ def plot_grouped_by_density_with_errors(pdr_df, coll_df, plot_dir, interval=None
         ax.errorbar(x + i * bar_width, values, yerr=errors, fmt='none', 
                    ecolor='black', capsize=5, alpha=0.7)
     
-    ax.set_xlabel("Local Density Groups (neighbors in range)")
+    # Calculate average neighbors for each density group (averaging across schedulers)
+    avg_neighbors_by_group = {}
+    for grp in density_groups:
+        rows = pdr_grouped[pdr_grouped["DensityGroup"] == grp]
+        if not rows.empty and not rows["AvgNeighbors"].isna().all():
+            avg_neighbors_by_group[grp] = rows["AvgNeighbors"].mean()
+    
+    # Plot average neighbors as a connected line
+    if avg_neighbors_by_group:
+        group_positions = list(range(len(density_groups)))
+        neighbor_values = [avg_neighbors_by_group.get(grp, 0) for grp in density_groups]
+        
+        ax2.plot(group_positions, neighbor_values, color='red', marker='o',
+               linestyle='-', linewidth=2, label='Avg Neighbors')
+        
+        # Add text labels at each point
+        for i, value in enumerate(neighbor_values):
+            if value > 0:  # Only label non-zero values
+                ax2.text(i, value, f"{value:.1f}", color='red',
+                       ha='center', va='bottom', fontsize=8)
+        
+        # Set y-limits for average neighbors axis
+        max_avg_neighbors = max(filter(lambda x: x > 0, neighbor_values), default=1)
+        ax2.set_ylim(0, max_avg_neighbors * 1.2)
+    
+    ax.set_xlabel("Total Buoys (Grouped)")
     ax.set_ylabel("Average B-PDR")
     if interval:
-        ax.set_title(f"B-PDR vs Density Groups (Static Interval: {interval}s)")
+        ax.set_title(f"B-PDR vs Buoy Count Groups (Static Interval: {interval}s)")
     else:
-        ax.set_title("B-PDR vs Density Groups")
+        ax.set_title("B-PDR vs Buoy Count Groups")
     ax.set_xticks(x + bar_width/2)
     ax.set_xticklabels(density_groups)
-    ax.legend()
+    
+    # Create a combined legend
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
     ax.grid(axis="y", linestyle="--", alpha=0.6)
+    
     plt.tight_layout()
     
     if interval:
@@ -401,6 +545,13 @@ def plot_grouped_by_density_with_errors(pdr_df, coll_df, plot_dir, interval=None
     
     # Create collision rate by density group plot with error bars
     fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Create secondary y-axis for average neighbors
+    ax2 = ax.twinx()
+    ax2.set_ylabel("Average Neighbors", color="red")
+    ax2.tick_params(axis='y', labelcolor="red")
+    ax2.grid(False)
+    
     for i, sched in enumerate(schedulers):
         values = []
         errors = []
@@ -418,16 +569,39 @@ def plot_grouped_by_density_with_errors(pdr_df, coll_df, plot_dir, interval=None
         ax.errorbar(x + i * bar_width, values, yerr=errors, fmt='none', 
                    ecolor='black', capsize=5, alpha=0.7)
     
-    ax.set_xlabel("Local Density Groups (neighbors in range)")
+    # Plot average neighbors as a connected line
+    if avg_neighbors_by_group:
+        group_positions = list(range(len(density_groups)))
+        neighbor_values = [avg_neighbors_by_group.get(grp, 0) for grp in density_groups]
+        
+        ax2.plot(group_positions, neighbor_values, color='red', marker='o',
+               linestyle='-', linewidth=2, label='Avg Neighbors')
+        
+        # Add text labels at each point
+        for i, value in enumerate(neighbor_values):
+            if value > 0:  # Only label non-zero values
+                ax2.text(i, value, f"{value:.1f}", color='red',
+                       ha='center', va='bottom', fontsize=8)
+        
+        # Set y-limits for average neighbors axis
+        max_avg_neighbors = max(filter(lambda x: x > 0, neighbor_values), default=1)
+        ax2.set_ylim(0, max_avg_neighbors * 1.2)
+    
+    ax.set_xlabel("Total Buoys (Grouped)")
     ax.set_ylabel("Average Collision Rate")
     if interval:
-        ax.set_title(f"Collision Rate vs Density Groups (Static Interval: {interval}s)")
+        ax.set_title(f"Collision Rate vs Buoy Count Groups (Static Interval: {interval}s)")
     else:
-        ax.set_title("Collision Rate vs Density Groups")
+        ax.set_title("Collision Rate vs Buoy Count Groups")
     ax.set_xticks(x + bar_width/2)
     ax.set_xticklabels(density_groups)
-    ax.legend()
+    
+    # Create a combined legend
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
     ax.grid(axis="y", linestyle="--", alpha=0.6)
+    
     plt.tight_layout()
     
     if interval:
@@ -479,6 +653,7 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
     # Process data for each mode
     grouped_data = {}
     grouped_std = {}
+    avg_neighbors_by_group = {}  # Store average neighbors by buoy count group
     valid_modes = []
     
     for mode, color in modes:
@@ -495,6 +670,13 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
                 print(f"Warning: No B-PDR or delivery_ratio column in data for {mode}")
                 continue
             
+            # Check for average neighbors data
+            avg_neighbors_col = None
+            if "avg_neighbors" in df.columns:
+                avg_neighbors_col = "avg_neighbors"
+            elif "average_neighbors" in df.columns:
+                avg_neighbors_col = "average_neighbors"
+            
             # Group by buoy count
             df["group"] = pd.cut(df["n_buoys"], bins=group_edges, labels=group_labels, right=False)
             
@@ -507,6 +689,14 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
             else:
                 grouped_errors = pd.Series(0, index=group_labels)
             
+            # Calculate average neighbors by group if available
+            if avg_neighbors_col:
+                neighbors_by_group = df.groupby("group", observed=False)[avg_neighbors_col].mean().reindex(group_labels)
+                for group, value in neighbors_by_group.items():
+                    if group not in avg_neighbors_by_group:
+                        avg_neighbors_by_group[group] = []
+                    avg_neighbors_by_group[group].append(value)
+            
             # Only include modes with non-empty data
             if not grouped.empty and len(grouped.values) > 0:
                 grouped_data[mode] = grouped.values
@@ -514,6 +704,10 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
                 valid_modes.append((mode, color))
             else:
                 print(f"Warning: No valid grouped data for {mode}")
+    
+    # Average the neighbors across modes for each group
+    for group in avg_neighbors_by_group:
+        avg_neighbors_by_group[group] = np.mean(avg_neighbors_by_group[group])
     
     # If no valid data found, exit early
     if not valid_modes:
@@ -524,6 +718,12 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
     x = np.arange(len(group_labels))
     bar_width = 0.35
     fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Create secondary y-axis for average neighbors
+    ax2 = ax.twinx()
+    ax2.set_ylabel("Average Neighbors", color="red")
+    ax2.tick_params(axis='y', labelcolor="red")
+    ax2.grid(False)
     
     for i, (mode, color) in enumerate(valid_modes):
         # Ensure data length matches x length
@@ -541,13 +741,35 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
         else:
             print(f"Warning: Data length mismatch for {mode}. Expected {len(x)}, got {len(data)}")
     
+    # Plot average neighbors as a connected line
+    if avg_neighbors_by_group:
+        neighbor_values = [avg_neighbors_by_group.get(group, 0) for group in group_labels]
+        
+        ax2.plot(x, neighbor_values, color='red', marker='o',
+               linestyle='-', linewidth=2, label='Avg Neighbors')
+        
+        # Add text labels at each point
+        for i, value in enumerate(neighbor_values):
+            if value > 0:  # Only label non-zero values
+                ax2.text(i, value, f"{value:.1f}", color='red',
+                       ha='center', va='bottom', fontsize=8)
+        
+        # Set y-limits for average neighbors axis
+        max_avg_neighbors = max(filter(lambda x: x > 0, neighbor_values), default=1)
+        ax2.set_ylim(0, max_avg_neighbors * 1.2)
+    
     ax.set_xlabel("Buoy Count Group")
     ax.set_ylabel("Average B-PDR")
     ax.set_title("Average B-PDR vs Buoy Count Group (Ramp Scenario)")
     ax.set_xticks(x + (bar_width / 2 if len(valid_modes) > 1 else 0))
     ax.set_xticklabels(group_labels)
-    ax.legend(loc="lower right")
+    
+    # Create a combined legend
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
     ax.grid(axis="y", linestyle="--", alpha=0.6)
+    
     plt.tight_layout()
     plt.savefig(plot_file)
     plt.close()
@@ -559,6 +781,7 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
 
     time_buoy = None
     max_buoys = 0
+    time_neighbors = None
 
     for mode, color in modes:
         csv_file = os.path.join(data_dir, f"{mode}_ramp_timeseries.csv")
@@ -590,6 +813,13 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
             if time_buoy is None and "n_buoys" in df.columns:
                 time_buoy = (df["time"], df["n_buoys"])
                 max_buoys = df["n_buoys"].max()
+            
+            # Check for average neighbors data in timeseries
+            if time_neighbors is None:
+                if "avg_neighbors" in df.columns:
+                    time_neighbors = (df["time"], df["avg_neighbors"])
+                elif "average_neighbors" in df.columns:
+                    time_neighbors = (df["time"], df["average_neighbors"])
 
     if not found:
         print("No ramp timeseries files found for plotting.")
@@ -605,9 +835,21 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
         ax2.set_ylim(0, max(40, int(max_buoys)))
         ax2.tick_params(axis='y', colors='gray')
         ax2.grid(False)
-        handles2, labels2 = ax2.get_legend_handles_labels()
         handles += [gray_area]
         labels += ["Buoy Count"]
+        
+        # Add average neighbors on third y-axis if available
+        if time_neighbors is not None:
+            ax3 = ax.twinx()
+            # Offset the axis to the right
+            ax3.spines["right"].set_position(("axes", 1.1))
+            neighbor_line = ax3.plot(time_neighbors[0], time_neighbors[1], 
+                                   color="red", linestyle="-", label="Avg. Neighbors")
+            ax3.set_ylabel("Avg. Neighbors", color="red", fontsize=12)
+            ax3.tick_params(axis='y', colors='red')
+            ax3.grid(False)
+            handles += neighbor_line
+            labels += ["Avg. Neighbors"]
 
     ax.set_xlabel("Time (s)", fontsize=12)
     ax.set_ylabel("B-PDR", fontsize=12)

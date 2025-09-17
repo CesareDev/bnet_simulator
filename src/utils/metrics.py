@@ -17,6 +17,7 @@ class Metrics:
         self.actually_received = 0
         self.potentially_sent_per_sender = {}
         self.actually_received_per_sender = {}
+        self.avg_neighbors = 0
         self.density = density
         self.time_series = []
 
@@ -94,6 +95,7 @@ class Metrics:
             ),
             "Potentially Sent": self.potentially_sent,
             "Actually Received": self.actually_received,
+            "Average Neighbors": self.avg_neighbors,
         }
 
         summary = {**base_summary}
@@ -140,3 +142,11 @@ class Metrics:
         df = pd.DataFrame(self.time_series)
         df.to_csv(filepath, index=False)
         logging.log_info(f"Time series exported to {filepath}")
+
+    def set_avg_neighbors(self, avg_neighbors):
+        self.avg_neighbors = avg_neighbors
+        
+        # Add to timeseries data if we're logging timeseries
+        if self.time_series:
+            # Add to the most recent timepoint
+            self.time_series[-1]['avg_neighbors'] = avg_neighbors
