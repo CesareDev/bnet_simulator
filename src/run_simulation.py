@@ -17,8 +17,8 @@ DENSITIES = range(20, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
 INTERVALS = [0.25] # Static scheduler intervals to test
 
 DURATION = 600 # Simulation duration in seconds
-WORLD_WIDTH = 1200 # World width
-WORLD_HEIGHT = 1200 # World height
+WORLD_WIDTH = 800 # World width
+WORLD_HEIGHT = 800 # World height
 
 # Number of parallel processes to use (adjust based on your CPU)
 NUM_PROCESSES = 4
