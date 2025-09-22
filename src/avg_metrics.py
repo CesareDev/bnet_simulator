@@ -51,24 +51,17 @@ def average_metrics(input_dirs, output_dir):
         plot_averaged_metrics(results_dir, plots_dir, interval)
 
 def extract_interval_from_dirname(dirname):
-    # Updated to capture decimals with optional underscore separator
     match = re.search(r'interval(\d+(?:_\d+)?)', dirname)
     if match:
-        interval_str = match.group(1).replace('_', '.')
-        # Convert to float directly instead of int conversion
+        interval_str = match.group(1).replace('_', '.')  # "2_5" → "2.5"
         try:
-            # Check if it's a potential decimal value (e.g., 25 for 0.25)
-            if int(interval_str) < 10:
-                return float(interval_str) / 10.0
-            else:
-                # Handle cases where underscore might be used (e.g., 2_5 for 0.25)
-                return float(interval_str)
+            value = float(interval_str)
+            # If it's a single-digit or decimal like 2.5, interpret as fraction of 10
+            if value < 10:
+                return value / 10.0
+            return value
         except ValueError:
-            # Fall back to the old method if parsing fails
-            interval_value = int(match.group(1))
-            if interval_value < 10:
-                return interval_value / 10.0
-            return interval_value
+            return None
     return None
 
 def process_density_files(input_dirs, output_dir):
@@ -274,7 +267,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     # Create B-PDR by density plot with error bars
     densities = sorted(pdr_df["Density"].unique())
     schedulers = ["static", "dynamic"]
-    scheduler_labels = {"static": "SBP", "dynamic": "ACAB"}
+    scheduler_labels = {"static": "SBP", "dynamic": "ADAB"}
     color_map = {"static": "tab:blue", "dynamic": "tab:green"}
     bar_width = 0.35
     x = np.arange(len(densities))
@@ -353,7 +346,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     # Create a combined legend
     lines1, labels1 = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
     ax.grid(axis="y", linestyle="--", alpha=0.6)
     
     plt.tight_layout()
@@ -476,7 +469,7 @@ def plot_grouped_by_density_with_errors(pdr_df, coll_df, plot_dir, interval=None
     # Get sorted density groups
     density_groups = sorted(pdr_grouped['DensityGroup'].unique(), key=sort_key)
     schedulers = ["static", "dynamic"]
-    scheduler_labels = {"static": "SBP", "dynamic": "ACAB"}
+    scheduler_labels = {"static": "SBP", "dynamic": "ADAB"}
     color_map = {"static": "tab:blue", "dynamic": "tab:green"}
     bar_width = 0.35
     x = np.arange(len(density_groups))
@@ -544,7 +537,7 @@ def plot_grouped_by_density_with_errors(pdr_df, coll_df, plot_dir, interval=None
     # Create a combined legend
     lines1, labels1 = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
     ax.grid(axis="y", linestyle="--", alpha=0.6)
     
     plt.tight_layout()

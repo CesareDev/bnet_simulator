@@ -153,6 +153,7 @@ def main():
     # Make static interval available to config
     if args.static_interval:
         config.STATIC_INTERVAL = args.static_interval
+        config.BEACON_MIN_INTERVAL = args.static_interval
 
     if args.seed is not None:
         random.seed(args.seed)
