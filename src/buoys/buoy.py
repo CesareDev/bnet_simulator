@@ -99,11 +99,12 @@ class Buoy:
             
         if self.channel.is_busy(self.position, sim_time):
             self.state = BuoyState.RECEIVING
-            self.simulator.schedule_event(
-                sim_time, EventType.CHANNEL_SENSE, self
-            )
+            self.simulator.schedule_event(sim_time, EventType.CHANNEL_SENSE, self)
         else:
-            backoff_time = random.uniform(config.BACKOFF_TIME_MIN, config.BACKOFF_TIME_MAX)
+            # DCF-compliant backoff: Random[0, CW-1] × SlotTime
+            backoff_slots = random.randint(0, config.CW - 1)  # 0 to 15
+            backoff_time = backoff_slots * config.SLOT_TIME
+            
             self.backoff_time = backoff_time
             self.backoff_remaining = backoff_time
             self.state = BuoyState.BACKOFF

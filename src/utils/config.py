@@ -11,10 +11,12 @@ COMMUNICATION_RANGE_HIGH_PROB = 70.0  # Up to this, 90% delivery
 DELIVERY_PROB_HIGH = 0.9  # Probability if <= 70m
 DELIVERY_PROB_LOW = 0.15  # Probability if > 70m and <= 120m
 NEIGHBOR_TIMEOUT = 5.0  # seconds
-DIFS_TIME = 0.048 # seconds
 BACKOFF_TIME_MIN = 0.001 # seconds
 BACKOFF_TIME_MAX = 0.016 # seconds
-SCHEDULER_TYPE = "static"  # Options: "static", "dynamic", "auto"
+SLOT_TIME = 0.000020  # 20 microseconds
+DIFS_TIME = 0.000050  # 50 microseconds
+CW = 16  # Fixed contention window
+SCHEDULER_TYPE = "static"  # Options: "static", "dynamic"
 
 SAFE_DISTANCE = 10.0  # meters, minimum distance between buoys
 
