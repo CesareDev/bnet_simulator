@@ -12,9 +12,10 @@ RANDOM_POS = True # Use random buoy positions instead of density-based
 RAMP = False # Use ramp scenario (buoy count increases over time)
 HEADLESS = True # Run without GUI
 
-TOTAL_BUOY = 260 # Maximum number of buoys for ramp scenario
-DENSITIES = range(20, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
-INTERVALS = [0.25, 0.5, 1.0] # Static scheduler intervals to test
+TOTAL_BUOY = 80 # Maximum number of buoys for ramp scenario
+MOBILE = True # Whether to include mobile buoys in the simulation
+DENSITIES = range(10, TOTAL_BUOY + 1, 10) # Buoy densities to simulate
+INTERVALS = [0.25] # Static scheduler intervals to test
 
 DURATION = 600 # Simulation duration in seconds
 WORLD_WIDTH = 800 # World width
@@ -69,14 +70,23 @@ def run_simulation(mode, interval, density, positions, results_dir):
     else:
         result_file = os.path.join(results_dir, f"{mode}_density{density}.csv")
     
+    if MOBILE:
+        # Calculate mobile and fixed buoy counts (~1/3 mobile, 2/3 fixed)
+        total_buoys = len(positions)
+        mobile_count = max(1, total_buoys // 3)  # At least 1 mobile buoy if any buoys exist
+        fixed_count = total_buoys - mobile_count
+    else:
+        mobile_count = 0
+        fixed_count = len(positions)
+    
     # Build command
     cmd = ["uv", "run", "src/init.py",
            "--mode", mode,
            "--seed", str(int(time.time())),
            "--world-width", str(WORLD_WIDTH),
            "--world-height", str(WORLD_HEIGHT),
-           "--mobile-buoy-count", "0",
-           "--fixed-buoy-count", str(len(positions)),
+           "--mobile-buoy-count", str(mobile_count),
+           "--fixed-buoy-count", str(fixed_count),
            "--duration", str(DURATION),
            "--result-file", result_file,
            "--positions-file", positions_file,
