@@ -5,7 +5,7 @@ SPEED_OF_LIGHT = 3e8  # m/s
 
 # Buoy settings
 DEFAULT_BATTERY = 100.0  # %
-DEFAULT_BUOY_VELOCITY = 5.0 # m/s
+DEFAULT_BUOY_VELOCITY = 15.0 # m/s
 COMMUNICATION_RANGE_MAX = 120.0  # Max range for any beacon
 COMMUNICATION_RANGE_HIGH_PROB = 70.0  # Up to this, 90% delivery
 DELIVERY_PROB_HIGH = 0.9  # Probability if <= 70m

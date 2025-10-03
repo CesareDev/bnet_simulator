@@ -14,6 +14,7 @@ HEADLESS = True # Run without GUI
 
 TOTAL_BUOY = 240 # Maximum number of buoys for ramp scenario
 MOBILE = True # Whether to include mobile buoys in the simulation
+MOBILE_PERCENTAGE = 0.33 # Percentage of buoys that are mobile if MOBILE is True
 DENSITIES = range(20, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
 INTERVALS = [0.25] # Static scheduler intervals to test
 
@@ -73,7 +74,7 @@ def run_simulation(mode, interval, density, positions, results_dir):
     if MOBILE:
         # Calculate mobile and fixed buoy counts (~1/3 mobile, 2/3 fixed)
         total_buoys = len(positions)
-        mobile_count = max(1, total_buoys // 3)  # At least 1 mobile buoy if any buoys exist
+        mobile_count = max(1, int(total_buoys * MOBILE_PERCENTAGE))  # At least 1 mobile buoy if any buoys exist
         fixed_count = total_buoys - mobile_count
     else:
         mobile_count = 0
