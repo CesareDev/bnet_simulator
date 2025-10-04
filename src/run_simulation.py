@@ -8,14 +8,13 @@ from multiprocessing import Pool
 from utils import config
 
 IDEAL = True # Use ideal channel conditions (no loss)
-RANDOM_POS = True # Use random buoy positions instead of density-based
 RAMP = False # Use ramp scenario (buoy count increases over time)
 HEADLESS = True # Run without GUI
 
-TOTAL_BUOY = 240 # Maximum number of buoys for ramp scenario
+TOTAL_BUOY = 80 # Maximum number of buoys for ramp scenario
 MOBILE = True # Whether to include mobile buoys in the simulation
-MOBILE_PERCENTAGE = 0.33 # Percentage of buoys that are mobile if MOBILE is True
-DENSITIES = range(20, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
+MOBILE_PERCENTAGE = 1.0 # Percentage of buoys that are mobile if MOBILE is True
+DENSITIES = range(10, TOTAL_BUOY + 1, 10) # Buoy densities to simulate
 INTERVALS = [0.25] # Static scheduler intervals to test
 
 DURATION = 600 # Simulation duration in seconds
@@ -24,30 +23,6 @@ WORLD_HEIGHT = 800 # World height
 
 # Number of parallel processes to use (adjust based on your CPU)
 NUM_PROCESSES = 4
-
-def arrange_buoys_for_density(density):
-    # Determine communication range based on ideal setting
-    comm_range = config.COMMUNICATION_RANGE_HIGH_PROB * 0.9 if IDEAL else config.COMMUNICATION_RANGE_MAX * 0.9
-    
-    # Calculate parameters for positioning
-    n_buoys = density + 1
-    area_radius = comm_range * (1.5 - (0.5 * density / 30))
-    area_radius = max(comm_range * 0.5, min(comm_range, area_radius))
-    center_x = WORLD_WIDTH / 2
-    center_y = WORLD_HEIGHT / 2
-    
-    # Generate positions
-    positions = []
-    random.seed(time.time())
-    for i in range(n_buoys):
-        angle = random.uniform(0, 2 * math.pi)
-        distance = math.sqrt(random.random()) * area_radius
-        x = center_x + distance * math.cos(angle)
-        y = center_y + distance * math.sin(angle)
-        x = max(10, min(WORLD_WIDTH - 10, x))
-        y = max(10, min(WORLD_HEIGHT - 10, y))
-        positions.append((x, y))
-    return positions
 
 def arrange_buoys_randomly(n_buoys):
     positions = []
@@ -155,27 +130,23 @@ def main():
         
         if RAMP:
             # For ramp scenario, we only need one density
-            if RANDOM_POS:
-                positions = arrange_buoys_randomly(TOTAL_BUOY)
-            else:
-                positions = arrange_buoys_for_density(TOTAL_BUOY)
+            positions = arrange_buoys_randomly(TOTAL_BUOY)
                 
-            # For ramp, run serially since we only have two simulations
+            # For ramp, run serially since we have three simulations
             run_simulation("static", interval, TOTAL_BUOY, positions, results_dir)
-            run_simulation("dynamic", interval, TOTAL_BUOY, positions, results_dir)
+            run_simulation("dynamic_adab", interval, TOTAL_BUOY, positions, results_dir)
+            run_simulation("dynamic_acab", interval, TOTAL_BUOY, positions, results_dir)
         else:
             # For density sweep, create tasks for parallel execution
             tasks = []
             
             for density in DENSITIES:
-                if RANDOM_POS:
-                    positions = arrange_buoys_randomly(density)
-                else:
-                    positions = arrange_buoys_for_density(density)
+                positions = arrange_buoys_randomly(density)
                 
-                # Add both static and dynamic tasks for this density
+                # Add static, dynamic_adab, and dynamic_acab tasks for this density
                 tasks.append(("static", interval, density, positions, results_dir))
-                tasks.append(("dynamic", interval, density, positions, results_dir))
+                tasks.append(("dynamic_adab", interval, density, positions, results_dir))
+                tasks.append(("dynamic_acab", interval, density, positions, results_dir))
             
             # Run all tasks in parallel
             print(f"Running {len(tasks)} simulations in parallel using {NUM_PROCESSES} processes")

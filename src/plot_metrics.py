@@ -27,8 +27,12 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
                 sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
             elif f.startswith("static_"):
                 sched_type = "static"
+            elif f.startswith("dynamic_acab_"):
+                sched_type = "dynamic_acab"
+            elif f.startswith("dynamic_adab_"):
+                sched_type = "dynamic_adab"
             elif f.startswith("dynamic_"):
-                sched_type = "dynamic"
+                sched_type = "dynamic_adab"  # fallback for backward compatibility
             else:
                 sched_type = "unknown"
                 
@@ -43,8 +47,12 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
                 sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
             elif f.startswith("static_"):
                 sched_type = "static"
+            elif f.startswith("dynamic_acab_"):
+                sched_type = "dynamic_acab"
+            elif f.startswith("dynamic_adab_"):
+                sched_type = "dynamic_adab"
             elif f.startswith("dynamic_"):
-                sched_type = "dynamic"
+                sched_type = "dynamic_adab"  # fallback for backward compatibility
             else:
                 sched_type = "unknown"
                 
@@ -59,9 +67,9 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     df = pd.DataFrame(data, columns=["Density", "B-PDR", "Scheduler"])
     grouped = df.groupby(["Density", "Scheduler"]).mean().reset_index()
     densities = sorted(df["Density"].unique())
-    schedulers = ["static", "dynamic"]
-    scheduler_labels = {"static": "SBP", "dynamic": "ACAB"}
-    color_map = {"static": "tab:blue", "dynamic": "tab:green"}
+    schedulers = ["static", "dynamic_adab", "dynamic_acab"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
     bar_width = 0.25
     x = np.arange(len(densities))
     
@@ -69,17 +77,18 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     
     # Add second y-axis for average neighbors
     ax2 = ax.twinx()
-    ax2.set_ylabel("Average Neighbors", color="red")
-    ax2.tick_params(axis='y', labelcolor="red")
+    ax2.set_ylabel("Average Neighbors", color="black")
+    ax2.tick_params(axis='y', labelcolor="black")
     ax2.grid(False)
     
     # Plot bars for each scheduler
+    offset = -(len(schedulers) - 1) * bar_width / 2
     for i, sched in enumerate(schedulers):
         pdrs = []
         for d in densities:
             row = grouped[(grouped["Density"] == d) & (grouped["Scheduler"] == sched)]
             pdrs.append(row["B-PDR"].values[0] if not row.empty else 0)
-        ax.bar(x + i * bar_width, pdrs, bar_width, label=scheduler_labels[sched], color=color_map[sched])
+        ax.bar(x + offset + i * bar_width, pdrs, bar_width, label=scheduler_labels[sched], color=color_map[sched])
     
     # Plot average neighbors as a connected line across all densities
     if avg_neighbors_data:
@@ -99,12 +108,12 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             x_positions = [list(densities).index(d) for d in density_points]
             
             # Plot the connected line
-            ax2.plot(x_positions, neighbor_values, color='red', marker='o', 
-                   linestyle='-', linewidth=2, label='Avg Neighbors')
+            ax2.plot(x_positions, neighbor_values, color='black', marker='o', 
+                   linestyle='-', linewidth=1, label='Avg Neighbors')
             
             # Add text labels at each point
             for i, (x_pos, value) in enumerate(zip(x_positions, neighbor_values)):
-                ax2.text(x_pos, value, f"{value:.1f}", color='red', 
+                ax2.text(x_pos, value, f"{value:.1f}", color='black', 
                        ha='center', va='bottom', fontsize=8)
             
             # Set y-limits for average neighbors axis
@@ -118,7 +127,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         ax.set_title(f"B-PDR vs Buoy Count (Static Interval: {interval}s)")
     else:
         ax.set_title("B-PDR vs Buoy Count")
-    ax.set_xticks(x + bar_width/2)
+    ax.set_xticks(x)
     ax.set_xticklabels([str(int(d)) for d in densities])
     
     # Create a combined legend
@@ -146,12 +155,13 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     densities = sorted(coll_df["Density"].unique())
     
     fig, ax = plt.subplots(figsize=(10, 6))
+    offset = -(len(schedulers) - 1) * bar_width / 2
     for i, sched in enumerate(schedulers):
         rates = []
         for d in densities:
             row = grouped_coll[(grouped_coll["Density"] == d) & (grouped_coll["Scheduler"] == sched)]
             rates.append(row["CollisionRate"].values[0] if not row.empty else 0)
-        ax.bar(x + i * bar_width, rates, bar_width, label=scheduler_labels[sched], color=color_map[sched])
+        ax.bar(x + offset + i * bar_width, rates, bar_width, label=scheduler_labels[sched], color=color_map[sched])
     
     # Update this label as well
     ax.set_xlabel("Total Buoys")
@@ -160,7 +170,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         ax.set_title(f"Collision Rate vs Buoy Count (Static Interval: {interval}s)")
     else:
         ax.set_title("Collision Rate vs Buoy Count")
-    ax.set_xticks(x + bar_width/2)
+    ax.set_xticks(x)
     ax.set_xticklabels([str(int(d)) for d in densities])
     ax.legend()
     ax.grid(axis="y", linestyle="--", alpha=0.6)
@@ -171,87 +181,9 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     else:
         plt.savefig(os.path.join(plot_dir, "collision_rate_block_by_density.png"))
     plt.close()
-    
-    # Create grouped plots if we have enough density values
-    if len(densities) > 5:
-        plot_grouped_by_density(df, coll_df, plot_dir, interval)
-
-def plot_grouped_by_density(pdr_df, coll_df, plot_dir, interval=None):
-    def get_density_group(density):
-        return f"{5*((int(density)-1)//5) + 1}-{5*((int(density)-1)//5) + 5}"
-    
-    pdr_df['DensityGroup'] = pdr_df['Density'].apply(get_density_group)
-    coll_df['DensityGroup'] = coll_df['Density'].apply(get_density_group)
-    
-    grouped_pdr = pdr_df.groupby(['DensityGroup', 'Scheduler']).mean().reset_index()
-    grouped_coll = coll_df.groupby(['DensityGroup', 'Scheduler']).mean().reset_index()
-    
-    def sort_key(group):
-        return int(group.split('-')[0])
-    
-    density_groups = sorted(grouped_pdr['DensityGroup'].unique(), key=sort_key)
-    schedulers = ["static", "dynamic"]
-    scheduler_labels = {"static": "SBP", "dynamic": "ACAB"}
-    color_map = {"static": "tab:blue", "dynamic": "tab:green"}
-    bar_width = 0.35
-    x = np.arange(len(density_groups))
-    
-    # Create B-PDR by density group plot
-    fig, ax = plt.subplots(figsize=(12, 6))
-    for i, sched in enumerate(schedulers):
-        pdrs = []
-        for grp in density_groups:
-            row = grouped_pdr[(grouped_pdr["DensityGroup"] == grp) & (grouped_pdr["Scheduler"] == sched)]
-            pdrs.append(row["B-PDR"].values[0] if not row.empty else 0)
-        ax.bar(x + i * bar_width, pdrs, bar_width, label=scheduler_labels[sched], color=color_map[sched])
-    
-    ax.set_xlabel("Total Buoys (Grouped)")
-    ax.set_ylabel("Average B-PDR")
-    if interval:
-        ax.set_title(f"B-PDR vs Buoy Count Groups (Static Interval: {interval}s)")
-    else:
-        ax.set_title("B-PDR vs Buoy Count Groups")
-    ax.set_xticks(x + bar_width/2)
-    ax.set_xticklabels(density_groups)
-    ax.legend()
-    ax.grid(axis="y", linestyle="--", alpha=0.6)
-    plt.tight_layout()
-    
-    if interval:
-        plt.savefig(os.path.join(plot_dir, f"b_pdr_grouped_interval{int(interval*10)}.png"))
-    else:
-        plt.savefig(os.path.join(plot_dir, "b_pdr_grouped.png"))
-    plt.close()
-    
-    # Create collision rate by density group plot
-    fig, ax = plt.subplots(figsize=(12, 6))
-    for i, sched in enumerate(schedulers):
-        rates = []
-        for grp in density_groups:
-            row = grouped_coll[(grouped_coll["DensityGroup"] == grp) & (grouped_coll["Scheduler"] == sched)]
-            rates.append(row["CollisionRate"].values[0] if not row.empty else 0)
-        ax.bar(x + i * bar_width, rates, bar_width, label=scheduler_labels[sched], color=color_map[sched])
-    
-    ax.set_xlabel("Total Buoys (Grouped)")
-    ax.set_ylabel("Average Collision Rate")
-    if interval:
-        ax.set_title(f"Collision Rate vs Buoy Count Groups (Static Interval: {interval}s)")
-    else:
-        ax.set_title("Collision Rate vs Buoy Count Groups")
-    ax.set_xticks(x + bar_width/2)
-    ax.set_xticklabels(density_groups)
-    ax.legend()
-    ax.grid(axis="y", linestyle="--", alpha=0.6)
-    plt.tight_layout()
-    
-    if interval:
-        plt.savefig(os.path.join(plot_dir, f"collision_rate_grouped_interval{int(interval*10)}.png"))
-    else:
-        plt.savefig(os.path.join(plot_dir, "collision_rate_grouped.png"))
-    plt.close()
 
 def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
-    modes = [("static", "tab:blue"), ("dynamic", "tab:green")]
+    modes = [("static", "tab:blue"), ("dynamic_adab", "tab:orange"), ("dynamic_acab", "tab:green")]
     
     # First, collect data and determine overall min/max buoy counts
     min_buoys = float('inf')
@@ -324,22 +256,26 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
     
     # Plot the results
     x = np.arange(len(group_labels))
-    bar_width = 0.35
+    bar_width = 0.25
     fig, ax = plt.subplots(figsize=(10, 6))
+    
+    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+    offset = -(len(valid_modes) - 1) * bar_width / 2
     
     for i, (mode, color) in enumerate(valid_modes):
         # Ensure data length matches x length
         data = grouped_data[mode]
         if len(data) == len(x):
-            ax.bar(x + i * bar_width, data, bar_width, 
-                  label=mode.capitalize(), color=color)
+            label = mode_labels.get(mode, mode.capitalize())
+            ax.bar(x + offset + i * bar_width, data, bar_width, 
+                  label=label, color=color)
         else:
             print(f"Warning: Data length mismatch for {mode}. Expected {len(x)}, got {len(data)}")
     
     ax.set_xlabel("Buoy Count Group")
     ax.set_ylabel("Average B-PDR")
     ax.set_title("Average B-PDR vs Buoy Count Group (Ramp Scenario)")
-    ax.set_xticks(x + (bar_width / 2 if len(valid_modes) > 1 else 0))
+    ax.set_xticks(x)
     ax.set_xticklabels(group_labels)
     ax.legend(loc="lower right")
     ax.grid(axis="y", linestyle="--", alpha=0.6)
@@ -370,7 +306,8 @@ def extract_interval_from_dirname(dirname):
     return None
 
 def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
-    modes = [("static", "tab:blue"), ("dynamic", "tab:green")]
+    modes = [("static", "tab:blue"), ("dynamic_adab", "tab:orange"), ("dynamic_acab", "tab:green")]
+    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
     plt.figure(figsize=(10, 6))
     found = False
 
@@ -389,7 +326,8 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
             else:
                 print(f"Warning: No B-PDR or delivery_ratio column in {csv_file}")
                 continue
-            plt.plot(df["time"], df[y_col], label=mode.capitalize(), color=color)
+            label = mode_labels.get(mode, mode.capitalize())
+            plt.plot(df["time"], df[y_col], label=label, color=color)
             found = True
             
             if time_buoy is None and "n_buoys" in df.columns:
@@ -424,9 +362,9 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
             # Offset the axis to the right
             ax3.spines["right"].set_position(("axes", 1.1))
             neighbor_line = ax3.plot(time_neighbors[0], time_neighbors[1], 
-                                   color="red", linestyle="-", label="Avg. Neighbors")
-            ax3.set_ylabel("Avg. Neighbors", color="red", fontsize=12)
-            ax3.tick_params(axis='y', colors='red')
+                                   color="black", linestyle="-", linewidth=1, label="Avg. Neighbors")
+            ax3.set_ylabel("Avg. Neighbors", color="black", fontsize=12)
+            ax3.tick_params(axis='y', colors='black')
             ax3.grid(False)
             handles += neighbor_line
             labels += ["Avg. Neighbors"]

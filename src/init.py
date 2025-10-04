@@ -16,7 +16,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run the BNet Simulator")
     parser.add_argument(
         "--mode",
-        choices=["static", "dynamic", "auto"],
+        choices=["static", "dynamic_adab", "dynamic_acab"],
         default=config.SCHEDULER_TYPE,
         help="Scheduler mode to use for the simulation (default: static)"
     )
@@ -98,17 +98,10 @@ def parse_args():
     return parser.parse_args()
 
 def random_position():
-    # Place all buoys randomly within a small circle at the center of the world
-    center_x = config.WORLD_WIDTH / 2
-    center_y = config.WORLD_HEIGHT / 2
-    # Use a radius smaller than the communication range to ensure all are in range
-    max_radius = min(getattr(config, "COMMUNICATION_RANGE_HIGH_PROB", 70), config.WORLD_WIDTH, config.WORLD_HEIGHT) / 2.5
-    angle = random.uniform(0, 2 * 3.1415926535)
-    radius = random.uniform(0, max_radius)
-    return (
-        center_x + radius * math.cos(angle),
-        center_y + radius * math.sin(angle)
-    )
+    # Place buoys randomly across the entire world
+    x = random.uniform(10, config.WORLD_WIDTH - 10)
+    y = random.uniform(10, config.WORLD_HEIGHT - 10)
+    return (x, y)
 
 def random_velocity():
     return (
@@ -176,10 +169,11 @@ def main():
 
     mobile_buoys = []
     for i in range(config.MOBILE_BUOY_COUNT):
+        pos = positions[i] if positions else random_position()
         mobile_buoys.append(
             Buoy(
                 channel=channel,
-                position=random_position(),
+                position=pos,
                 is_mobile=True,
                 battery=config.DEFAULT_BATTERY,
                 velocity=random_velocity(),

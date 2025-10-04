@@ -4,8 +4,6 @@ import math
 from typing import Tuple, List
 from utils import config
 
-COMBINATION = True
-
 class BeaconScheduler:
     def __init__(
         self,
@@ -31,7 +29,7 @@ class BeaconScheduler:
     def should_send(self, battery, velocity, neighbors, current_time):
         if config.SCHEDULER_TYPE == "static":
             return self.should_send_static(current_time)
-        elif config.SCHEDULER_TYPE == "dynamic":
+        elif config.SCHEDULER_TYPE in ["dynamic_adab", "dynamic_acab"]:
             return self.should_send_dynamic(battery, velocity, neighbors, current_time)
         else:
             raise ValueError(f"Unknown scheduler type: {config.SCHEDULER_TYPE}")
@@ -68,7 +66,8 @@ class BeaconScheduler:
         neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
         current_time: float,
     ) -> float:
-        if COMBINATION:
+        if config.SCHEDULER_TYPE == "dynamic_acab":
+            # ACAB
             # DENSITY FACTOR
             # More neighbors = higher congestion = beacon less frequently
             n_neighbors = len(neighbors)
@@ -112,8 +111,8 @@ class BeaconScheduler:
             combined = (w_density * density_score + 
                        w_contact * contact_score + 
                        w_mobility * (1.0 - mobility_score))
-        else:
-            # Density factor
+        else:  # dynamic_adab
+            # ADAB
             n_neighbors = len(neighbors)
             NEIGHBORS_THRESHOLD = 15
             density_score = min(1.0, n_neighbors / NEIGHBORS_THRESHOLD)
