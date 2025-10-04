@@ -11,10 +11,10 @@ IDEAL = True # Use ideal channel conditions (no loss)
 RAMP = False # Use ramp scenario (buoy count increases over time)
 HEADLESS = True # Run without GUI
 
-TOTAL_BUOY = 80 # Maximum number of buoys for ramp scenario
+TOTAL_BUOY = 300 # Maximum number of buoys for ramp scenario
 MOBILE = True # Whether to include mobile buoys in the simulation
 MOBILE_PERCENTAGE = 1.0 # Percentage of buoys that are mobile if MOBILE is True
-DENSITIES = range(10, TOTAL_BUOY + 1, 10) # Buoy densities to simulate
+DENSITIES = range(20, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
 INTERVALS = [0.25] # Static scheduler intervals to test
 
 DURATION = 600 # Simulation duration in seconds

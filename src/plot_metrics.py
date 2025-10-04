@@ -67,7 +67,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     df = pd.DataFrame(data, columns=["Density", "B-PDR", "Scheduler"])
     grouped = df.groupby(["Density", "Scheduler"]).mean().reset_index()
     densities = sorted(df["Density"].unique())
-    schedulers = ["static", "dynamic_adab", "dynamic_acab"]
+    schedulers = ["dynamic_acab", "dynamic_adab", "static"]
     scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
     color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
     bar_width = 0.25
@@ -133,7 +133,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     # Create a combined legend
     lines1, labels1 = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
     ax.grid(axis="y", linestyle="--", alpha=0.6)
     
     plt.tight_layout()
@@ -183,7 +183,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     plt.close()
 
 def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
-    modes = [("static", "tab:blue"), ("dynamic_adab", "tab:orange"), ("dynamic_acab", "tab:green")]
+    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
     
     # First, collect data and determine overall min/max buoy counts
     min_buoys = float('inf')
@@ -306,7 +306,7 @@ def extract_interval_from_dirname(dirname):
     return None
 
 def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
-    modes = [("static", "tab:blue"), ("dynamic_adab", "tab:orange"), ("dynamic_acab", "tab:green")]
+    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
     mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
     plt.figure(figsize=(10, 6))
     found = False
