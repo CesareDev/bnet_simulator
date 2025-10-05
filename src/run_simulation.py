@@ -15,7 +15,7 @@ TOTAL_BUOY = 300 # Maximum number of buoys for ramp scenario
 MOBILE = True # Whether to include mobile buoys in the simulation
 MOBILE_PERCENTAGE = 1.0 # Percentage of buoys that are mobile if MOBILE is True
 DENSITIES = range(20, TOTAL_BUOY + 1, 20) # Buoy densities to simulate
-INTERVALS = [0.25] # Static scheduler intervals to test
+INTERVALS = [1.0, 0.5, 0.25] # Static scheduler intervals to test
 
 DURATION = 600 # Simulation duration in seconds
 WORLD_WIDTH = 800 # World width
