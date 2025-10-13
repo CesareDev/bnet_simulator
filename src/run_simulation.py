@@ -9,7 +9,6 @@ from utils import config
 
 IDEAL = True # Use ideal channel conditions (no loss)
 RAMP = False # Use ramp scenario (buoy count increases over time)
-HEADLESS = True # Run without GUI
 
 TOTAL_BUOY = 300 # Maximum number of buoys for ramp scenario
 MOBILE = True # Whether to include mobile buoys in the simulation
@@ -69,8 +68,6 @@ def run_simulation(mode, interval, density, positions, results_dir):
            "--density", str(density),
            "--static-interval", str(interval)]
     
-    if HEADLESS:
-        cmd.append("--headless")
     if RAMP:
         cmd.append("--ramp")
     if IDEAL:

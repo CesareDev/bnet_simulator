@@ -57,11 +57,6 @@ def parse_args():
         help="Number of fixed buoys (default: from config)"
     )
     parser.add_argument(
-        "--headless",
-        action='store_true',
-        help="Run in headless mode without GUI (default: False)"
-    )
-    parser.add_argument(
         "--result-file",
         type=str,
         default=None,
@@ -141,7 +136,6 @@ def main():
     config.MOBILE_BUOY_COUNT = args.mobile_buoy_count
     config.FIXED_BUOY_COUNT = args.fixed_buoy_count
     config.SEED = args.seed
-    config.HEADLESS = args.headless
     config.IDEAL_CHANNEL = args.ideal
     # Make static interval available to config
     if args.static_interval:
