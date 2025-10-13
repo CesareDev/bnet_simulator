@@ -3,16 +3,27 @@ import random
 from typing import Tuple
 from protocols.beacon import Beacon
 from core.events import EventType
-from utils import logging, config
+from config.config_handler import ConfigHandler
+from utils import logging
 
 class Channel:
-    def __init__(self, metrics = None):
+    def __init__(self, metrics = None, ideal_channel = None):
+        cfg = ConfigHandler()
+        
         self.active_transmissions = []
         self.metrics = metrics
         self.buoys = []
         self.simulator = None
         self.seen_attempts = set()
-        self.collision_beacons = set()  # Track beacons involved in collisions
+        self.collision_beacons = set()
+        
+        self.ideal_channel = ideal_channel if ideal_channel is not None else cfg.get('simulation', 'ideal_channel')
+        self.bit_rate = cfg.get('network', 'bit_rate')
+        self.speed_of_light = cfg.get('network', 'speed_of_light')
+        self.comm_range_max = cfg.get('network', 'communication_range_max')
+        self.comm_range_high_prob = cfg.get('network', 'communication_range_high_prob')
+        self.delivery_prob_high = cfg.get('network', 'delivery_prob_high')
+        self.delivery_prob_low = cfg.get('network', 'delivery_prob_low')
 
     def set_buoys(self, buoys):
         self.buoys = buoys
@@ -38,27 +49,22 @@ class Channel:
 
     def update(self, sim_time: float):
         expired_indices = []
-        # Use max propagation delay for grace period
-        max_delay = config.COMMUNICATION_RANGE_MAX / config.SPEED_OF_LIGHT
-        grace_period = max_delay + 1e-6  # Small epsilon to account for floating point errors
+        max_delay = self.comm_range_max / self.speed_of_light
+        grace_period = max_delay + 1e-6
         
         for i, (beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
             if end + grace_period <= sim_time:
                 expired_indices.append(i)
                 
-                # For ideal channel - ensure processed + lost = potential
-                if config.IDEAL_CHANNEL:
+                if self.ideal_channel:
                     beacon_key = (beacon.sender_id, beacon.timestamp)
                     if beacon_key not in self.collision_beacons:
                         unprocessed = potential_count - processed_count
                         if unprocessed > 0:
-                            # In ideal channel, all unreceived should be marked as received
                             for _ in range(unprocessed):
                                 if self.metrics:
                                     self.metrics.log_actually_received(beacon.sender_id)
                                     logging.log_info(f"Ideal channel: marking {unprocessed} unreached as received for {str(beacon.sender_id)[:6]}")
-                
-                # No need to do anything for non-ideal channel as we've already accounted for all losses
 
         for idx in sorted(expired_indices, reverse=True):
             self.active_transmissions.pop(idx)
@@ -69,7 +75,7 @@ class Channel:
         if self.metrics:
             self.metrics.log_sent()
 
-        transmission_time = beacon.size_bits() / config.BIT_RATE
+        transmission_time = beacon.size_bits() / self.bit_rate
         new_end_time = sim_time + transmission_time
 
         receivers_in_range = [
@@ -81,35 +87,27 @@ class Channel:
         if self.metrics:
             self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
 
-        # Track if this beacon has a collision
         beacon_key = (beacon.sender_id, beacon.timestamp)
-        
-        # Track which receivers will experience collisions
         receivers_with_collisions = set()
 
-        # Check for collisions
         for i, (existing, start, end, _, _) in enumerate(self.active_transmissions):
             if beacon.sender_id == existing.sender_id:
                 continue
             
-            # Check for time overlap
             time_overlap = (sim_time <= end) and (start <= new_end_time)
             if not time_overlap:
                 continue
             
             existing_key = (existing.sender_id, existing.timestamp)
             
-            # Direct collision detection (transmitters can hear each other)
             if self.in_range(beacon.position, existing.position):
                 logging.log_error(f"Direct collision between {str(beacon.sender_id)[:6]} and {str(existing.sender_id)[:6]}")
                 self.collision_beacons.add(beacon_key)
                 self.collision_beacons.add(existing_key)
                 
-                # In case of direct collision, all receivers are affected
                 for receiver in receivers_in_range:
                     receivers_with_collisions.add(receiver.id)
                     
-            # Check which specific receivers can hear both transmissions
             else:
                 for receiver in receivers_in_range:
                     if self.in_range(receiver.position, existing.position):
@@ -118,11 +116,9 @@ class Channel:
                         self.collision_beacons.add(beacon_key)
                         self.collision_beacons.add(existing_key)
 
-        # Record transmission with count of affected receivers
         successful_receivers = 0
         self.active_transmissions.append((beacon, sim_time, new_end_time, n_receivers, successful_receivers))
         
-        # Schedule transmission end
         self.simulator.schedule_event(
             new_end_time, 
             EventType.TRANSMISSION_END, 
@@ -130,48 +126,38 @@ class Channel:
             {"beacon": beacon}
         )
         
-        # Track all receivers who won't get the packet (both collisions and probability-based losses)
         total_lost = 0
         collision_lost = len(receivers_with_collisions)
         probability_lost = 0
         
-        # Process each potential receiver
         for receiver in receivers_in_range:
-            # Calculate distance and propagation delay
             dx = receiver.position[0] - beacon.position[0]
             dy = receiver.position[1] - beacon.position[1]
             distance = math.hypot(dx, dy)
-            propagation_delay = distance / config.SPEED_OF_LIGHT
+            propagation_delay = distance / self.speed_of_light
             reception_time = new_end_time + propagation_delay + 1e-9
             
-            # Check if receiver will experience collision
             collision_loss = receiver.id in receivers_with_collisions
-            
-            # Determine if packet will be received
             will_receive = False
             
-            if config.IDEAL_CHANNEL:
-                # In ideal channel, only receivers affected by collisions should miss the packet
+            if self.ideal_channel:
                 will_receive = not collision_loss
             else:
-                # In non-ideal channel, consider both probability and collisions
                 probability_loss = False
                 
-                # Only check probability if there's no collision
                 if not collision_loss:
                     random_val = random.random()
                     
-                    if distance <= config.COMMUNICATION_RANGE_HIGH_PROB:
-                        probability_loss = random_val >= config.DELIVERY_PROB_HIGH
-                    elif distance <= config.COMMUNICATION_RANGE_MAX:
-                        probability_loss = random_val >= config.DELIVERY_PROB_LOW
+                    if distance <= self.comm_range_high_prob:
+                        probability_loss = random_val >= self.delivery_prob_high
+                    elif distance <= self.comm_range_max:
+                        probability_loss = random_val >= self.delivery_prob_low
                     
                     if probability_loss:
                         probability_lost += 1
                 
                 will_receive = not (collision_loss or probability_loss)
             
-            # Schedule reception only if the packet will be received
             if will_receive:
                 self.simulator.schedule_event(
                     reception_time,
@@ -180,17 +166,13 @@ class Channel:
                     {"beacon": beacon, "collision_checked": True}
                 )
         
-        # Count all losses
         total_lost = collision_lost + probability_lost
         
-        # Log metrics for collisions and losses
         if self.metrics:
             if collision_lost > 0:
-                # Log each collision as a separate event
                 for _ in range(collision_lost):
                     self.metrics.log_collision()
             
-            # Log all losses (both collision and probability-based)
             if total_lost > 0:
                 self.metrics.log_lost(total_lost)
                 logging.log_info(f"Lost {total_lost} packets: {collision_lost} from collisions, {probability_lost} from probability")
@@ -202,18 +184,13 @@ class Channel:
             if start <= sim_time <= end:
                 sender_position = beacon.position
                 
-                # Calculate distance to the transmitter
                 dx = position[0] - sender_position[0]
                 dy = position[1] - sender_position[1]
                 distance = math.hypot(dx, dy)
                 
-                # Calculate how far the signal wavefront has traveled
-                wavefront_radius = config.SPEED_OF_LIGHT * (sim_time - start)
+                wavefront_radius = self.speed_of_light * (sim_time - start)
+                detection_range = self.comm_range_high_prob
                 
-                # Node can sense transmission only if:
-                # 1. It's within the detection range (carrier sense)
-                # 2. The wavefront has reached this position
-                detection_range = config.COMMUNICATION_RANGE_HIGH_PROB
                 if distance <= wavefront_radius and distance <= detection_range:
                     return True
                 
@@ -223,5 +200,4 @@ class Channel:
         dx = pos1[0] - pos2[0]
         dy = pos1[1] - pos2[1]
         distance = math.hypot(dx, dy)
-        # Always use COMMUNICATION_RANGE_MAX as maximum range
-        return distance <= config.COMMUNICATION_RANGE_MAX
+        return distance <= self.comm_range_max

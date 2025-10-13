@@ -1,6 +1,6 @@
 import os
 import csv
-from utils import logging, config
+from utils import logging
 
 class Metrics:
     def __init__(self, density=None):
@@ -20,6 +20,21 @@ class Metrics:
         self.avg_neighbors = 0
         self.density = density
         self.time_series = []
+        
+        self.scheduler_type = None
+        self.world_width = None
+        self.world_height = None
+        self.mobile_buoy_count = None
+        self.fixed_buoy_count = None
+        self.simulation_duration = None
+
+    def set_simulation_info(self, scheduler_type, world_width, world_height, mobile_count, fixed_count, duration):
+        self.scheduler_type = scheduler_type
+        self.world_width = world_width
+        self.world_height = world_height
+        self.mobile_buoy_count = mobile_count
+        self.fixed_buoy_count = fixed_count
+        self.simulation_duration = duration
 
     def log_sent(self):
         self.beacons_sent += 1
@@ -72,11 +87,11 @@ class Metrics:
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
         base_summary = {
-            "Scheduler Type": config.SCHEDULER_TYPE,
-            "World Size": f"{config.WORLD_WIDTH}x{config.WORLD_HEIGHT}",
-            "Mobile Buoys": config.MOBILE_BUOY_COUNT,
-            "Fixed Buoys": config.FIXED_BUOY_COUNT,
-            "Simulation Duration": config.SIMULATION_DURATION,
+            "Scheduler Type": self.scheduler_type or "unknown",
+            "World Size": f"{self.world_width}x{self.world_height}" if self.world_width else "unknown",
+            "Mobile Buoys": self.mobile_buoy_count or 0,
+            "Fixed Buoys": self.fixed_buoy_count or 0,
+            "Simulation Duration": self.simulation_duration or sim_time,
             "Sent": self.beacons_sent,
             "Received": self.beacons_received,
             "Lost": self.beacons_lost,
@@ -108,9 +123,9 @@ class Metrics:
             results_dir = os.path.join("metrics", "test_results")
             os.makedirs(results_dir, exist_ok=True)
             filename = (
-                f"{config.SCHEDULER_TYPE}_"
-                f"{int(config.WORLD_WIDTH)}x{int(config.WORLD_HEIGHT)}_"
-                f"mob{config.MOBILE_BUOY_COUNT}_fix{config.FIXED_BUOY_COUNT}.csv"
+                f"{self.scheduler_type or 'unknown'}_"
+                f"{int(self.world_width or 0)}x{int(self.world_height or 0)}_"
+                f"mob{self.mobile_buoy_count or 0}_fix{self.fixed_buoy_count or 0}.csv"
             )
             filepath = os.path.join(results_dir, filename)
         else:
@@ -130,9 +145,9 @@ class Metrics:
             results_dir = os.path.join("metrics", "test_results")
             os.makedirs(results_dir, exist_ok=True)
             filename = (
-                f"{config.SCHEDULER_TYPE}_"
-                f"{int(config.WORLD_WIDTH)}x{int(config.WORLD_HEIGHT)}_"
-                f"mob{config.MOBILE_BUOY_COUNT}_fix{config.FIXED_BUOY_COUNT}_timeseries.csv"
+                f"{self.scheduler_type or 'unknown'}_"
+                f"{int(self.world_width or 0)}x{int(self.world_height or 0)}_"
+                f"mob{self.mobile_buoy_count or 0}_fix{self.fixed_buoy_count or 0}_timeseries.csv"
             )
             filepath = os.path.join(results_dir, filename)
         else:
@@ -146,7 +161,5 @@ class Metrics:
     def set_avg_neighbors(self, avg_neighbors):
         self.avg_neighbors = avg_neighbors
         
-        # Add to timeseries data if we're logging timeseries
         if self.time_series:
-            # Add to the most recent timepoint
             self.time_series[-1]['avg_neighbors'] = avg_neighbors

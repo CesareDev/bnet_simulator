@@ -6,7 +6,8 @@ from typing import Tuple
 from protocols.scheduler import BeaconScheduler
 from protocols.beacon import Beacon
 from core.events import EventType
-from utils import config, logging
+from config.config_handler import ConfigHandler
+from utils import logging
 
 class BuoyState(Enum):
     SLEEPING = 0
@@ -20,14 +21,16 @@ class Buoy:
         channel,
         position: Tuple[float, float] = (0.0, 0.0),
         is_mobile: bool = False,
-        battery: float = 100.0,
+        battery: float = None,
         velocity: Tuple[float, float] = (0.0, 0.0),
         metrics = None
     ):
+        cfg = ConfigHandler()
+        
         self.id = uuid.uuid4()
         self.position = position
         self.is_mobile = is_mobile
-        self.battery = battery
+        self.battery = battery if battery is not None else cfg.get('buoys', 'default_battery')
         self.velocity = velocity
         self.neighbors = []
         self.scheduler = BeaconScheduler()
@@ -36,7 +39,15 @@ class Buoy:
         self.metrics = metrics
         self.simulator = None
 
-        # CSMA/CA state
+        self.difs_time = cfg.get('csma', 'difs_time')
+        self.slot_time = cfg.get('csma', 'slot_time')
+        self.cw = cfg.get('csma', 'cw')
+        self.neighbor_timeout = cfg.get('scheduler', 'neighbor_timeout')
+        self.world_width = cfg.get('world', 'width')
+        self.world_height = cfg.get('world', 'height')
+        self.speed_of_light = cfg.get('network', 'speed_of_light')
+        self.comm_range_max = cfg.get('network', 'communication_range_max')
+
         self.backoff_time = 0.0
         self.backoff_remaining = 0.0
         self.next_try_time = 0.0
@@ -83,14 +94,13 @@ class Buoy:
             return
             
         if self.channel.is_busy(self.position, sim_time):
-            # Small delay (10ms) before retrying channel sense to avoid immediate busy-wait and allow event queue to advance
             self.simulator.schedule_event(
                 sim_time + 0.01, EventType.CHANNEL_SENSE, self
             )
         else:
             self.state = BuoyState.WAITING_DIFS
             self.simulator.schedule_event(
-                sim_time + config.DIFS_TIME, EventType.DIFS_COMPLETION, self
+                sim_time + self.difs_time, EventType.DIFS_COMPLETION, self
             )
 
     def _handle_difs_completion(self, event, sim_time: float):
@@ -101,9 +111,8 @@ class Buoy:
             self.state = BuoyState.RECEIVING
             self.simulator.schedule_event(sim_time, EventType.CHANNEL_SENSE, self)
         else:
-            # DCF-compliant backoff: Random[0, CW-1] × SlotTime
-            backoff_slots = random.randint(0, config.CW - 1)  # 0 to 15
-            backoff_time = backoff_slots * config.SLOT_TIME
+            backoff_slots = random.randint(0, self.cw - 1)
+            backoff_time = backoff_slots * self.slot_time
             
             self.backoff_time = backoff_time
             self.backoff_remaining = backoff_time
@@ -153,47 +162,37 @@ class Buoy:
         if not beacon:
             return
     
-        # Skip collision check if already done at channel level
         collision = False
         collision_checked = event.data.get("collision_checked", False)
     
         if not collision_checked:
-            # Define a collision window (10 microseconds)
             COLLISION_WINDOW = 1e-5
             
-            # Check for collision with other transmissions at this receiver
             for tx_beacon, start, end, _, _ in self.channel.active_transmissions:
-                # Skip the beacon we're currently processing
                 if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
                     continue
             
-                # Only consider transmissions that have started
                 if sim_time < start:
                     continue
                 
-                # Calculate when this transmission's wavefront reached this receiver
                 dx = self.position[0] - tx_beacon.position[0]
                 dy = self.position[1] - tx_beacon.position[1]
                 distance = math.hypot(dx, dy)
             
-                # Only consider transmissions within reception range
-                if distance > config.COMMUNICATION_RANGE_MAX:
+                if distance > self.comm_range_max:
                     continue
                 
-                propagation_delay = distance / config.SPEED_OF_LIGHT
+                propagation_delay = distance / self.speed_of_light
                 arrival_time = end + propagation_delay
             
-                # If another transmission arrives within the collision window, mark as collision
                 if abs(arrival_time - sim_time) < COLLISION_WINDOW:
                     logging.log_error(f"Collision detected at receiver {str(self.id)[:6]} between {str(beacon.sender_id)[:6]} and {str(tx_beacon.sender_id)[:6]}")
                     collision = True
                     break
     
-        # If collision detected, don't process (already counted as lost in channel.py)
         if collision:
             return
     
-        # No collision - process the reception normally
         updated = False
         for i, (nid, _, _) in enumerate(self.neighbors):
             if nid == beacon.sender_id:
@@ -207,13 +206,11 @@ class Buoy:
         if key not in self.channel.seen_attempts:
             self.channel.seen_attempts.add(key)
         
-            # Update successful reception count in active_transmissions
             for i, (tx_beacon, start, end, potential_count, processed_count) in enumerate(self.channel.active_transmissions):
                 if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
                     self.channel.active_transmissions[i] = (tx_beacon, start, end, potential_count, processed_count + 1)
                     break
         
-            # Log successful reception
             if self.metrics:
                 self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, self.id)
                 self.metrics.log_actually_received(beacon.sender_id)
@@ -221,11 +218,11 @@ class Buoy:
     def _handle_neighbor_cleanup(self, event, sim_time: float):
         self.neighbors = [
             (nid, ts, pos) for nid, ts, pos in self.neighbors
-            if sim_time - ts <= config.NEIGHBOR_TIMEOUT
+            if sim_time - ts <= self.neighbor_timeout
         ]
         
         self.simulator.schedule_event(
-            sim_time + config.NEIGHBOR_TIMEOUT, EventType.NEIGHBOR_CLEANUP, self
+            sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, self
         )
 
     def _handle_buoy_movement(self, event, sim_time: float):
@@ -239,12 +236,9 @@ class Buoy:
         new_x = x + vx * dt
         new_y = y + vy * dt
         
-        world_width = config.WORLD_WIDTH
-        world_height = config.WORLD_HEIGHT
-        
-        if new_x < 0 or new_x > world_width:
+        if new_x < 0 or new_x > self.world_width:
             self.velocity = (-vx, vy)
-        if new_y < 0 or new_y > world_height:
+        if new_y < 0 or new_y > self.world_height:
             self.velocity = (vx, -vy)
             
         vx, vy = self.velocity
@@ -266,15 +260,3 @@ class Buoy:
 
     def __repr__(self):
         return f"<Buoy id={str(self.id)[:6]} pos={self.position} vel={self.velocity} bat={self.battery:.1f}% mob={self.is_mobile}>"
-    
-    # CSMA/CA Transmission Cycle Example:
-#
-# Step                | Time (s) | State        | Action
-# --------------------|----------|--------------|----------------------------------------
-# Scheduler Check     | 0.00     | RECEIVING    | Decide to send, schedule channel sense
-# Channel Sense       | 0.00     | WAITING_DIFS | Channel free, schedule DIFS
-# DIFS Completion     | 0.05     | BACKOFF      | Channel free, random backoff, schedule backoff completion
-# Backoff Completion  | 0.17     | RECEIVING    | Channel free, schedule transmission start
-# Transmission Start  | 0.17     | RECEIVING    | Send beacon, record scheduler latency
-#
-# If the channel is busy at any step, the buoy retries sensing after a short delay.
