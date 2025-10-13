@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-sim = "run_simulation:main"
+sim = "run:main"
 
 [build-system]
 requires = ["hatchling"]
