@@ -15,10 +15,6 @@ class Event:
         self.event_type = event_type
         self.target_obj = target_obj
         self.data = data or {}
-    
-    def __repr__(self):
-        target_id = getattr(self.target_obj, 'id', id(self.target_obj))
-        return f"Event({self.time:.2f}, {self.event_type.name}, {str(target_id)[:6]})"
 
 class Simulator:
     def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, ramp: bool = False, duration: float = None):
@@ -51,7 +47,8 @@ class Simulator:
         self.event_queue = []
         self.event_counter = 0
 
-        self.calculate_avg_neighbors()
+        # Calculate initial avg_neighbors
+        self.calculate_and_record_avg_neighbors()
         self._schedule_initial_events()
 
     def schedule_event(self, time: float, event_type: EventType, target_obj, data: Optional[Dict] = None) -> None:
@@ -77,12 +74,18 @@ class Simulator:
         
         self.schedule_event(1.0, EventType.CHANNEL_UPDATE, self.channel)
         self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
+        
+        # Schedule periodic avg_neighbors calculation every 30 seconds
+        self.schedule_event(30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
 
     def update_buoy_array(self, event, sim_time: float):
         if self.ramp:
             self._update_buoy_array_ramp(sim_time)
         else:
             self._update_buoy_array_random(sim_time)
+        
+        # Recalculate avg_neighbors after buoy array changes
+        self.calculate_and_record_avg_neighbors()
 
     def _update_buoy_array_random(self, sim_time: float):
         active_buoys = self.buoys.copy()
@@ -157,6 +160,10 @@ class Simulator:
     def handle_event(self, event, sim_time: float):
         if event.event_type == EventType.BUOY_ARRAY_UPDATE:
             self.update_buoy_array(event, sim_time)
+        elif event.event_type == EventType.AVG_NEIGHBORS_CALCULATION:
+            self.calculate_and_record_avg_neighbors()
+            # Schedule next calculation
+            self.schedule_event(sim_time + 30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
 
     def start(self):
         self.running = True
@@ -186,7 +193,8 @@ class Simulator:
                     logging.log_error(f"Error handling event {event}: {str(e)}")
                 
                 if self.ramp and int(self.simulated_time) % 5 == 0 and self.simulated_time > 0:
-                    self.metrics.log_timepoint(self.simulated_time, len(self.buoys))
+                    avg_neighbors_sample = self.calculate_avg_neighbors()
+                    self.metrics.log_timepoint(self.simulated_time, len(self.buoys), avg_neighbors_sample)
 
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
@@ -196,13 +204,10 @@ class Simulator:
         real_duration = real_time_end - real_time_start
         sim_speedup = self.simulated_time / real_duration if real_duration > 0 else float('inf')
         logging.log_info(f"Simulation complete. {self.simulated_time:.2f}s simulated in {real_duration:.2f}s real time (speedup: {sim_speedup:.2f}x)")
-
-    def __repr__(self):
-        return f"<Simulator buoys={len(self.buoys)}>"
     
     def calculate_avg_neighbors(self):
         if not self.buoys:
-            return
+            return 0.0
             
         total_neighbors = 0
         
@@ -218,5 +223,10 @@ class Simulator:
                         neighbor_count += 1
             total_neighbors += neighbor_count
         
-        avg_neighbors = total_neighbors / len(self.buoys)
-        self.metrics.set_avg_neighbors(avg_neighbors)
+        return total_neighbors / len(self.buoys)
+    
+    def calculate_and_record_avg_neighbors(self):
+        avg_neighbors = self.calculate_avg_neighbors()
+        if self.metrics:
+            self.metrics.record_avg_neighbors_sample(avg_neighbors)
+        return avg_neighbors

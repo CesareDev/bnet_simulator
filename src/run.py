@@ -27,7 +27,7 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
     else:
         result_file = os.path.join(results_dir, f"{mode}_density{density}.csv")
     
-    mobile = cfg.get('buoys', 'mobile')
+    mobile = cfg.get('buoys', 'mobile_percentage') > 0
     if mobile:
         total_buoys = len(positions)
         mobile_percentage = cfg.get('buoys', 'mobile_percentage')

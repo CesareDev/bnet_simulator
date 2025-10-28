@@ -19,6 +19,8 @@ class ConfigHandler:
             'ramp_scenario': False,
             'enable_metrics': True,
             'enable_logging': False,
+            'multihop_mode': 'none',  # Options: none, append, forwarded
+            'multihop_limit': 2,      # Maximum hops for forwarded mode
         },
         'world': {
             'width': 800.0,

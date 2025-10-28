@@ -17,7 +17,7 @@ COLORS = {
 LOG_FILE = Path("simulator.log")
 
 def _log(level: str, message: str, to_console: bool = True, to_file: bool = False):
-    if not ConfigHandler().get('logging', 'enable'):
+    if not ConfigHandler().get('simulation', 'enable_logging'):
         return
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     color = COLORS.get(level, '')

@@ -27,6 +27,12 @@ class Metrics:
         self.mobile_buoy_count = None
         self.fixed_buoy_count = None
         self.simulation_duration = None
+        
+        # New: track unique neighbors per buoy
+        self.unique_neighbors_per_buoy = {}  # {buoy_id: set(neighbor_ids)}
+        
+        # Track avg_neighbors samples over time
+        self.avg_neighbors_samples = []
 
     def set_simulation_info(self, scheduler_type, world_width, world_height, mobile_count, fixed_count, duration):
         self.scheduler_type = scheduler_type
@@ -53,6 +59,11 @@ class Metrics:
                     latency = receive_time - timestamp
                     self.reaction_latencies.append(latency)
                     self.discovery_times[receiver_id][sender_id] = receive_time
+                
+                # Track unique neighbor discovery
+                if receiver_id not in self.unique_neighbors_per_buoy:
+                    self.unique_neighbors_per_buoy[receiver_id] = set()
+                self.unique_neighbors_per_buoy[receiver_id].add(sender_id)
 
     def log_lost(self, count=1):
         self.beacons_lost += count
@@ -74,18 +85,42 @@ class Metrics:
         self.actually_received += 1
         self.actually_received_per_sender[sender_id] = self.actually_received_per_sender.get(sender_id, 0) + 1
 
-    def log_timepoint(self, sim_time, n_buoys):
-        self.time_series.append({
+    def log_timepoint(self, sim_time, n_buoys, avg_neighbors_sample=None):
+        timepoint = {
             "time": sim_time,
             "delivery_ratio": self.delivery_ratio(),
-            "n_buoys": n_buoys
-        })
+            "n_buoys": n_buoys,
+            "avg_unique_neighbors": self.avg_unique_neighbors_discovered()
+        }
+        
+        if avg_neighbors_sample is not None:
+            timepoint["avg_neighbors"] = avg_neighbors_sample
+            
+        self.time_series.append(timepoint)
 
     def delivery_ratio(self):
         return self.actually_received / self.potentially_sent if self.potentially_sent else 0
     
+    def avg_unique_neighbors_discovered(self):
+        if not self.unique_neighbors_per_buoy:
+            return 0.0
+        
+        neighbor_counts = [len(neighbors) for neighbors in self.unique_neighbors_per_buoy.values()]
+        return sum(neighbor_counts) / len(neighbor_counts) if neighbor_counts else 0.0
+    
+    def record_avg_neighbors_sample(self, avg_neighbors_value):
+        self.avg_neighbors_samples.append(avg_neighbors_value)
+    
+    def get_final_avg_neighbors(self):
+        if not self.avg_neighbors_samples:
+            return self.avg_neighbors  # Fallback to initial calculation
+        return sum(self.avg_neighbors_samples) / len(self.avg_neighbors_samples)
+    
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
+        avg_unique_neighbors = self.avg_unique_neighbors_discovered()
+        final_avg_neighbors = self.get_final_avg_neighbors()
+        
         base_summary = {
             "Scheduler Type": self.scheduler_type or "unknown",
             "World Size": f"{self.world_width}x{self.world_height}" if self.world_width else "unknown",
@@ -110,7 +145,8 @@ class Metrics:
             ),
             "Potentially Sent": self.potentially_sent,
             "Actually Received": self.actually_received,
-            "Average Neighbors": self.avg_neighbors,
+            "Average Neighbors": final_avg_neighbors,
+            "Avg Unique Neighbors Discovered": avg_unique_neighbors,
         }
 
         summary = {**base_summary}
@@ -159,7 +195,5 @@ class Metrics:
         logging.log_info(f"Time series exported to {filepath}")
 
     def set_avg_neighbors(self, avg_neighbors):
+        # Deprecated: new -> record_avg_neighbors_sample
         self.avg_neighbors = avg_neighbors
-        
-        if self.time_series:
-            self.time_series[-1]['avg_neighbors'] = avg_neighbors

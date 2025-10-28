@@ -8,7 +8,8 @@ class EventType(Enum):
     TRANSMISSION_START = auto()    # Buoy starts transmitting
     TRANSMISSION_END = auto()      # Transmission completes
     RECEPTION = auto()             # Buoy receives a beacon
-    NEIGHBOR_CLEANUP = auto()      # Check for expired neighbors
+    NEIGHBOR_CLEANUP = auto()      # Clean up stale neighbor entries
     BUOY_MOVEMENT = auto()         # Update buoy position
-    CHANNEL_UPDATE = auto()        # Clean up expired transmissions
-    BUOY_ARRAY_UPDATE = auto()     # Update the array of buoys
+    CHANNEL_UPDATE = auto()        # Update channel state
+    BUOY_ARRAY_UPDATE = auto()     # Add/remove buoys
+    AVG_NEIGHBORS_CALCULATION = auto()  # Periodic calculation of avg neighbors
