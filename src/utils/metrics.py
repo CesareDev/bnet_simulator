@@ -27,6 +27,7 @@ class Metrics:
         self.mobile_buoy_count = None
         self.fixed_buoy_count = None
         self.simulation_duration = None
+        self.multihop_mode = None
         
         # New: track unique neighbors per buoy
         self.unique_neighbors_per_buoy = {}  # {buoy_id: set(neighbor_ids)}
@@ -34,13 +35,14 @@ class Metrics:
         # Track avg_neighbors samples over time
         self.avg_neighbors_samples = []
 
-    def set_simulation_info(self, scheduler_type, world_width, world_height, mobile_count, fixed_count, duration):
+    def set_simulation_info(self, scheduler_type, world_width, world_height, mobile_count, fixed_count, duration, multihop_mode=None):
         self.scheduler_type = scheduler_type
         self.world_width = world_width
         self.world_height = world_height
         self.mobile_buoy_count = mobile_count
         self.fixed_buoy_count = fixed_count
         self.simulation_duration = duration
+        self.multihop_mode = multihop_mode
 
     def log_sent(self):
         self.beacons_sent += 1
@@ -123,6 +125,7 @@ class Metrics:
         
         base_summary = {
             "Scheduler Type": self.scheduler_type or "unknown",
+            "Multihop Mode": self.multihop_mode or "none",
             "World Size": f"{self.world_width}x{self.world_height}" if self.world_width else "unknown",
             "Mobile Buoys": self.mobile_buoy_count or 0,
             "Fixed Buoys": self.fixed_buoy_count or 0,

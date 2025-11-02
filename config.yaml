@@ -4,11 +4,9 @@ simulation:
   - dynamic_adab
   - dynamic_acab
   min_buoys: 20
-  max_buoys: 20
+  max_buoys: 60
   step_buoys: 20
   intervals:
-  - 1.0
-  - 0.5
   - 0.25
   duration: 600
   num_processes: 4
@@ -16,13 +14,13 @@ simulation:
   ramp_scenario: false
   enable_metrics: true
   enable_logging: false
-  multihop_mode: append  # Options: none, append, forwarded
-  multihop_limit: 2    # Maximum hops for forwarded mode
+  multihop_mode: forwarded  # Options: none, append, forwarded
+  multihop_limit: 3    # Maximum hops for forwarded mode
 world:
   width: 800.0
   height: 800.0
 buoys:
-  mobile_percentage: 1.0
+  mobile_percentage: 0.25
   default_battery: 100.0
   default_velocity: 15.0
 network:

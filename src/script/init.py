@@ -121,13 +121,16 @@ def main():
 
     if cfg.get('simulation', 'enable_metrics'):
         metrics = Metrics(density=args.density)
+        multihop_mode = cfg.get('simulation', 'multihop_mode')
+        
         metrics.set_simulation_info(
             scheduler_type=args.mode,
             world_width=args.world_width,
             world_height=args.world_height,
             mobile_count=args.mobile_buoy_count,
             fixed_count=args.fixed_buoy_count,
-            duration=args.duration
+            duration=args.duration,
+            multihop_mode=multihop_mode
         )
     else:
         metrics = None
