@@ -8,7 +8,8 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
     data = []
     collision_data = []
-    avg_neighbors_data = {}  # Will store density -> avg_neighbors mapping
+    avg_neighbors_data = {}
+    multihop_modes = set()  # Track multihop modes
     
     # Extract data from CSV files
     for f in files:
@@ -17,10 +18,14 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             density = float(df.loc["Density", "Value"])
             pdr = float(df.loc["B-PDR", "Value"]) if "B-PDR" in df.index else float(df.loc["Delivery Ratio", "Value"])
             
-            # Extract average neighbors if available
             if "Average Neighbors" in df.index:
                 avg_neighbors = float(df.loc["Average Neighbors", "Value"])
                 avg_neighbors_data[density] = avg_neighbors
+            
+            # Extract multihop mode
+            if "Multihop Mode" in df.index:
+                mode = str(df.loc["Multihop Mode", "Value"]).lower()
+                multihop_modes.add(mode)
             
             # Determine scheduler type
             if "Scheduler Type" in df.index:
@@ -32,7 +37,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             elif f.startswith("dynamic_adab_"):
                 sched_type = "dynamic_adab"
             elif f.startswith("dynamic_"):
-                sched_type = "dynamic_adab"  # fallback for backward compatibility
+                sched_type = "dynamic_adab"
             else:
                 sched_type = "unknown"
                 
@@ -42,7 +47,6 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             density = float(df.loc["Density", "Value"])
             collision_rate = float(df.loc["Collision Rate", "Value"])
             
-            # Determine scheduler type
             if "Scheduler Type" in df.index:
                 sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
             elif f.startswith("static_"):
@@ -52,16 +56,31 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             elif f.startswith("dynamic_adab_"):
                 sched_type = "dynamic_adab"
             elif f.startswith("dynamic_"):
-                sched_type = "dynamic_adab"  # fallback for backward compatibility
+                sched_type = "dynamic_adab"
             else:
                 sched_type = "unknown"
                 
             collision_data.append((density, collision_rate, sched_type))
     
-    # Handle no data case
     if not data:
         print("No B-PDR data with density found.")
         return
+    
+    # Determine mode string for title
+    mode_str = ""
+    if multihop_modes:
+        if len(multihop_modes) == 1:
+            mode = list(multihop_modes)[0]
+            if mode == "none":
+                mode_str = "Single-Hop"
+            elif mode == "append":
+                mode_str = "Append Mode"
+            elif mode == "forwarded":
+                mode_str = "Forward Mode"
+            else:
+                mode_str = mode.capitalize()
+        else:
+            mode_str = "Mixed Modes"
     
     # Create B-PDR by density plot
     df = pd.DataFrame(data, columns=["Density", "B-PDR", "Scheduler"])
@@ -75,13 +94,11 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Add second y-axis for average neighbors
     ax2 = ax.twinx()
     ax2.set_ylabel("Average Neighbors", color="black")
     ax2.tick_params(axis='y', labelcolor="black")
     ax2.grid(False)
     
-    # Plot bars for each scheduler
     offset = -(len(schedulers) - 1) * bar_width / 2
     for i, sched in enumerate(schedulers):
         pdrs = []
@@ -120,17 +137,24 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             max_avg_neighbors = max(neighbor_values)
             ax2.set_ylim(0, max_avg_neighbors * 1.2)
     
-    # Change this line to reflect what's actually on the x-axis
     ax.set_xlabel("Total Buoys")
     ax.set_ylabel("B-PDR")
-    if interval:
-        ax.set_title(f"B-PDR vs Buoy Count (Static Interval: {interval}s)")
-    else:
-        ax.set_title("B-PDR vs Buoy Count")
+    
+    # Update title to include mode
+    title_parts = ["B-PDR vs Buoy Count"]
+    if mode_str:
+        title_parts.append(f"({mode_str}")
+        if interval:
+            title_parts.append(f", Static Interval: {interval}s)")
+        else:
+            title_parts.append(")")
+    elif interval:
+        title_parts.append(f"(Static Interval: {interval}s)")
+    ax.set_title(" ".join(title_parts))
+    
     ax.set_xticks(x)
     ax.set_xticklabels([str(int(d)) for d in densities])
     
-    # Create a combined legend
     lines1, labels1 = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
@@ -144,7 +168,6 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         plt.savefig(os.path.join(plot_dir, "b_pdr_block_by_density.png"))
     plt.close()
     
-    # Skip collision rate plot if no data
     if not collision_data:
         print("No collision rate data with density found.")
         return
@@ -163,13 +186,21 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             rates.append(row["CollisionRate"].values[0] if not row.empty else 0)
         ax.bar(x + offset + i * bar_width, rates, bar_width, label=scheduler_labels[sched], color=color_map[sched])
     
-    # Update this label as well
     ax.set_xlabel("Total Buoys")
     ax.set_ylabel("Collision Rate")
-    if interval:
-        ax.set_title(f"Collision Rate vs Buoy Count (Static Interval: {interval}s)")
-    else:
-        ax.set_title("Collision Rate vs Buoy Count")
+    
+    # Update title to include mode
+    title_parts = ["Collision Rate vs Buoy Count"]
+    if mode_str:
+        title_parts.append(f"({mode_str}")
+        if interval:
+            title_parts.append(f", Static Interval: {interval}s)")
+        else:
+            title_parts.append(")")
+    elif interval:
+        title_parts.append(f"(Static Interval: {interval}s)")
+    ax.set_title(" ".join(title_parts))
+    
     ax.set_xticks(x)
     ax.set_xticklabels([str(int(d)) for d in densities])
     ax.legend()
@@ -185,10 +216,10 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
 def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
     modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
     
-    # First, collect data and determine overall min/max buoy counts
     min_buoys = float('inf')
     max_buoys = 0
     all_data = {}
+    multihop_mode = None  # Track multihop mode
     
     for mode, _ in modes:
         csv_file = os.path.join(results_dir, f"{mode}_ramp_timeseries.csv")
@@ -198,31 +229,28 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
                 min_buoys = min(min_buoys, df["n_buoys"].min())
                 max_buoys = max(max_buoys, df["n_buoys"].max())
                 all_data[mode] = df
+            
+            # Try to get multihop mode from main CSV (not timeseries)
+            main_csv = csv_file.replace("_timeseries.csv", ".csv")
+            if multihop_mode is None and os.path.exists(main_csv):
+                main_df = pd.read_csv(main_csv, index_col=0)
+                if "Multihop Mode" in main_df.index:
+                    multihop_mode = str(main_df.loc["Multihop Mode", "Value"]).lower()
     
-    # If no data found, exit early
     if not all_data:
         print("No valid data files found for buoy count grouping")
         return
     
-    # Determine appropriate number of groups based on data range
-    # Use 5-10 groups depending on range
     buoy_range = max_buoys - min_buoys
     if buoy_range <= 10:
         num_groups = max(5, buoy_range)
     else:
         num_groups = min(10, max(5, buoy_range // 5))
     
-    # Create group edges with consistent bin sizes
-    # Add 1 to max_buoys to ensure it's included in the last bin
     group_edges = np.linspace(min_buoys, max_buoys + 1, num_groups + 1).astype(int)
-    
-    # Ensure the first bin starts from the actual minimum
     group_edges[0] = int(min_buoys)
-    
-    # Create readable group labels
     group_labels = [f"{group_edges[i]}-{group_edges[i+1]-1}" for i in range(len(group_edges)-1)]
     
-    # Process data for each mode
     grouped_data = {}
     valid_modes = []
     
@@ -238,23 +266,19 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
                 print(f"Warning: No B-PDR or delivery_ratio column in data for {mode}")
                 continue
             
-            # Group by buoy count
             df["group"] = pd.cut(df["n_buoys"], bins=group_edges, labels=group_labels, right=False)
             grouped = df.groupby("group", observed=False)[y_col].mean().reindex(group_labels)
             
-            # Only include modes with non-empty data
             if not grouped.empty and len(grouped.values) > 0:
                 grouped_data[mode] = grouped.values
                 valid_modes.append((mode, color))
             else:
                 print(f"Warning: No valid grouped data for {mode}")
     
-    # If no valid data found, exit early
     if not valid_modes:
         print("No valid data to plot for any mode")
         return
     
-    # Plot the results
     x = np.arange(len(group_labels))
     bar_width = 0.25
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -263,7 +287,6 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
     offset = -(len(valid_modes) - 1) * bar_width / 2
     
     for i, (mode, color) in enumerate(valid_modes):
-        # Ensure data length matches x length
         data = grouped_data[mode]
         if len(data) == len(x):
             label = mode_labels.get(mode, mode.capitalize())
@@ -274,7 +297,22 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
     
     ax.set_xlabel("Buoy Count Group")
     ax.set_ylabel("Average B-PDR")
-    ax.set_title("Average B-PDR vs Buoy Count Group (Ramp Scenario)")
+    
+    # Update title to include mode
+    title = "Average B-PDR vs Buoy Count Group (Ramp Scenario"
+    if multihop_mode:
+        if multihop_mode == "none":
+            title += ", Single-Hop)"
+        elif multihop_mode == "append":
+            title += ", Append Mode)"
+        elif multihop_mode == "forwarded":
+            title += ", Forward Mode)"
+        else:
+            title += f", {multihop_mode.capitalize()})"
+    else:
+        title += ")"
+    ax.set_title(title)
+    
     ax.set_xticks(x)
     ax.set_xticklabels(group_labels)
     ax.legend(loc="lower right")
@@ -284,21 +322,15 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
     plt.close()
 
 def extract_interval_from_dirname(dirname):
-    # Original regex: r'interval(\d+)'
-    # Updated to capture decimals with optional underscore separator
     match = re.search(r'interval(\d+(?:_\d+)?)', dirname)
     if match:
         interval_str = match.group(1).replace('_', '.')
-        # Convert to float directly instead of int conversion
         try:
-            # Check if it's a potential decimal value (e.g., 25 for 0.25)
             if int(interval_str) < 10:
                 return float(interval_str) / 10.0
             else:
-                # Handle cases where underscore might be used (e.g., 2_5 for 0.25)
                 return float(interval_str)
         except ValueError:
-            # Fall back to the old method if parsing fails
             interval_value = int(match.group(1))
             if interval_value < 10:
                 return interval_value / 10.0
@@ -314,6 +346,7 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
     time_buoy = None
     max_buoys = 0
     time_neighbors = None
+    multihop_mode = None  # Track multihop mode
 
     for mode, color in modes:
         csv_file = os.path.join(results_dir, f"{mode}_ramp_timeseries.csv")
@@ -334,9 +367,15 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
                 time_buoy = (df["time"], df["n_buoys"])
                 max_buoys = df["n_buoys"].max()
             
-            # Get average neighbors data if available
             if time_neighbors is None and "avg_neighbors" in df.columns:
                 time_neighbors = (df["time"], df["avg_neighbors"])
+            
+            # Try to get multihop mode from main CSV
+            main_csv = csv_file.replace("_timeseries.csv", ".csv")
+            if multihop_mode is None and os.path.exists(main_csv):
+                main_df = pd.read_csv(main_csv, index_col=0)
+                if "Multihop Mode" in main_df.index:
+                    multihop_mode = str(main_df.loc["Multihop Mode", "Value"]).lower()
 
     if not found:
         print("No ramp timeseries files found for plotting.")
@@ -356,10 +395,8 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
         handles += [gray_area]
         labels += ["Buoy Count"]
         
-        # Add average neighbors on third y-axis if available
         if time_neighbors is not None:
             ax3 = ax.twinx()
-            # Offset the axis to the right
             ax3.spines["right"].set_position(("axes", 1.1))
             neighbor_line = ax3.plot(time_neighbors[0], time_neighbors[1], 
                                    color="black", linestyle="-", linewidth=1, label="Avg. Neighbors")
@@ -371,10 +408,25 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
 
     ax.set_xlabel("Time (s)", fontsize=12)
     ax.set_ylabel("B-PDR", fontsize=12)
+    
+    # Update title to include mode
+    title_parts = ["B-PDR vs Time (Ramp Scenario"]
+    if multihop_mode:
+        if multihop_mode == "none":
+            title_parts.append(", Single-Hop")
+        elif multihop_mode == "append":
+            title_parts.append(", Append Mode")
+        elif multihop_mode == "forwarded":
+            title_parts.append(", Forward Mode")
+        else:
+            title_parts.append(f", {multihop_mode.capitalize()}")
+    
     if interval:
-        plt.title(f"B-PDR vs Time (Ramp Scenario, Static Interval: {interval}s)")
+        title_parts.append(f", Static Interval: {interval}s)")
     else:
-        plt.title("B-PDR vs Time (Ramp Scenario)")
+        title_parts.append(")")
+    
+    plt.title("".join(title_parts))
 
     ax.legend(handles, labels, loc="lower right", fontsize=11)
     ax.grid(True)
@@ -382,22 +434,19 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
     plt.savefig(plot_file)
     plt.close()
 
-def plot_unique_neighbors_by_density(results_dir, plot_dir, interval=None):
-    """Plot average unique neighbors discovered vs density for different schedulers"""
+def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None):
+    """Plot average unique nodes discovered vs density for different schedulers"""
     files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
     data = []
     
-    # Extract data from CSV files
     for f in files:
         df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
-        if "Density" in df.index and "Avg Unique Neighbors Discovered" in df.index:
+        if "Density" in df.index and "Avg Unique Nodes Discovered" in df.index:
             density = float(df.loc["Density", "Value"])
-            avg_unique = float(df.loc["Avg Unique Neighbors Discovered", "Value"])
+            avg_unique = float(df.loc["Avg Unique Nodes Discovered", "Value"])
             
-            # Also get Average Neighbors for comparison
             avg_neighbors = float(df.loc["Average Neighbors", "Value"]) if "Average Neighbors" in df.index else 0
             
-            # Determine scheduler type
             if "Scheduler Type" in df.index:
                 sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
             elif f.startswith("static_"):
@@ -411,7 +460,6 @@ def plot_unique_neighbors_by_density(results_dir, plot_dir, interval=None):
             else:
                 sched_type = "unknown"
             
-            # Get multihop mode
             multihop_mode = "none"
             if "Multihop Mode" in df.index:
                 multihop_mode = str(df.loc["Multihop Mode", "Value"]).lower()
@@ -419,11 +467,15 @@ def plot_unique_neighbors_by_density(results_dir, plot_dir, interval=None):
             data.append((density, avg_unique, avg_neighbors, sched_type, multihop_mode))
     
     if not data:
-        print("No unique neighbors data with density found.")
+        print("No unique nodes data with density found.")
         return
     
-    # Create DataFrame and group by density, scheduler, and multihop mode
-    df = pd.DataFrame(data, columns=["Density", "AvgUniqueNeighbors", "AvgNeighbors", "Scheduler", "MultihopMode"])
+    df = pd.DataFrame(data, columns=["Density", "AvgUniqueNodes", "AvgNeighbors", "Scheduler", "MultihopMode"])
+    
+    # Calculate percentage - (avg_unique / (density - 1)) * 100
+    # density - 1 because we exclude self from potential discoveries
+    df["PercentageDiscovered"] = (df["AvgUniqueNodes"] / (df["Density"] - 1)) * 100
+    
     grouped = df.groupby(["Density", "Scheduler", "MultihopMode"]).mean().reset_index()
     
     densities = sorted(df["Density"].unique())
@@ -431,11 +483,9 @@ def plot_unique_neighbors_by_density(results_dir, plot_dir, interval=None):
     scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
     color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
     
-    # Check if we have multiple multihop modes
     multihop_modes = sorted(df["MultihopMode"].unique())
     
     if len(multihop_modes) > 1:
-        # Create separate subplots for each multihop mode
         fig, axes = plt.subplots(1, len(multihop_modes), figsize=(8 * len(multihop_modes), 6))
         if len(multihop_modes) == 1:
             axes = [axes]
@@ -450,12 +500,13 @@ def plot_unique_neighbors_by_density(results_dir, plot_dir, interval=None):
                 values = []
                 for d in densities:
                     row = mode_data[(mode_data["Density"] == d) & (mode_data["Scheduler"] == sched)]
-                    values.append(row["AvgUniqueNeighbors"].values[0] if not row.empty else 0)
+                    values.append(row["PercentageDiscovered"].values[0] if not row.empty else 0)  # UPDATED
                 ax.bar(x + offset + i * bar_width, values, bar_width, 
                       label=scheduler_labels[sched], color=color_map[sched])
             
             ax.set_xlabel("Total Buoys")
-            ax.set_ylabel("Avg Unique Neighbors Discovered")
+            ax.set_ylabel("Avg % of Network Discovered")  # UPDATED
+            ax.set_ylim(0, 100)  # Set y-axis from 0 to 100%
             mode_title = mode.capitalize() if mode != "none" else "Single-Hop"
             ax.set_title(f"{mode_title} Mode")
             ax.set_xticks(x)
@@ -464,13 +515,12 @@ def plot_unique_neighbors_by_density(results_dir, plot_dir, interval=None):
             ax.grid(axis="y", linestyle="--", alpha=0.6)
         
         if interval:
-            fig.suptitle(f"Avg Unique Neighbors Discovered vs Buoy Count (Static Interval: {interval}s)")
+            fig.suptitle(f"Avg % of Network Discovered vs Buoy Count (Static Interval: {interval}s)")  # UPDATED
         else:
-            fig.suptitle("Avg Unique Neighbors Discovered vs Buoy Count")
+            fig.suptitle("Avg % of Network Discovered vs Buoy Count")  # UPDATED
         plt.tight_layout()
         
     else:
-        # Single multihop mode - create single plot
         fig, ax = plt.subplots(figsize=(10, 6))
         bar_width = 0.25
         x = np.arange(len(densities))
@@ -480,18 +530,24 @@ def plot_unique_neighbors_by_density(results_dir, plot_dir, interval=None):
             values = []
             for d in densities:
                 row = grouped[(grouped["Density"] == d) & (grouped["Scheduler"] == sched)]
-                values.append(row["AvgUniqueNeighbors"].values[0] if not row.empty else 0)
+                values.append(row["PercentageDiscovered"].values[0] if not row.empty else 0)  # UPDATED
             ax.bar(x + offset + i * bar_width, values, bar_width, 
                   label=scheduler_labels[sched], color=color_map[sched])
         
         ax.set_xlabel("Total Buoys")
-        ax.set_ylabel("Avg Unique Neighbors Discovered")
+        ax.set_ylabel("Avg % of Network Discovered")  # UPDATED
+        ax.set_ylim(0, 100)  # Set y-axis from 0 to 100%
         mode = multihop_modes[0]
         mode_title = mode.capitalize() if mode != "none" else "Single-Hop"
+        
+        title_parts = ["Avg % of Network Discovered vs Buoy Count"]  # UPDATED
+        title_parts.append(f"({mode_title} Mode")
         if interval:
-            ax.set_title(f"Avg Unique Neighbors Discovered vs Buoy Count ({mode_title} Mode, Static Interval: {interval}s)")
+            title_parts.append(f", Static Interval: {interval}s)")
         else:
-            ax.set_title(f"Avg Unique Neighbors Discovered vs Buoy Count ({mode_title} Mode)")
+            title_parts.append(")")
+        ax.set_title(" ".join(title_parts))
+        
         ax.set_xticks(x)
         ax.set_xticklabels([str(int(d)) for d in densities])
         ax.legend(loc='upper left')
@@ -499,13 +555,13 @@ def plot_unique_neighbors_by_density(results_dir, plot_dir, interval=None):
         plt.tight_layout()
     
     if interval:
-        plt.savefig(os.path.join(plot_dir, f"avg_unique_neighbors_interval{int(interval*10)}.png"))
+        plt.savefig(os.path.join(plot_dir, f"avg_percentage_network_discovered_interval{int(interval*10)}.png"))  # UPDATED
     else:
-        plt.savefig(os.path.join(plot_dir, "avg_unique_neighbors_by_density.png"))
+        plt.savefig(os.path.join(plot_dir, "avg_percentage_network_discovered_by_density.png"))  # UPDATED
     plt.close()
 
-def plot_unique_neighbors_vs_time(results_dir, plot_file, interval=None):
-    """Plot average unique neighbors discovered vs time for ramp scenarios"""
+def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None):
+    """Plot average unique nodes discovered vs time for ramp scenarios"""
     modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
     mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
     plt.figure(figsize=(10, 6))
@@ -513,22 +569,30 @@ def plot_unique_neighbors_vs_time(results_dir, plot_file, interval=None):
 
     time_buoy = None
     max_buoys = 0
+    multihop_mode = None  # Track multihop mode
 
     for mode, color in modes:
         csv_file = os.path.join(results_dir, f"{mode}_ramp_timeseries.csv")
         if os.path.exists(csv_file):
             df = pd.read_csv(csv_file)
-            if "avg_unique_neighbors" in df.columns:
+            if "avg_unique_nodes" in df.columns:
                 label = mode_labels.get(mode, mode.capitalize())
-                plt.plot(df["time"], df["avg_unique_neighbors"], label=label, color=color)
+                plt.plot(df["time"], df["avg_unique_nodes"], label=label, color=color)
                 found = True
                 
                 if time_buoy is None and "n_buoys" in df.columns:
                     time_buoy = (df["time"], df["n_buoys"])
                     max_buoys = df["n_buoys"].max()
 
+            # Try to get multihop mode from main CSV
+            main_csv = csv_file.replace("_timeseries.csv", ".csv")
+            if multihop_mode is None and os.path.exists(main_csv):
+                main_df = pd.read_csv(main_csv, index_col=0)
+                if "Multihop Mode" in main_df.index:
+                    multihop_mode = str(main_df.loc["Multihop Mode", "Value"]).lower()
+
     if not found:
-        print("No ramp timeseries files with avg_unique_neighbors found for plotting.")
+        print("No ramp timeseries files with avg_unique_nodes found for plotting.")
         return
 
     ax = plt.gca()
@@ -546,11 +610,26 @@ def plot_unique_neighbors_vs_time(results_dir, plot_file, interval=None):
         labels += ["Buoy Count"]
 
     ax.set_xlabel("Time (s)", fontsize=12)
-    ax.set_ylabel("Avg Unique Neighbors Discovered", fontsize=12)
+    ax.set_ylabel("Avg Unique Nodes Discovered", fontsize=12)
+    
+    # Update title to include mode
+    title_parts = ["Avg Unique Nodes Discovered vs Time (Ramp Scenario"]
+    if multihop_mode:
+        if multihop_mode == "none":
+            title_parts.append(", Single-Hop")
+        elif multihop_mode == "append":
+            title_parts.append(", Append Mode")
+        elif multihop_mode == "forwarded":
+            title_parts.append(", Forward Mode")
+        else:
+            title_parts.append(f", {multihop_mode.capitalize()}")
+    
     if interval:
-        plt.title(f"Avg Unique Neighbors vs Time (Ramp Scenario, Static Interval: {interval}s)")
+        title_parts.append(f", Static Interval: {interval}s)")
     else:
-        plt.title("Avg Unique Neighbors vs Time (Ramp Scenario)")
+        title_parts.append(")")
+    
+    plt.title("".join(title_parts))
 
     ax.legend(handles, labels, loc="lower right", fontsize=11)
     ax.grid(True)
@@ -586,16 +665,16 @@ def main():
     print("Plotting standard metrics...")
     plot_block_by_density(results_dir, plot_dir, interval=interval)
 
-    print("Plotting unique neighbors by density...")  # NEW
-    plot_unique_neighbors_by_density(results_dir, plot_dir, interval=interval)
+    print("Plotting unique nodes by density...")
+    plot_unique_nodes_by_density(results_dir, plot_dir, interval=interval)
 
     print("Plotting B-PDR vs time for ramp scenarios...")
     plot_file = os.path.join(plot_dir, "b_pdr_vs_time_ramp.png")
     plot_delivery_ratio_vs_time(results_dir, plot_file, interval=interval)
 
-    print("Plotting unique neighbors vs time for ramp scenarios...")  # NEW
-    plot_file = os.path.join(plot_dir, "avg_unique_neighbors_vs_time_ramp.png")
-    plot_unique_neighbors_vs_time(results_dir, plot_file, interval=interval)
+    print("Plotting unique nodes vs time for ramp scenarios...")
+    plot_file = os.path.join(plot_dir, "avg_unique_nodes_vs_time_ramp.png")
+    plot_unique_nodes_vs_time(results_dir, plot_file, interval=interval)
 
     print("Plotting B-PDR grouped by buoy count for ramp scenario...")
     plot_group_file = os.path.join(plot_dir, "b_pdr_grouped_by_buoy_count_ramp.png")

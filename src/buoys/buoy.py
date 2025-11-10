@@ -218,8 +218,8 @@ class Buoy:
     
         if collision:
             return
-    
-        # Update direct neighbors
+        
+        # Update direct neighbors (by sender_id)
         updated = False
         for i, (nid, _, _) in enumerate(self.neighbors):
             if nid == beacon.sender_id:
@@ -228,27 +228,26 @@ class Buoy:
                 break
         if not updated:
             self.neighbors.append((beacon.sender_id, sim_time, beacon.position))
-    
+        
+        # Extract node IDs from beacon's neighbor list
+        neighbor_node_ids = [nid for nid, _, _ in beacon.neighbors]
+        
         # Multihop append mode: collect neighbors from received beacon
         if self.multihop_mode == 'append':
             for neighbor_id, neighbor_ts, neighbor_pos in beacon.neighbors:
-                # Don't add self or sender
                 if neighbor_id == self.id or neighbor_id == beacon.sender_id:
                     continue
-                # Check if not already in received_neighbors
                 already_exists = any(nid == neighbor_id for nid, _, _ in self.received_neighbors)
                 if not already_exists:
                     self.received_neighbors.append((neighbor_id, neighbor_ts, neighbor_pos))
         
         # Multihop forwarded mode: forward beacon if hop_limit > 0
         if self.multihop_mode == 'forwarded' and beacon.hop_limit > 0:
-            # Check if already forwarded this beacon
             beacon_key = (beacon.origin_id, beacon.timestamp)
             if beacon_key not in self.forwarded_beacons:
                 self.forwarded_beacons.add(beacon_key)
-                # Schedule immediate forwarding
                 self.simulator.schedule_event(
-                    sim_time + 0.001,  # Small delay to avoid instant collision
+                    sim_time + 0.001,
                     EventType.CHANNEL_SENSE,
                     self,
                     {"forward_beacon": beacon}
@@ -264,7 +263,22 @@ class Buoy:
                     break
         
             if self.metrics:
-                self.metrics.log_received(beacon.sender_id, beacon.timestamp, sim_time, self.id)
+                # Log direct reception (sender)
+                self.metrics.log_received(
+                    sender_id=beacon.sender_id,
+                    timestamp=beacon.timestamp,
+                    receive_time=sim_time,
+                    receiver_id=self.id
+                )
+                
+                # Log nodes discovered from beacon's neighbor list
+                if neighbor_node_ids:
+                    self.metrics.log_nodes_discovered_from_neighbors(
+                        receiver_id=self.id,
+                        neighbor_ids=neighbor_node_ids
+                    )
+                
+                # Track for delivery ratio
                 self.metrics.log_actually_received(beacon.sender_id)
 
     def _handle_neighbor_cleanup(self, event, sim_time: float):
@@ -336,14 +350,14 @@ class Buoy:
             hop_limit=hop_limit
         )
     
-    def forward_beacon(self, original_beacon: Beacon, sim_time: float):
+    def forward_beacon(self, original_beacon: Beacon, sim_time: float) -> Beacon:
         return Beacon(
-            sender_id=self.id,  # Change sender to self
-            mobile=self.is_mobile,
-            position=self.position,
-            battery=self.battery,
-            neighbors=self.neighbors.copy(),  # Use own neighbors
+            sender_id=self.id,  # Forwarder becomes sender
+            mobile=original_beacon.mobile,  # Keep original's mobility status
+            position=self.position,  # Use forwarder's position for range calc
+            battery=self.battery,  # Forwarder's battery
+            neighbors=original_beacon.neighbors,  # Original neighbors
             timestamp=original_beacon.timestamp,  # Keep original timestamp
-            origin_id=original_beacon.origin_id,  # Keep original origin
+            origin_id=original_beacon.origin_id,  # Keep origin ID
             hop_limit=original_beacon.hop_limit - 1  # Decrement hop limit
         )

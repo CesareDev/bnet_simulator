@@ -29,8 +29,8 @@ class Metrics:
         self.simulation_duration = None
         self.multihop_mode = None
         
-        # New: track unique neighbors per buoy
-        self.unique_neighbors_per_buoy = {}  # {buoy_id: set(neighbor_ids)}
+        # Track unique nodes discovered per buoy
+        self.unique_nodes_per_buoy = {}  # {buoy_id: set(node_ids)}
         
         # Track avg_neighbors samples over time
         self.avg_neighbors_samples = []
@@ -62,10 +62,18 @@ class Metrics:
                     self.reaction_latencies.append(latency)
                     self.discovery_times[receiver_id][sender_id] = receive_time
                 
-                # Track unique neighbor discovery
-                if receiver_id not in self.unique_neighbors_per_buoy:
-                    self.unique_neighbors_per_buoy[receiver_id] = set()
-                self.unique_neighbors_per_buoy[receiver_id].add(sender_id)
+                # Track unique node discovery (direct sender)
+                if receiver_id not in self.unique_nodes_per_buoy:
+                    self.unique_nodes_per_buoy[receiver_id] = set()
+                self.unique_nodes_per_buoy[receiver_id].add(sender_id)
+    
+    def log_nodes_discovered_from_neighbors(self, receiver_id, neighbor_ids):
+        if receiver_id not in self.unique_nodes_per_buoy:
+            self.unique_nodes_per_buoy[receiver_id] = set()
+        
+        for node_id in neighbor_ids:
+            if node_id != receiver_id:  # Don't add self
+                self.unique_nodes_per_buoy[receiver_id].add(node_id)
 
     def log_lost(self, count=1):
         self.beacons_lost += count
@@ -92,7 +100,7 @@ class Metrics:
             "time": sim_time,
             "delivery_ratio": self.delivery_ratio(),
             "n_buoys": n_buoys,
-            "avg_unique_neighbors": self.avg_unique_neighbors_discovered()
+            "avg_unique_nodes": self.avg_unique_nodes_discovered()
         }
         
         if avg_neighbors_sample is not None:
@@ -103,24 +111,24 @@ class Metrics:
     def delivery_ratio(self):
         return self.actually_received / self.potentially_sent if self.potentially_sent else 0
     
-    def avg_unique_neighbors_discovered(self):
-        if not self.unique_neighbors_per_buoy:
+    def avg_unique_nodes_discovered(self):
+        if not self.unique_nodes_per_buoy:
             return 0.0
         
-        neighbor_counts = [len(neighbors) for neighbors in self.unique_neighbors_per_buoy.values()]
-        return sum(neighbor_counts) / len(neighbor_counts) if neighbor_counts else 0.0
+        node_counts = [len(nodes) for nodes in self.unique_nodes_per_buoy.values()]
+        return sum(node_counts) / len(node_counts) if node_counts else 0.0
     
     def record_avg_neighbors_sample(self, avg_neighbors_value):
         self.avg_neighbors_samples.append(avg_neighbors_value)
     
     def get_final_avg_neighbors(self):
         if not self.avg_neighbors_samples:
-            return self.avg_neighbors  # Fallback to initial calculation
+            return self.avg_neighbors
         return sum(self.avg_neighbors_samples) / len(self.avg_neighbors_samples)
     
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
-        avg_unique_neighbors = self.avg_unique_neighbors_discovered()
+        avg_unique_nodes = self.avg_unique_nodes_discovered()  # UPDATED: Use new method
         final_avg_neighbors = self.get_final_avg_neighbors()
         
         base_summary = {
@@ -149,7 +157,7 @@ class Metrics:
             "Potentially Sent": self.potentially_sent,
             "Actually Received": self.actually_received,
             "Average Neighbors": final_avg_neighbors,
-            "Avg Unique Neighbors Discovered": avg_unique_neighbors,
+            "Avg Unique Nodes Discovered": avg_unique_nodes,  # UPDATED: New name
         }
 
         summary = {**base_summary}
@@ -198,5 +206,4 @@ class Metrics:
         logging.log_info(f"Time series exported to {filepath}")
 
     def set_avg_neighbors(self, avg_neighbors):
-        # Deprecated: new -> record_avg_neighbors_sample
         self.avg_neighbors = avg_neighbors
