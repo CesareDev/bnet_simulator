@@ -4,8 +4,8 @@ simulation:
   - dynamic_adab
   - dynamic_acab
   min_buoys: 10
-  max_buoys: 30
-  step_buoys: 5
+  max_buoys: 80
+  step_buoys: 10
   intervals:
   - 1.0
   - 0.5
@@ -22,7 +22,7 @@ world:
   width: 800.0
   height: 800.0
 buoys:
-  mobile_percentage: 0.5
+  mobile_percentage: 0.2
   default_battery: 100.0
   default_velocity: 15.0
 network:
