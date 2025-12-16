@@ -51,17 +51,29 @@ def average_metrics(input_dirs, output_dir):
         plot_averaged_metrics(results_dir, plots_dir, interval)
 
 def extract_interval_from_dirname(dirname):
+    """
+    Hard-coded interval mapping based on directory naming convention.
+    interval1_ideal -> 1.0s
+    interval2_5_ideal -> 0.25s  
+    interval5_ideal -> 0.5s
+    """
+    # Hard-coded mappings
+    if 'interval1' in dirname:
+        return 1.0
+    elif 'interval2_5' in dirname or 'interval2.5' in dirname:
+        return 0.25
+    elif 'interval5' in dirname:
+        return 0.5
+    
+    # Fallback: try to parse from dirname if it doesn't match known patterns
     match = re.search(r'interval(\d+(?:_\d+)?)', dirname)
     if match:
-        interval_str = match.group(1).replace('_', '.')  # "2_5" → "2.5"
+        interval_str = match.group(1).replace('_', '.')
         try:
-            value = float(interval_str)
-            # If it's a single-digit or decimal like 2.5, interpret as fraction of 10
-            if value < 10:
-                return value / 10.0
-            return value
+            return float(interval_str)
         except ValueError:
             return None
+    
     return None
 
 def process_density_files(input_dirs, output_dir):
@@ -316,9 +328,15 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
                 values.append(0)
                 errors.append(0)
         
-        ax.bar(x + offset + i * bar_width, values, bar_width, 
+        values_arr = np.array(values)
+        errors_arr = np.array(errors)
+        lower_errors = np.minimum(errors_arr, values_arr)
+        upper_errors = errors_arr
+        
+        ax.bar(x + offset + i * bar_width, values_arr, bar_width, 
                label=scheduler_labels[sched], color=color_map[sched])
-        ax.errorbar(x + offset + i * bar_width, values, yerr=errors, fmt='none', 
+        ax.errorbar(x + offset + i * bar_width, values_arr, 
+                   yerr=[lower_errors, upper_errors], fmt='none', 
                    ecolor='black', capsize=5, alpha=0.7)
     
     # Plot average neighbors
@@ -401,9 +419,15 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
                 values.append(0)
                 errors.append(0)
         
-        ax.bar(x + offset + i * bar_width, values, bar_width, 
+        values_arr = np.array(values)
+        errors_arr = np.array(errors)
+        lower_errors = np.minimum(errors_arr, values_arr)
+        upper_errors = errors_arr
+        
+        ax.bar(x + offset + i * bar_width, values_arr, bar_width, 
                label=scheduler_labels[sched], color=color_map[sched])
-        ax.errorbar(x + offset + i * bar_width, values, yerr=errors, fmt='none', 
+        ax.errorbar(x + offset + i * bar_width, values_arr, 
+                   yerr=[lower_errors, upper_errors], fmt='none', 
                    ecolor='black', capsize=5, alpha=0.7)
     
     ax.set_xlabel("Total Buoys")
@@ -488,9 +512,15 @@ def plot_unique_nodes_by_density_with_errors(data_dir, plot_dir, interval=None):
                 values.append(0)
                 errors.append(0)
         
-        ax.bar(x + offset + i * bar_width, values, bar_width, 
+        values_arr = np.array(values)
+        errors_arr = np.array(errors)
+        lower_errors = np.minimum(errors_arr, values_arr)
+        upper_errors = np.minimum(errors_arr, 100 - values_arr)
+        
+        ax.bar(x + offset + i * bar_width, values_arr, bar_width, 
                label=scheduler_labels[sched], color=color_map[sched])
-        ax.errorbar(x + offset + i * bar_width, values, yerr=errors, fmt='none', 
+        ax.errorbar(x + offset + i * bar_width, values_arr, 
+                   yerr=[lower_errors, upper_errors], fmt='none', 
                    ecolor='black', capsize=5, alpha=0.7)
     
     ax.set_xlabel("Total Buoys")
@@ -608,12 +638,18 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
         errors = grouped_std[mode]
         
         if len(data) == len(x):
+            data_arr = np.array(data)
+            errors_arr = np.array(errors)
+            lower_errors = np.minimum(errors_arr, data_arr)
+            upper_errors = errors_arr
+            
             label = mode_labels.get(mode, mode.capitalize())
-            ax.bar(x + offset + i * bar_width, data, bar_width, 
+            ax.bar(x + offset + i * bar_width, data_arr, bar_width, 
                   label=label, color=color)
             
-            if np.any(errors > 0):
-                ax.errorbar(x + offset + i * bar_width, data, yerr=errors, fmt='none', 
+            if np.any(errors_arr > 0):
+                ax.errorbar(x + offset + i * bar_width, data_arr, 
+                           yerr=[lower_errors, upper_errors], fmt='none', 
                            ecolor='black', capsize=5, alpha=0.7)
         else:
             print(f"Warning: Data length mismatch for {mode}. Expected {len(x)}, got {len(data)}")
@@ -673,10 +709,13 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
             plt.plot(df["time"], df[y_col], label=label, color=color)
             
             if std_col in df.columns:
+                lower_bound = np.maximum(df[y_col] - df[std_col], 0)
+                upper_bound = df[y_col] + df[std_col]
+                
                 plt.fill_between(
                     df["time"],
-                    df[y_col] - df[std_col],
-                    df[y_col] + df[std_col],
+                    lower_bound,
+                    upper_bound,
                     color=color, alpha=0.2
                 )
             
@@ -774,10 +813,13 @@ def plot_unique_nodes_vs_time_with_errors(data_dir, plot_dir, interval=None):
                 plt.plot(df["time"], df["avg_unique_nodes"], label=label, color=color)
                 
                 if "avg_unique_nodes_std" in df.columns:
+                    lower_bound = np.maximum(df["avg_unique_nodes"] - df["avg_unique_nodes_std"], 0)
+                    upper_bound = df["avg_unique_nodes"] + df["avg_unique_nodes_std"]
+                    
                     plt.fill_between(
                         df["time"],
-                        df["avg_unique_nodes"] - df["avg_unique_nodes_std"],
-                        df["avg_unique_nodes"] + df["avg_unique_nodes_std"],
+                        lower_bound,
+                        upper_bound,
                         color=color, alpha=0.2
                     )
                 

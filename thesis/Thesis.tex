@@ -1,0 +1,151 @@
+% !TeX encoding = UTF-8
+% !TeX program = pdflatex
+% !TeX spellcheck = it_IT
+\documentclass[a4paper, oneside, noexaminfo]{sapthesis}
+
+% Essential packages
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{amsfonts, amssymb, amsmath, amsthm, bm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subfigure}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{array}
+\usepackage{ragged2e}
+\usepackage{tcolorbox}
+\usepackage{adjustbox}
+\usepackage{algpseudocode}
+\usepackage{natbib}
+\usepackage[acronym]{glossaries}
+\usepackage{imakeidx}
+\usepackage[linguistics]{forest}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% Colors
+\definecolor{airforceblue}{rgb}{0.50, 0.70, 0.80}
+\definecolor{darkred}{RGB}{150, 11, 0}
+\definecolor{darkgreen}{RGB}{25, 191, 0}
+\definecolor{darkblue}{RGB}{11, 0, 112}
+\definecolor{lightgray}{RGB}{200, 200, 200}
+\definecolor{defaultgray}{RGB}{170, 170, 170}
+\definecolor{Silver}{rgb}{0.752,0.752,0.752}
+
+% Math operators and commands
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\sign}{sign}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+
+% Custom dash commands
+\newcommand*{\threeemdash}{\rule[0.5ex]{3em}{0.55pt}}
+\newcommand*{\xdash}[1][1.5em]{\rule[0.5ex]{#1}{0.55pt}}
+
+% List formatting
+\renewcommand{\theenumi}{(\arabic{enumi})}
+\renewcommand{\labelenumi}{\theenumi}
+
+% Custom vertical dots
+\makeatletter
+\DeclareRobustCommand{\rvdots}{%
+  \vbox{
+    \baselineskip3\p@\lineskiplimit\z@
+    \kern-\p@
+    \hbox{.}\hbox{.}\hbox{.}
+  }}
+\makeatother
+
+% Table rule color helpers
+\newcommand*{\belowrulesepcolor}[1]{%
+  \noalign{%
+  \kern-\belowrulesep \begingroup \color{#1}%
+  \hrule height\belowrulesep \endgroup }%
+}
+\newcommand*{\aboverulesepcolor}[1]{%
+  \noalign{%
+  \begingroup \color{#1}%
+  \hrule height\aboverulesep \endgroup \kern-\aboverulesep }%
+}
+
+% Bibliography
+\bibliographystyle{plain}
+\setcitestyle{numbers,square}
+
+% PDF metadata
+\hypersetup{
+    pdfborder=0 0 0,
+    pdftitle={Design and development of beaconing protocols for smart buoys},
+    pdfauthor={Cesare Corsi}
+}
+
+% Thesis info
+\title{Design and development of beaconing protocols for smart buoys}
+\author{Cesare Corsi}
+\IDnumber{2156214}
+\course{Corso di laurea magistrale in Computer Science}
+\courseorganizer{Facoltà di Ingegneria dell'Informazione, Informatica e Statistica}
+\AcademicYear{2024/2025}
+\advisor{Gaia Maselli}
+\customadvisorlabel{Advisor}
+\authoremail{corsi.2156214@studenti.uniroma1.it}
+\copyyear{2025}
+% \examdate{24 Gennaio 2024}
+
+% Index and glossary
+\makeindex
+\makeglossaries
+\input{glossario}
+
+% Chapters to include
+\includeonly{
+    Cap_1_introduction,
+    Cap_2_background,
+    Cap_3_methods,
+    Cap_4_implementation,
+    Cap_5_exp-results,
+    Cap_6_conclusions
+}
+
+% Figure and citation helpers
+\newcommand{\Fig}[1]{[{\footnotesize \texttt{Fig.#1}}]}
+\newcommand{\citfig}[1]{\ap{\scriptsize\textrm{(\textit{F#1})}}}
+
+\begin{document}
+\maketitle
+\pagenumbering{roman}
+\renewcommand{\thepage}{\romannumeral\value{page}}
+\input{abstract}
+\tableofcontents
+\listoffigures
+\listoftables
+
+\phantomsection
+\printglossary[type=\acronymtype]
+
+\mainmatter
+\include{Cap_1_introduction}
+\include{Cap_2_background}
+\include{Cap_3_methods}
+\include{Cap_4_implementation}
+\include{Cap_5_exp-results}
+\include{Cap_6_conclusions}
+
+\nocite{*}
+
+\backmatter
+\cleardoublepage
+
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{\bibname}
+\bibliography{bibiografia}
+
+\input{acknowledgements}
+
+\end{document}
