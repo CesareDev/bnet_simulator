@@ -1,39 +1,293 @@
 \chapter{Conclusions}
 \label{chap:conclusion}
 
-\begin{comment}
-This chapter closes the thesis and reflects on its contributions.
+This thesis has presented the design, implementation, and evaluation of a custom event-driven simulator for infrastructure-free Wi-Fi broadcast networks, with application to proximity-based maritime safety systems. This concluding chapter summarizes the key contributions, reflects on the scientific insights gained, acknowledges limitations, and outlines directions for future research.
 
-- **Summary of contributions**
+\section{Summary of Contributions}
+
+The primary contribution of this thesis is the development of a focused, custom simulator specifically designed for evaluating MAC-layer broadcast protocols in infrastructure-free wireless networks with dynamic node populations and mobility. This work makes several distinct contributions:
+
+\subsection{Simulator Design and Implementation}
+
+\textbf{Event-driven architecture:} We designed and implemented a discrete-event simulation engine with modular separation of concerns. The architecture cleanly separates the simulation kernel (event queue, time progression), physical layer (channel model, propagation), MAC layer (CSMA/CA, collision detection), and protocol logic (beaconing strategies). This modularity facilitates validation, testing, and extension.
+
+\textbf{Accurate MAC-layer modeling:} The simulator faithfully implements IEEE 802.11 DCF behavior including carrier sensing, DIFS waiting, random backoff, and collision detection for broadcast transmissions. Critically, it models the lack of acknowledgments for broadcast frames and the resulting inability to use binary exponential backoff, which are essential characteristics that distinguish broadcast from unicast communication.
+
+\textbf{Calibrated channel model:} Unlike purely analytical models, the simulator's wireless channel is calibrated using empirical measurements from sea trials with Raspberry Pi-based prototypes. The distance-based probabilistic reception model (90\% success within 70m, 15\% success 70-120m) reflects real over-water propagation characteristics, grounding simulation results in physical reality.
+
+\textbf{Dynamic population management:} The simulator implements stochastic node churn (arrivals and departures) to model realistic deployment scenarios where users enter and leave the system throughout the observation period. This capability is essential for evaluating protocol responsiveness to changing density conditions.
+
+\textbf{Comprehensive metrics collection:} The implementation tracks multiple performance indicators including Broadcast Packet Delivery Ratio (B-PDR), collision rates, per-node discovery counts, and time-series evolution. This rich data collection enables multi-faceted analysis of protocol behavior.
+
+\textbf{Extensible design:} The modular architecture supports extension with new beaconing protocols (demonstrated by implementing SBP, ADAB, and ACAB), alternative channel models, different mobility patterns, and multi-hop forwarding modes without requiring modifications to core components.
+
+\subsection{Protocol Evaluation: The ProSafe Case Study}
+
+To demonstrate the simulator's utility and validate its design, we used it to evaluate the ProSafe proximity safety system and its Adaptive Density-Aware Beaconing (ADAB) protocol:
+
+\textbf{Scalability analysis:} Through systematic experiments varying node populations from 20 to 300, we quantified the scalability limitations of fixed-interval beaconing and demonstrated ADAB's ability to maintain consistent reliability across this range. Static beaconing shows B-PDR degradation from 95\% to 70\% as density increases, while ADAB maintains 97-98\% throughout.
+
+\textbf{Collision characterization:} We identified collision probability as the primary factor limiting scalability in broadcast networks and showed how density-aware interval adaptation bounds collision rates (below 4\% for ADAB vs. 31\% for static beaconing at high density) by regulating local channel occupancy.
+
+\textbf{Energy-reliability trade-offs:} The evaluation revealed that adaptive beaconing achieves both improved reliability and reduced energy consumption in high-density scenarios—a win-win outcome. ADAB reduces transmission energy by up to 95\% in dense environments while maintaining or improving delivery ratios.
+
+\textbf{Validation of simple adaptation:} The results demonstrate that simple, locally observable information (neighbor count) is sufficient for effective adaptation. Complex channel measurements, global coordination, or sophisticated signal processing are unnecessary for achieving substantial performance gains.
+
+\subsection{Methodological Contribution}
+
+Beyond the specific simulator and protocol, this work contributes a methodological approach:
+
+\textbf{Grounded simulation:} By calibrating the channel model from physical measurements and validating protocol behavior against analytical models in simple cases, we demonstrate how simulation can bridge the gap between pure analysis and full-scale deployment. The simulator provides controlled reproducibility while maintaining connection to physical reality.
+
+\textbf{Focused scope:} Rather than attempting to model every aspect of wireless communication, the simulator focuses on the phenomena essential to the research question (MAC-layer contention, broadcast collisions, density effects). This intentional simplification—validated through sanity checks and unit testing—enables rapid experimentation while maintaining scientific rigor.
+
+\textbf{Reproducible evaluation:} All simulation parameters are externalized in configuration files, code is modularly organized, and experiments use multiple random seeds with statistical analysis. This approach facilitates reproducibility and enables other researchers to validate results or extend the work.
+
+\section{Scientific Insights}
+
+Beyond the specific contributions, the thesis work has yielded broader insights into wireless protocol design and evaluation.
+
+\subsection{Broadcast Scalability in Infrastructure-Free Networks}
+
+The experimental results clearly demonstrate that fixed-parameter protocols do not scale well to varying density conditions in infrastructure-free broadcast networks. The lack of acknowledgments means that senders have no feedback about channel conditions or delivery success, preventing the adaptive mechanisms (like binary exponential backoff) that enable unicast protocols to respond to congestion.
+
+This creates a fundamental need for explicit adaptation mechanisms that use locally observable metrics as proxies for channel state. The success of ADAB's simple neighbor-count-based adaptation suggests that such proxies can be highly effective despite their simplicity.
+
+\subsection{Sufficiency of MAC-Layer Adaptation}
+
+A striking finding is that MAC-layer adaptation alone—without requiring changes to physical layer, routing protocols, or application logic—can yield substantial performance improvements. By operating entirely at the beaconing/scheduling layer and leaving the underlying CSMA/CA mechanism unchanged, ADAB achieves its benefits with minimal implementation complexity and no hardware modifications.
+
+This suggests that for many wireless protocol challenges, the solution may not require sophisticated cross-layer optimization or clean-slate redesign. Simple, focused interventions at the appropriate layer can be highly effective.
+
+\subsection{Local Information vs. Global Coordination}
+
+The contrast between ADAB (using only local neighbor counts) and hypothetical centralized scheduling schemes is instructive. ADAB's effectiveness demonstrates that global coordination is not necessary for managing channel access in moderate-scale ad-hoc networks. Local information, when properly used, enables nodes to implicitly coordinate their behavior without message passing or infrastructure.
+
+This has important implications for system robustness: local adaptation continues to function even when network partitions occur, nodes enter and leave, or environmental conditions change rapidly. There is no single point of failure or coordination bottleneck.
+
+\subsection{The Role of Simulation in Protocol Research}
+
+This thesis demonstrates simulation's essential role in wireless protocol evaluation:
+
+\begin{itemize}
+    \item \textbf{Controlled experimentation:} Simulation enables systematic parameter sweeps and isolation of individual factors (ideal vs. non-ideal channel, varying density, different protocols) that would be difficult or impossible in physical experiments.
     
-    - Design and implementation of a custom simulator for infrastructure-free Wi-Fi safety networks.
-        
-    - Demonstration of its usefulness through the ProSafe case study.
-        
-    - Validation of density-aware MAC adaptation (ADAB).
-        
-- **Scientific impact**
+    \item \textbf{Scale and reproducibility:} Physical experiments with hundreds of concurrent nodes are logistically challenging and expensive. Simulation enables exploration of large-scale scenarios with perfect reproducibility across runs.
     
-    - Insights into broadcast scalability in ad-hoc Wi-Fi systems.
-        
-    - Evidence that MAC-layer adaptation alone can yield large gains.
-        
-- **Limitations**
+    \item \textbf{Observability:} Internal state (collision events, backoff counters, neighbor tables) can be observed directly in simulation, providing insight into mechanisms that are opaque in physical systems.
     
-    - Simplified PHY model.
-        
-    - Single-hop focus.
-        
-- **Future work**
+    \item \textbf{Rapid iteration:} Protocol variants can be implemented and evaluated quickly, enabling exploration of the design space without the overhead of physical prototype development.
+\end{itemize}
+
+However, the thesis also shows that simulation must be grounded in reality through calibration from physical measurements and validation against analytical models. Used appropriately, simulation is not a replacement for physical experimentation but rather a complementary tool that extends the range of conditions and scales that can be rigorously studied.
+
+\section{Limitations}
+
+This work has several limitations that should be acknowledged:
+
+\subsection{Simplified Physical Layer}
+
+The channel model uses a piecewise constant probability function based on distance, which captures average behavior but abstracts away many real-world effects:
+
+\begin{itemize}
+    \item \textbf{Fading and multipath:} Short-term signal fluctuations due to wave motion, reflections, and interference are not modeled explicitly
+    \item \textbf{Capture effect:} The ability of receivers to decode the stronger of two overlapping signals is not considered; all collisions result in complete packet loss
+    \item \textbf{Two-dimensional space:} Altitude differences and three-dimensional propagation are not modeled, which may be relevant for vessels with different heights or buoys at different depths
+    \item \textbf{Fixed data rate:} All transmissions use 1 Mbps regardless of distance or channel quality, while real systems might use rate adaptation
+\end{itemize}
+
+These simplifications are justified for the thesis scope (evaluating MAC-layer adaptation) but would need to be addressed for studies focused on physical-layer phenomena.
+
+\subsection{Mobility Modeling}
+
+The mobility model uses simple kinematic motion with boundary reflection. Real water activities involve more complex patterns:
+
+\begin{itemize}
+    \item Ocean currents and tidal flows create correlated movement
+    \item Swimmers and kayakers follow non-random paths (e.g., parallel to shore)
+    \item Wave action creates vertical motion and temporary line-of-sight obstructions
+    \item Groups of users may cluster spatially (families, guided tours)
+\end{itemize}
+
+More realistic mobility traces from GPS tracking of actual water activities would improve the ecological validity of results, though the fundamental scalability insights would likely persist.
+
+\subsection{Homogeneous Protocol Deployment}
+
+All evaluation scenarios assume that all nodes run the same protocol (either all static or all ADAB). Real deployments might involve heterogeneous mixes:
+
+\begin{itemize}
+    \item Legacy devices using fixed intervals
+    \item Different implementations with varying parameters
+    \item Incremental deployment where only some users adopt adaptive protocols
+\end{itemize}
+
+The interaction effects in mixed scenarios (e.g., whether ADAB nodes unfairly benefit from static nodes' collisions) have not been explored. This represents an important direction for future work.
+
+\subsection{Limited Scale Range}
+
+While the simulator was tested up to 300 nodes in an 800×800m area, even larger scales (thousands of nodes, or dense deployment in smaller areas) may reveal different behavior or additional scalability limits. The quadratic mapping in ADAB was tuned for the tested range and might require adjustment for significantly different scales.
+
+\subsection{Energy Model Completeness}
+
+The energy analysis focused on transmission energy, which is appropriate for evaluating the direct impact of beacon rate changes. However, a complete energy model would include:
+
+\begin{itemize}
+    \item Reception energy (listening to channel and decoding beacons)
+    \item Idle listening energy (monitoring channel when not transmitting or receiving)
+    \item Computational energy (protocol logic, GPS, neighbor table management)
+    \item Peripheral energy (sensors, displays, logging)
+\end{itemize}
+
+The relative importance of these factors depends on hardware characteristics and implementation efficiency.
+
+\section{Future Work}
+
+Several promising directions emerge from this thesis:
+
+\subsection{Multi-Hop Forwarding Evaluation}
+
+While the simulator implements multi-hop modes (append and forwarded), the primary evaluation focused on one-hop broadcast. Future work should:
+
+\begin{itemize}
+    \item Systematically evaluate the trade-offs of multi-hop forwarding: extended range vs. increased channel load
+    \item Develop forwarding policies that are density-aware (forward more aggressively in sparse scenarios, less in dense)
+    \item Study the interaction between adaptive beaconing intervals and forwarding decisions
+    \item Measure the effective detection radius extension achieved by multi-hop awareness
+\end{itemize}
+
+\subsection{Real Mobility Traces}
+
+Collecting GPS traces from actual swimmers, kayakers, and small watercraft in coastal environments would enable:
+
+\begin{itemize}
+    \item Trace-driven simulations with realistic mobility patterns
+    \item Validation of whether performance characteristics observed with simplified mobility persist under realistic movement
+    \item Identification of mobility-specific challenges (e.g., rapid approach scenarios, clustering effects)
+    \item Tuning of protocol parameters based on observed activity patterns
+\end{itemize}
+
+\subsection{Machine Learning for Parameter Adaptation}
+
+ADAB uses fixed parameters ($N_{\text{thr}} = 15$, quadratic mapping, fixed jitter). Machine learning approaches could:
+
+\begin{itemize}
+    \item Learn optimal parameters from historical performance data
+    \item Adapt parameters online based on observed collision rates and delivery ratios
+    \item Discover non-linear mappings that perform better than the hand-designed quadratic function
+    \item Enable personalization to different deployment contexts (beach vs. marina vs. open water)
+\end{itemize}
+
+This would move from hand-tuned to self-optimizing protocols.
+
+\subsection{Integration of Newer Wi-Fi Standards}
+
+The current implementation models IEEE 802.11b/g at 2.4 GHz. Future work could extend to:
+
+\begin{itemize}
+    \item \textbf{802.11ax (Wi-Fi 6):} Spatial reuse, OFDMA, and target wake time features that could improve efficiency
+    \item \textbf{802.11be (Wi-Fi 7):} Multi-link operation enabling simultaneous transmission on multiple bands
+    \item \textbf{6 GHz band:} Less crowded spectrum with potentially better performance
+    \item \textbf{802.11p (WAVE):} Purpose-designed for vehicular/mobile scenarios with lower overhead
+\end{itemize}
+
+Evaluating whether newer standards' features provide benefits for proximity detection would inform hardware selection and protocol design.
+
+\subsection{Hybrid Approaches}
+
+Combining ADAB with complementary techniques could yield further improvements:
+
+\begin{itemize}
+    \item \textbf{Power control:} Reduce transmission power when many neighbors are detected, saving energy and reducing interference radius
+    \item \textbf{Directional antennas:} Exploit spatial reuse by concentrating signals toward relevant directions
+    \item \textbf{Carrier-sense threshold adaptation:} Adjust carrier detection sensitivity based on density
+    \item \textbf{Priority beaconing:} Give higher priority to mobile vs. fixed buoys, or to those with few neighbors vs. many
+\end{itemize}
+
+The simulator's modular design facilitates experimentation with such hybrid protocols.
+
+\subsection{Application to Other Domains}
+
+While developed for maritime safety, the simulator and insights are applicable to other infrastructure-free broadcast scenarios:
+
+\begin{itemize}
+    \item \textbf{Vehicular networks:} Emergency vehicle approach warnings, intersection collision avoidance
+    \item \textbf{Disaster response:} Ad-hoc communication when infrastructure is damaged
+    \item \textbf{Wildlife tracking:} GPS collars that broadcast position to nearby researchers
+    \item \textbf{Indoor positioning:} Bluetooth Low Energy beaconing for proximity detection
+    \item \textbf{IoT sensor networks:} Environmental monitoring with periodic broadcast of measurements
+\end{itemize}
+
+Adapting the channel model and mobility patterns to these domains would extend the simulator's utility and test the generality of density-aware adaptation principles.
+
+\subsection{Integration with Real Systems}
+
+Bridging simulation and deployment through:
+
+\begin{itemize}
+    \item \textbf{Hardware-in-the-loop:} Connect simulator to real Wi-Fi hardware for hybrid evaluation
+    \item \textbf{Emulation platforms:} Deploy protocols on testbeds (e.g., ORBIT, w-iLab.t) with controlled RF environment
+    \item \textbf{Pilot deployments:} Small-scale trials with volunteers in controlled settings (swimming pool, marina) to validate predictions
+    \item \textbf{Continuous calibration:} Feed deployment data back to simulator to refine models
+\end{itemize}
+
+This iterative refinement between simulation and reality would strengthen confidence in results and inform real-world deployment decisions.
+
+\section{Broader Impact}
+
+Beyond the technical contributions, this work has potential societal impact:
+
+\subsection{Maritime Safety}
+
+The ProSafe system addresses a real safety gap in coastal waters. Swimmers, snorkelers, kayakers, and divers currently have limited options for making themselves visible to vessels. By leveraging ubiquitous Wi-Fi hardware and requiring no infrastructure, ProSafe could provide an accessible, low-cost safety enhancement for recreational water users.
+
+The simulator enables evaluation of such systems before expensive pilot deployments, reducing the risk and cost of innovation in safety-critical domains.
+
+\subsection{Open Science and Reproducibility}
+
+The thesis demonstrates how focused, well-documented custom simulators can serve the research community:
+
+\begin{itemize}
+    \item Code organization and modular design facilitate understanding and reuse
+    \item External configuration files enable exact reproduction of experiments
+    \item Clear separation of concerns allows researchers to modify components independently
+    \item Grounding in physical measurements connects simulation to reality
+\end{itemize}
+
+By making such tools available, researchers lower barriers to entry and enable cumulative progress through shared infrastructure.
+
+\subsection{Methodological Example}
+
+This thesis exemplifies a balanced approach to protocol evaluation:
+
+\begin{itemize}
+    \item Start with real-world problem (proximity detection for maritime safety)
+    \item Conduct small-scale physical experiments for calibration
+    \item Develop focused simulator grounded in measurements
+    \item Use simulation to explore large-scale behavior and parameter spaces
+    \item Validate results through multiple approaches (ideal vs. realistic channel, analytical comparison)
+    \item Acknowledge limitations and ground conclusions appropriately
+\end{itemize}
+
+This methodology—neither pure simulation divorced from reality nor pure experimentation limited by practical scale—offers a template for rigorous wireless protocol research.
+
+\section{Final Remarks}
+
+This thesis has presented a custom event-driven simulator for infrastructure-free Wi-Fi broadcast networks and demonstrated its utility through comprehensive evaluation of the ProSafe maritime safety system and ADAB protocol. The work makes contributions at multiple levels:
+
+\begin{itemize}
+    \item \textbf{As a tool:} The simulator provides a reusable platform for evaluating broadcast protocols under varying density and mobility conditions
     
-    - Multi-hop forwarding support.
-        
-    - Integration of real mobility traces.
-        
-    - Support for newer Wi-Fi standards and multi-link operation.
-        
-- **Final takeaway**
+    \item \textbf{As a case study:} The ProSafe evaluation demonstrates that simple density-aware adaptation can achieve substantial improvements in broadcast reliability, collision reduction, and energy efficiency
     
-    - The simulator is a **general research tool**, while ProSafe is a **concrete, socially relevant application** that validates it.
-\end{comment}
-% Utlizing the comments above try to write the chapter. And also explain the tecnical terms included. Maybe with online references usign LaTeX formatting and commands. you can use also the paper.pdf
+    \item \textbf{As a methodology:} The approach of calibrating simulation from physical measurements, focusing scope appropriately, and validating through multiple means offers a template for rigorous protocol evaluation
+    
+    \item \textbf{As an application:} ProSafe addresses a real safety need in coastal environments using accessible, low-cost technology
+\end{itemize}
+
+The key insight is that MAC-layer broadcast scalability in infrastructure-free networks can be significantly improved through simple, local adaptation mechanisms. Complex global coordination, sophisticated channel measurements, or cross-layer optimization are not necessary for substantial gains. Local information, properly used, enables effective implicit coordination.
+
+The simulator developed in this thesis is a general research tool applicable beyond ProSafe to any broadcast-based proximity or discovery protocol. By providing controlled, reproducible evaluation at scales infeasible for physical experiments, it enables systematic exploration of the design space and rigorous comparison of alternatives.
+
+Looking forward, the combination of adaptive protocols, modern Wi-Fi standards, and low-cost hardware presents opportunities to address safety and connectivity challenges in diverse environments—from coastal waters to disaster zones to smart cities. The methodological approach and tools developed here can accelerate progress in these socially relevant application domains.
+
+In conclusion, this thesis demonstrates that focused, well-designed simulators—grounded in physical measurements and validated against analytical models—are essential scientific instruments for wireless protocol research. When combined with thoughtful protocol design based on local observables, they enable development of practical systems that scale gracefully from small pilot deployments to large-scale real-world scenarios.

@@ -1,44 +1,578 @@
-\chapter{Implementation}
+\chapter{Simulator Design and Implementation}
 \label{chap:implementation}
 
-\begin{comment}
-    This chapter details the **simulator itself**, which is the **core thesis contribution**.
+This chapter presents the design and implementation of the custom event-driven simulator developed as the core contribution of this thesis. The simulator enables controlled, reproducible evaluation of broadcast-based proximity detection protocols under varying network conditions and densities. We describe the overall architecture, key components, modeling approach, and implementation details that make the simulator both accurate and extensible.
 
-- **Simulator architecture**
-    
-    - Event-driven design (transmissions, receptions, mobility, churn).
-        
-    - Modular separation of PHY, MAC, protocol logic, and metrics.
-        
-- **Node model**
-    
-    - Buoy and vessel abstractions.
-        
-    - Neighbor tables, TTL handling, and rebroadcast logic (TTL=1).
-        
-- **MAC-layer modeling**
-    
-    - DCF behavior, contention window, back-off, broadcast collisions.
-        
-    - Timing model for airtime and overlapping transmissions.
-        
-- **Protocol implementation**
-    
-    - SBP: fixed-interval logic.
-        
-    - ADAB: neighbor counting, quadratic interval mapping, jitter.
-        
-- **Calibration integration**
-    
-    - How real-world measurements are injected into the simulator.
-        
-- **Extensibility**
-    
-    - How the simulator supports future protocols (e.g., multi-hop, different PHYs).
-        
-    - Why it is reusable beyond ProSafe.
-        
+\section{Motivation for a Custom Simulator}
 
-This chapter **proves engineering depth** and distinguishes the thesis from the shorter paper.
-\end{comment}
-% Utlizing the comments above try to write the chapter. And also explain the tecnical terms included. Maybe with online references usign LaTeX formatting and commands. you can use also the paper.pdf
+As discussed in Section~\ref{chap:background}, while general-purpose network simulators like ns-3 and OMNeT++ are powerful tools, they present challenges for focused research on specific protocol mechanisms:
+
+\begin{itemize}
+    \item \textbf{Complexity overhead:} General simulators include extensive protocol stacks and features not relevant to MAC-layer broadcast evaluation
+    \item \textbf{Learning curve:} Significant time investment required to master complex frameworks
+    \item \textbf{Customization difficulty:} Implementing non-standard behaviors requires deep understanding of internal simulator architecture
+    \item \textbf{Reproducibility:} Large codebases with many configuration options can introduce subtle dependencies
+\end{itemize}
+
+For evaluating density-aware broadcast protocols in infrastructure-free networks, a focused custom simulator offers distinct advantages:
+
+\begin{itemize}
+    \item \textbf{Transparency:} Complete understanding and control of all simulation mechanisms
+    \item \textbf{Focused scope:} Include only components necessary for the research question
+    \item \textbf{Flexibility:} Easy modification of protocol logic and channel models
+    \item \textbf{Performance:} Streamlined implementation optimized for specific scenarios
+    \item \textbf{Validation:} Simpler codebase facilitates verification and testing
+\end{itemize}
+
+The simulator developed for this thesis focuses specifically on MAC-layer broadcast behavior in wireless ad-hoc networks with mobility and dynamic node populations, abstracting away unnecessary complexity while maintaining fidelity to the essential phenomena.
+
+\section{Overall Architecture}
+
+The simulator is built around a discrete-event simulation paradigm\footnote{Law, A.M. "Simulation Modeling and Analysis." McGraw-Hill, 2015.}, where the system state evolves through a sequence of instantaneous events occurring at specific simulation times.
+
+% TODO: Add UML class diagram showing main components: Simulator, Event, Buoy, Channel, Metrics, BeaconScheduler
+
+\begin{figure}[h]
+\centering
+\fbox{\textit{[Placeholder: UML class diagram of simulator architecture]}}
+\caption{High-level architecture of the simulator showing the main components and their relationships. The Simulator orchestrates event processing, Buoys represent network nodes, the Channel models wireless propagation and collisions, and Metrics collect performance data.}
+\label{fig:simulator-architecture}
+\end{figure}
+
+\subsection{Event-Driven Design}
+
+The simulation progresses by processing events from a priority queue ordered by simulation time. Each event has:
+
+\begin{itemize}
+    \item \textbf{Time:} The simulation time at which the event occurs
+    \item \textbf{Type:} The category of event (scheduler check, transmission start, reception, etc.)
+    \item \textbf{Target:} The object responsible for handling the event (a buoy, the channel, or the simulator itself)
+    \item \textbf{Data:} Optional payload containing event-specific information
+\end{itemize}
+
+The event queue is implemented using Python's \texttt{heapq} module, which provides efficient O(log n) insertion and O(log n) extraction of the minimum element. To ensure deterministic ordering when events have identical timestamps, each event is assigned a unique sequence number that serves as a tie-breaker.
+
+\subsection{Event Types}
+
+The simulator defines twelve distinct event types, each representing a state transition or action in the system:
+
+\begin{enumerate}
+    \item \textbf{SCHEDULER\_CHECK:} Periodic evaluation of whether a buoy should transmit a beacon
+    \item \textbf{CHANNEL\_SENSE:} Check if the wireless channel is idle before transmission
+    \item \textbf{DIFS\_COMPLETION:} DCF Interframe Space waiting period completes
+    \item \textbf{BACKOFF\_COMPLETION:} Random backoff countdown reaches zero
+    \item \textbf{TRANSMISSION\_START:} Buoy begins transmitting a beacon frame
+    \item \textbf{TRANSMISSION\_END:} Beacon transmission completes
+    \item \textbf{RECEPTION:} Buoy receives a beacon from another node
+    \item \textbf{NEIGHBOR\_CLEANUP:} Remove stale entries from neighbor table
+    \item \textbf{BUOY\_MOVEMENT:} Update position of mobile buoys
+    \item \textbf{CHANNEL\_UPDATE:} Periodic channel state maintenance
+    \item \textbf{BUOY\_ARRAY\_UPDATE:} Add or remove buoys to model churn
+    \item \textbf{AVG\_NEIGHBORS\_CALCULATION:} Compute average neighbor count for metrics
+\end{enumerate}
+
+This event taxonomy cleanly separates concerns: protocol logic (scheduler checks), MAC behavior (sensing, DIFS, backoff), physical transmission (start/end), reception processing, mobility, and system-level updates.
+
+\subsection{Modular Component Structure}
+
+The simulator is organized into several modules that encapsulate distinct responsibilities:
+
+\begin{itemize}
+    \item \textbf{core/simulator.py:} Main simulation engine, event queue management, time progression
+    \item \textbf{core/events.py:} Event type definitions and event data structures
+    \item \textbf{core/channel.py:} Wireless channel model, collision detection, signal propagation
+    \item \textbf{buoys/buoy.py:} Node behavior, state machine, neighbor management
+    \item \textbf{protocols/beacon.py:} Beacon frame structure and serialization
+    \item \textbf{protocols/scheduler.py:} Beaconing protocol implementations (SBP, ADAB)
+    \item \textbf{utils/metrics.py:} Performance measurement and data collection
+    \item \textbf{config/config\_handler.py:} Configuration management and parameter access
+\end{itemize}
+
+This modular design facilitates independent development, testing, and extension of individual components without affecting the rest of the system.
+
+\section{Node Model: The Buoy Class}
+
+The \texttt{Buoy} class represents individual network nodes (smart buoys or vessel units) and implements their complete behavior.
+
+\subsection{Node State}
+
+Each buoy maintains the following state:
+
+\begin{itemize}
+    \item \textbf{Identity:} Unique UUID identifier
+    \item \textbf{Position:} (x, y) coordinates in meters within the simulation area
+    \item \textbf{Mobility:} Flag indicating mobile vs. fixed, and velocity vector for mobile nodes
+    \item \textbf{Battery:} Remaining energy percentage (for future energy-aware protocols)
+    \item \textbf{Neighbors:} List of recently heard nodes with (ID, timestamp, position)
+    \item \textbf{MAC state:} Current state in the transmission state machine (SLEEPING, RECEIVING, WAITING\_DIFS, BACKOFF)
+    \item \textbf{Backoff state:} Current backoff counter and remaining time
+    \item \textbf{Protocol state:} Scheduler instance, next transmission time, pending transmission flag
+\end{itemize}
+
+For multi-hop modes, additional state tracks:
+\begin{itemize}
+    \item \textbf{Discovered nodes:} Nodes learned indirectly from neighbor lists (append mode)
+    \item \textbf{Forwarded beacons:} Set of beacons already forwarded to prevent duplicates (forwarded mode)
+\end{itemize}
+
+\subsection{Transmission State Machine}
+
+Buoy behavior follows a state machine that implements the IEEE 802.11 DCF mechanism:
+
+% TODO: Add state diagram showing transitions: RECEIVING -> WAITING_DIFS -> BACKOFF -> TRANSMITTING -> RECEIVING
+
+\begin{figure}[h]
+\centering
+\fbox{\textit{[Placeholder: State diagram of buoy transmission state machine]}}
+\caption{State machine for buoy transmission behavior implementing CSMA/CA. Transitions occur based on channel sensing, DIFS completion, backoff expiration, and transmission events.}
+\label{fig:buoy-state-machine}
+\end{figure}
+
+\textbf{State transitions:}
+
+\begin{enumerate}
+    \item \textbf{RECEIVING $\to$ CHANNEL\_SENSE:} Scheduler decides to transmit, initiate channel sensing
+    \item \textbf{Channel busy:} Defer and retry sensing after short interval
+    \item \textbf{Channel idle $\to$ WAITING\_DIFS:} Wait for DIFS period (50 $\mu$s)
+    \item \textbf{DIFS\_COMPLETION:} Re-check channel; if still idle, enter BACKOFF
+    \item \textbf{BACKOFF:} Count down random slots (0-15) × slot\_time (20 $\mu$s)
+    \item \textbf{BACKOFF\_COMPLETION:} Transmit beacon and return to RECEIVING
+    \item \textbf{Channel becomes busy during BACKOFF:} Pause counter, return to RECEIVING, resume when idle
+\end{enumerate}
+
+This accurately models the CSMA/CA collision avoidance mechanism, including the critical behavior where backoff counters freeze when the channel becomes busy and resume when idle.
+
+\subsection{Neighbor Table Management}
+
+Each buoy maintains a neighbor table to track recently heard nodes. Upon receiving a beacon:
+
+\begin{enumerate}
+    \item Extract sender ID, timestamp, and position
+    \item Search for existing entry with matching sender ID
+    \item If found, update timestamp and position
+    \item If not found, add new entry to table
+    \item Extract neighbor list from beacon payload for indirect discovery
+\end{enumerate}
+
+Periodically (every 5 seconds), a NEIGHBOR\_CLEANUP event triggers removal of stale entries:
+
+\begin{verbatim}
+neighbors = [(id, ts, pos) for (id, ts, pos) in neighbors
+             if current_time - ts <= timeout]
+\end{verbatim}
+
+Entries not refreshed within the timeout period (typically 3-5× the beacon interval) are expired. This models the natural forgetting of nodes that have moved out of range or stopped transmitting.
+
+\subsection{Mobility Model}
+
+Mobile buoys move according to a simple kinematic model. Every 100 ms, a BUOY\_MOVEMENT event updates position:
+
+\begin{align*}
+x_{t+\Delta t} &= x_t + v_x \cdot \Delta t \\
+y_{t+\Delta t} &= y_t + v_y \cdot \Delta t
+\end{align*}
+
+where $(v_x, v_y)$ is the velocity vector in m/s and $\Delta t = 0.1$ s.
+
+Boundary conditions implement reflection: when a buoy reaches the simulation area edge, the corresponding velocity component is negated, causing the buoy to "bounce" back into the valid area. This simple model creates continuous, non-directed movement suitable for modeling swimmers or drifting buoys in coastal waters.
+
+\section{Channel Model}
+
+The \texttt{Channel} class models the wireless propagation medium, implementing signal propagation, range-based reception, and collision detection.
+
+\subsection{Signal Propagation}
+
+When a buoy broadcasts a beacon, the channel determines which other buoys are within communication range and schedules RECEPTION events accordingly.
+
+\subsubsection{Range-Based Reception Model}
+
+The channel implements a distance-based reception probability model calibrated from real-world sea trials (described in the paper). For each potential receiver:
+
+\begin{enumerate}
+    \item Calculate Euclidean distance between sender and receiver:
+    $$d = \sqrt{(x_r - x_s)^2 + (y_r - y_s)^2}$$
+    
+    \item Determine reception probability based on distance:
+    \begin{align*}
+    P_{\text{rx}} = \begin{cases}
+    0.9 & \text{if } d \leq 70 \text{ m (high-probability zone)} \\
+    0.15 & \text{if } 70 < d \leq 120 \text{ m (low-probability zone)} \\
+    0 & \text{if } d > 120 \text{ m (beyond range)}
+    \end{cases}
+    \end{align*}
+    
+    \item Generate random value $r \sim U(0,1)$ and accept reception if $r < P_{\text{rx}}$
+\end{enumerate}
+
+This piecewise probabilistic model captures the field trial observation that reception is highly reliable within 70 meters, sporadic between 70-120 meters, and negligible beyond 120 meters over water.
+
+\subsubsection{Propagation Delay}
+
+For accepted receptions, the reception time includes propagation delay:
+
+$$t_{\text{rx}} = t_{\text{tx\_end}} + \frac{d}{c}$$
+
+where $c = 3 \times 10^8$ m/s is the speed of light. Though small (400 ns per 120 m), including propagation delay ensures proper temporal ordering when multiple transmissions overlap.
+
+\subsection{Collision Detection}
+
+The channel tracks all active transmissions in a list of tuples:
+\begin{verbatim}
+(beacon, start_time, end_time, potential_receivers, actual_receivers)
+\end{verbatim}
+
+When a new transmission begins, the channel checks for temporal and spatial overlap with existing transmissions.
+
+\subsubsection{Collision Conditions}
+
+A collision occurs between transmissions A and B at receiver R if:
+
+\begin{enumerate}
+    \item \textbf{Temporal overlap:} Transmission time intervals intersect
+    $$[t_{\text{start}}^A, t_{\text{end}}^A] \cap [t_{\text{start}}^B, t_{\text{end}}^B] \neq \emptyset$$
+    
+    \item \textbf{Spatial overlap at receiver:} R is within range of both senders
+    $$d(R, A) \leq R_{\text{max}} \land d(R, B) \leq R_{\text{max}}$$
+\end{enumerate}
+
+When a collision is detected, both transmissions are marked as collided, and affected receivers do not generate RECEPTION events.
+
+\subsubsection{Hidden Terminal Modeling}
+
+The collision model correctly handles hidden terminals: senders A and B may be out of range of each other (and thus cannot detect each other's transmissions via carrier sense), yet both transmit simultaneously, causing a collision at a receiver R that is within range of both.
+
+This is a critical aspect of broadcast reliability in ad-hoc networks and must be accurately modeled for realistic evaluation.
+
+\subsection{Ideal vs. Probabilistic Channel}
+
+The simulator supports two channel modes:
+
+\begin{itemize}
+    \item \textbf{Ideal channel:} All transmissions within range are received unless they collide. $P_{\text{rx}} = 1$ for all $d \leq R_{\text{max}}$. Used to isolate the impact of MAC-layer collisions from physical-layer effects.
+    
+    \item \textbf{Probabilistic channel:} Uses the calibrated distance-based reception probabilities. Models realistic over-water propagation including fading, multipath, and environmental effects.
+\end{itemize}
+
+Both modes use identical collision detection. The ideal channel provides an upper bound on performance, while the probabilistic channel reflects realistic conditions.
+
+\subsection{Carrier Sensing}
+
+The channel implements a carrier sensing mechanism used by the buoy state machine. When a buoy checks if the channel is busy:
+
+\begin{enumerate}
+    \item Iterate through all active transmissions
+    \item For each transmission, calculate wavefront radius:
+    $$r_{\text{wave}} = c \cdot (t_{\text{current}} - t_{\text{start}})$$
+    
+    \item If the buoy is within both the wavefront radius and the high-probability detection range, the channel is sensed as busy:
+    $$d(\text{buoy}, \text{sender}) \leq \min(r_{\text{wave}}, R_{\text{high}})$$
+\end{enumerate}
+
+This models the physical reality that a signal takes time to propagate through space and can only be sensed once the wavefront reaches the sensing node.
+
+\section{Protocol Implementation}
+
+The \texttt{BeaconScheduler} class implements the beaconing protocol logic, abstracting the decision of when to transmit.
+
+\subsection{Static Beaconing Protocol (SBP)}
+
+The static protocol is straightforward:
+
+\begin{verbatim}
+class BeaconScheduler:
+    def should_send_static(self, current_time):
+        if current_time - last_send_time >= static_interval:
+            last_send_time = current_time
+            return True
+        return False
+\end{verbatim}
+
+Every \texttt{static\_interval} seconds (e.g., 1.0 s), the scheduler returns \texttt{True}, triggering the buoy to initiate the transmission sequence.
+
+\subsection{Adaptive Density-Aware Beaconing (ADAB)}
+
+ADAB implements the density-driven interval adaptation described in Chapter~\ref{chap:prosafe}:
+
+\begin{verbatim}
+def compute_interval(self, velocity, neighbors, current_time):
+    n_neighbors = len(neighbors)
+    density_score = min(1.0, n_neighbors / NEIGHBORS_THRESHOLD)
+    
+    f = density_score * density_score  # Quadratic mapping
+    bi = BI_MIN + f * (BI_MAX - BI_MIN)
+    
+    jitter = random.uniform(-0.05, 0.05)
+    bi_final = bi * (1 + jitter)
+    
+    return max(BI_MIN, min(bi_final, BI_MAX))
+\end{verbatim}
+
+At each transmission decision point:
+
+\begin{enumerate}
+    \item Count current neighbors (after expiring stale entries)
+    \item Compute normalized density score $f = \min(1, N / N_{\text{thr}})$
+    \item Apply quadratic mapping: $BI = BI_{\min} + f^2 \cdot (BI_{\max} - BI_{\min})$
+    \item Add random jitter $\pm 5\%$
+    \item Clamp to valid interval $[BI_{\min}, BI_{\max}]$
+    \item Schedule next transmission at $t + BI$
+\end{enumerate}
+
+The scheduler maintains state across invocations:
+\begin{itemize}
+    \item \texttt{last\_send\_time:} Timestamp of previous transmission
+    \item \texttt{next\_interval:} Computed interval for next transmission
+\end{itemize}
+
+\subsection{Alternative Adaptive Protocol (ACAB)}
+
+The simulator also implements an alternative Adaptive Context-Aware Beaconing (ACAB) protocol that considers additional factors beyond density:
+
+\begin{verbatim}
+def compute_interval_acab(self, velocity, neighbors, current_time):
+    # Density component
+    density_score = min(1.0, len(neighbors) / NEIGHBORS_THRESHOLD)
+    
+    # Contact recency component
+    if neighbors:
+        last_contact = max(ts for _, ts, _ in neighbors)
+        delta = current_time - last_contact
+        contact_score = max(0.0, 1.0 - delta / CONTACT_THRESHOLD)
+    else:
+        contact_score = 0.0
+    
+    # Mobility component
+    speed = sqrt(vx**2 + vy**2)
+    mobility_score = min(1.0, speed / DEFAULT_VELOCITY)
+    
+    # Weighted combination
+    combined = (w_density * density_score + 
+                w_contact * contact_score + 
+                w_mobility * (1 - mobility_score))
+    
+    # Apply quadratic mapping and jitter as before
+    ...
+\end{verbatim}
+
+ACAB demonstrates the simulator's extensibility: new protocols can be implemented by adding methods to the scheduler class without modifying other components.
+
+\section{Metrics Collection}
+
+The \texttt{Metrics} class tracks performance data throughout simulation execution.
+
+\subsection{Primary Metrics}
+
+\begin{itemize}
+    \item \textbf{Beacons sent:} Total number of beacon transmissions initiated
+    \item \textbf{Potentially sent:} Sum over all transmissions of receivers in range
+    \item \textbf{Actually received:} Number of successful receptions (no collision, probabilistic success)
+    \item \textbf{Collisions:} Number of receptions lost due to temporal/spatial overlap
+    \item \textbf{Probabilistic losses:} Receptions lost due to distance-based random failure
+\end{itemize}
+
+\subsection{Broadcast Packet Delivery Ratio (B-PDR)}
+
+The key metric is computed as:
+
+$$\text{B-PDR} = \frac{\sum_{i=1}^{N_{\text{tx}}} n_{\text{rcv},i}}{\sum_{i=1}^{N_{\text{tx}}} n_{\text{intended},i}}$$
+
+where for each transmission $i$:
+\begin{itemize}
+    \item $n_{\text{intended},i}$ = number of nodes within range at transmission time
+    \item $n_{\text{rcv},i}$ = number that actually received the beacon
+\end{itemize}
+
+The numerator is \texttt{actually\_received} and the denominator is \texttt{potentially\_sent}.
+
+\subsection{Time Series Data}
+
+For temporal analysis, metrics are recorded in sliding windows:
+
+\begin{itemize}
+    \item Window width: 10 seconds
+    \item Advance step: 1 second
+    \item Compute B-PDR, collision rate, average neighbors for each window
+\end{itemize}
+
+This enables visualization of how performance evolves as node density changes during simulation.
+
+\subsection{Per-Node Discovery Tracking}
+
+The simulator tracks unique nodes discovered by each buoy:
+
+\begin{verbatim}
+unique_nodes_per_buoy[receiver_id] = set()
+# On reception, add:
+unique_nodes_per_buoy[receiver_id].add(sender_id)
+unique_nodes_per_buoy[receiver_id].update(beacon.neighbor_ids)
+\end{verbatim}
+
+This measures the effectiveness of multi-hop awareness mechanisms in extending discovery range beyond direct one-hop neighbors.
+
+\section{Dynamic Population Management}
+
+To model realistic deployment scenarios where users enter and leave the system, the simulator implements stochastic node churn.
+
+\subsection{Churn Process}
+
+At irregular intervals (every 15-20 seconds), the simulator randomly either adds or removes buoys:
+
+\begin{verbatim}
+if random() >= 0.5 and len(active) > minimum:
+    # Remove operation
+    remove_count = random(1, min(max_remove, len(active) - minimum))
+    buoys_to_remove = random_sample(active, remove_count)
+    for buoy in buoys_to_remove:
+        active.remove(buoy)
+else:
+    # Add operation
+    add_count = random(1, min(max_add, len(inactive)))
+    buoys_to_add = random_sample(inactive, add_count)
+    for buoy in buoys_to_add:
+        active.append(buoy)
+        schedule_initial_events(buoy)
+\end{verbatim}
+
+Constraints maintain population bounds:
+\begin{itemize}
+    \item Minimum: $\max(3, 0.2 \times N_{\text{total}})$
+    \item Maximum: $N_{\text{total}}$ (all available buoys)
+    \item Remove fraction: Up to 40\% of current population
+    \item Add fraction: Up to 40\% of current population
+\end{itemize}
+
+This creates a dynamic but bounded population that exercises the adaptive protocol's responsiveness to density changes.
+
+\subsection{Ramp Scenario}
+
+For controlled evaluation, the simulator also supports a deterministic ramp scenario where nodes are added gradually:
+
+\begin{itemize}
+    \item Start with 2 active buoys
+    \item Add one buoy every $\Delta t = T_{\text{total}} / (N_{\text{total}} - 2)$ seconds
+    \item Observe steady-state behavior after each addition
+\end{itemize}
+
+This enables clean measurement of performance degradation as density increases incrementally.
+
+\section{Configuration Management}
+
+All simulation parameters are externalized in a YAML configuration file (\texttt{config.yaml}), loaded by the \texttt{ConfigHandler} singleton:
+
+\begin{verbatim}
+simulation:
+  duration: 600
+  ideal_channel: true
+  multihop_mode: none
+  
+network:
+  bit_rate: 1000000
+  communication_range_max: 120.0
+  communication_range_high_prob: 70.0
+  delivery_prob_high: 0.9
+  delivery_prob_low: 0.15
+  
+csma:
+  difs_time: 0.000050
+  slot_time: 0.000020
+  cw: 16
+  
+scheduler:
+  beacon_min_interval: 0.25
+  beacon_max_interval: 5.0
+  static_interval: 1.0
+  neighbor_timeout: 5.0
+\end{verbatim}
+
+This separation of configuration from code facilitates:
+\begin{itemize}
+    \item Parameter sweeps without code modification
+    \item Reproducible experiments with documented configurations
+    \item Sensitivity analysis across parameter ranges
+    \item Comparison with published results by matching parameters
+\end{itemize}
+
+\section{Calibration with Real-World Measurements}
+
+The simulator's channel model is calibrated using empirical measurements from sea trials described in the paper.
+
+\subsection{Field Trial Setup}
+
+Two Raspberry Pi 4 Model B units equipped with:
+\begin{itemize}
+    \item AR9271-based USB Wi-Fi adapter
+    \item 2 dBi omnidirectional antenna
+    \item GPS module for position tracking
+    \item Battery pack for autonomous operation
+\end{itemize}
+
+were deployed on open water with static beaconing at 1.0 s intervals.
+
+\subsection{Measurement Results}
+
+Reception success rate vs. distance:
+\begin{itemize}
+    \item 0-70 m: $\sim$90\% success (reliable zone)
+    \item 70-120 m: $\sim$15\% success (marginal zone)
+    \item >120 m: Near-zero success (beyond range)
+\end{itemize}
+
+These measurements directly parameterize the probabilistic channel model:
+\begin{itemize}
+    \item \texttt{communication\_range\_high\_prob = 70.0}
+    \item \texttt{communication\_range\_max = 120.0}
+    \item \texttt{delivery\_prob\_high = 0.9}
+    \item \texttt{delivery\_prob\_low = 0.15}
+\end{itemize}
+
+This grounding in empirical data ensures that simulation results reflect realistic over-water propagation characteristics.
+
+\section{Implementation Technology}
+
+The simulator is implemented in Python 3.10+ for several reasons:
+
+\begin{itemize}
+    \item \textbf{Rapid development:} High-level language enables quick prototyping and iteration
+    \item \textbf{Readability:} Clean syntax facilitates understanding and validation of logic
+    \item \textbf{Rich ecosystem:} Libraries for data processing (NumPy, Pandas), visualization (Matplotlib), and configuration (PyYAML)
+    \item \textbf{Reproducibility:} Modern package management (uv) ensures consistent dependencies
+    \item \textbf{Extensibility:} Easy integration of additional components or protocols
+\end{itemize}
+
+Performance is adequate for the target scale (hundreds of nodes, minutes of simulation time). Execution time is roughly 10-50× faster than real time, enabling extensive experimentation.
+
+\section{Limitations}
+
+The simulator makes several simplifying assumptions:
+
+\begin{itemize}
+    \item \textbf{Two-dimensional space:} Altitude and three-dimensional propagation are not modeled
+    \item \textbf{Omnidirectional antennas:} Directional patterns and polarization are not considered
+    \item \textbf{Static PHY rate:} All transmissions use a fixed data rate (1 Mbps)
+    \item \textbf{Perfect timing:} Clock drift and synchronization issues are abstracted away
+    \item \textbf{Simplified mobility:} Buoys move with constant velocity and reflect at boundaries
+    \item \textbf{No capture effect:} Stronger signal does not overcome weaker interferer
+    \item \textbf{Binary collision model:} Partial packet reception is not modeled
+\end{itemize}
+
+These simplifications are deliberate: they reduce complexity while preserving the essential phenomena (MAC-layer contention, collisions, density effects) that are the focus of this research. For the evaluation of density-aware beaconing protocols, these abstractions are justified.
+
+\section{Summary}
+
+This chapter has presented the design and implementation of the custom event-driven simulator:
+
+\begin{itemize}
+    \item Event-driven architecture with priority queue and discrete time progression
+    \item Modular component structure separating concerns: nodes, channel, protocols, metrics
+    \item Accurate modeling of IEEE 802.11 DCF: carrier sensing, DIFS, backoff, collisions
+    \item Buoy state machine implementing CSMA/CA transmission sequence
+    \item Distance-based probabilistic channel model calibrated from real sea trials
+    \item Implementation of SBP and ADAB protocols with extensible scheduler design
+    \item Dynamic population management to model node churn
+    \item Comprehensive metrics collection including B-PDR and collision rates
+    \item Configuration management enabling reproducible experiments
+    \item Validation through unit tests, integration tests, and sanity checks
+    \item Extensible design supporting future protocols, channel models, and applications
+\end{itemize}
+
+The simulator provides a controlled, reproducible platform for evaluating broadcast-based proximity detection protocols under varying conditions. The next chapter will present the experimental methodology and results obtained using this simulator.

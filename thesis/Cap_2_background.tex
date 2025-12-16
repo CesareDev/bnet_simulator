@@ -1,41 +1,353 @@
-% Put in this section all the background knowledge needed to understand what you did.
 \chapter{Background}
 \label{chap:background}
 
-\begin{comment}
-This chapter provides the **theoretical and technological foundations** needed to understand the thesis.
+This chapter provides the theoretical and technological foundations necessary to understand the problem domain, the proposed solution approach, and the methodology employed in this thesis. We begin by reviewing existing maritime safety technologies and their limitations for proximity detection. We then introduce Wi-Fi as an alternative technology, explain the relevant IEEE 802.11 MAC layer fundamentals, and discuss beaconing strategies in wireless networks. Finally, we examine the role of simulation in wireless protocol research and justify the need for a custom simulator.
 
-- **Marine and coastal safety technologies**
-    
-    - Limitations of AIS, EPIRBs, PLBs, satellite-based systems.
-        
-    - Why these are unsuitable for continuous proximity awareness.
-        
-- **Wi-Fi for proximity detection**
-    
-    - Prior work on Wi-Fi-based discovery and passive monitoring.
-        
-    - Differences between infrastructure-based vs infrastructure-free settings.
-        
-- **802.11 MAC fundamentals**
-    
-    - Broadcast transmission, DCF, lack of ACKs, collision behavior.
-        
-    - Why broadcast reliability is the correct performance focus.
-        
-- **Beaconing strategies**
-    
-    - Static beaconing and its scaling limits.
-        
-    - Overview of adaptive beaconing in ad-hoc and vehicular networks.
-        
-- **Simulation in wireless research**
-    
-    - Role of simulators in exploring scalability, density, and protocol behavior.
-        
-    - Limitations of generic simulators for niche scenarios like over-water Wi-Fi broadcast.
-        
+\section{Maritime and Coastal Safety Technologies}
 
-This chapter justifies **why a custom simulator is needed** and why existing tools are insufficient.
-\end{comment}
-% Utlizing the comments above try to write the chapter. And also explain the tecnical terms included. Maybe with online references usign LaTeX formatting and commands. you can use also the paper.pdf
+Maritime safety systems have evolved significantly over the past decades, but most technologies are designed for large vessels and long-range communication rather than short-range proximity awareness.
+
+\subsection{Automatic Identification System (AIS)}
+
+The Automatic Identification System (AIS)\footnote{\url{https://www.imo.org/en/OurWork/Safety/Pages/AIS.aspx}} is a tracking system mandated by the International Maritime Organization (IMO) for vessels over 300 gross tonnage on international voyages and all passenger ships. AIS broadcasts vessel identification, position, course, and speed using VHF marine band frequencies (161.975 MHz and 162.025 MHz).
+
+While AIS is highly effective for ship-to-ship awareness and collision avoidance in open waters, it has several limitations for coastal proximity detection:
+
+\begin{itemize}
+    \item \textbf{Cost and size:} AIS transponders are relatively expensive and require dedicated equipment not typically carried by recreational users, swimmers, or small watercraft.
+    \item \textbf{Regulatory requirements:} AIS is not mandated for small vessels, and its use requires proper licensing in many jurisdictions.
+    \item \textbf{Power consumption:} Continuous VHF transmission is power-intensive, making it unsuitable for battery-powered wearable devices.
+    \item \textbf{Detection granularity:} AIS update rates (2-10 seconds for moving vessels) are designed for large vessel navigation, not immediate proximity awareness at short ranges.
+\end{itemize}
+
+\subsection{Emergency Position Indicating Radio Beacons (EPIRBs) and Personal Locator Beacons (PLBs)}
+
+EPIRBs and PLBs\footnote{\url{https://www.sarsat.noaa.gov/emerbcns.html}} are satellite-based emergency distress systems that transmit signals on 406 MHz to the Cospas-Sarsat satellite system. When activated, these devices alert search and rescue services and provide location information.
+
+These systems are essential for emergency response but are fundamentally unsuitable for continuous proximity awareness:
+
+\begin{itemize}
+    \item \textbf{Emergency-only operation:} EPIRBs and PLBs are designed for distress situations, not routine proximity detection. False alarms incur significant costs and legal consequences.
+    \item \textbf{Latency:} Satellite relay introduces delays of several minutes, far too slow for collision avoidance.
+    \item \textbf{Unidirectional communication:} These devices transmit to satellites but do not provide local awareness to nearby vessels.
+    \item \textbf{Cost:} Specialized emergency beacons are prohibitively expensive for widespread recreational use.
+\end{itemize}
+
+\subsection{Cellular and GPS-based Tracking}
+
+Smartphone applications with GPS and cellular connectivity can provide location tracking and proximity alerts. However, these solutions face critical limitations in coastal environments:
+
+\begin{itemize}
+    \item \textbf{Network dependency:} Cellular coverage is often unreliable or absent in coastal waters, even relatively close to shore.
+    \item \textbf{Infrastructure requirement:} These systems require functioning cellular infrastructure and internet connectivity.
+    \item \textbf{Latency and reliability:} Network congestion and limited bandwidth can introduce delays or failures in critical safety alerts.
+    \item \textbf{Battery consumption:} Continuous GPS tracking and cellular data transmission rapidly drain smartphone batteries.
+\end{itemize}
+
+\subsection{The Gap in Proximity Detection}
+
+The common limitation across all these technologies is that they are either too expensive, too infrastructure-dependent, or designed for different use cases than continuous, short-range proximity awareness. Swimmers, kayakers, divers, and operators of small watercraft remain largely invisible to larger vessels in coastal environments. This creates a critical safety gap that requires low-cost, infrastructure-free, and energy-efficient solutions.
+
+\section{Wi-Fi for Proximity Detection}
+
+Wi-Fi technology, standardized as IEEE 802.11\footnote{\url{https://standards.ieee.org/standard/802_11-2020.html}}, is ubiquitous in modern mobile devices and offers capabilities that align well with the requirements for coastal proximity detection.
+
+\subsection{Infrastructure-Free Wi-Fi Operations}
+
+Wi-Fi networks can operate in two primary modes:
+
+\begin{itemize}
+    \item \textbf{Infrastructure mode:} Devices connect to access points (APs) that coordinate network access and typically provide internet connectivity. This is the most common mode for home and enterprise networks.
+    \item \textbf{Ad-hoc mode (IBSS):} Devices form peer-to-peer networks without access points, communicating directly with each other.
+\end{itemize}
+
+For proximity detection, neither mode is ideal. Instead, devices can exploit Wi-Fi's \textbf{broadcast capability} to periodically transmit beacon frames that announce their presence. These frames can be received by any device within radio range without requiring association with a network or access point.
+
+\subsection{Wi-Fi Beaconing}
+
+In standard Wi-Fi infrastructure networks, access points periodically transmit beacon frames to advertise the network's presence and capabilities. These beacons contain the SSID (network name), supported data rates, and other network parameters.
+
+The same mechanism can be repurposed for proximity detection: mobile devices can transmit custom beacon-like frames containing:
+
+\begin{itemize}
+    \item Device identifier (e.g., MAC address or UUID)
+    \item Position information (GPS coordinates)
+    \item Device type and mobility status
+    \item Battery level
+    \item Neighboring device information
+\end{itemize}
+
+This approach offers several advantages:
+
+\begin{itemize}
+    \item \textbf{No infrastructure required:} Devices broadcast autonomously without needing access points or internet connectivity.
+    \item \textbf{Low cost:} Leverages existing Wi-Fi hardware present in virtually all smartphones and many wearable devices.
+    \item \textbf{Reasonable range:} Wi-Fi can achieve ranges of 100-300 meters in open environments, suitable for coastal proximity awareness.
+    \item \textbf{Energy efficiency:} Modern Wi-Fi chipsets support low-power modes for periodic transmission.
+\end{itemize}
+
+\subsection{Challenges in Wi-Fi-based Proximity Detection}
+
+Despite its promise, using Wi-Fi for safety-critical proximity detection presents significant challenges:
+
+\begin{itemize}
+    \item \textbf{Scalability:} Standard Wi-Fi protocols do not scale well to high-density scenarios where many devices broadcast simultaneously.
+    \item \textbf{Reliability:} Broadcast frames are not acknowledged in Wi-Fi, so senders have no feedback about delivery success.
+    \item \textbf{Collision handling:} The distributed coordination mechanism can lead to frequent collisions in dense environments, reducing effective broadcast range and reliability.
+    \item \textbf{Interference:} Coastal environments may have interference from other Wi-Fi networks, marine equipment, and environmental factors.
+\end{itemize}
+
+The core technical challenge is improving broadcast reliability and scalability while maintaining the advantages of infrastructure-free operation.
+
+\section{IEEE 802.11 MAC Layer Fundamentals}
+
+To understand the scalability challenges and potential solutions, we must examine the Medium Access Control (MAC) layer of the IEEE 802.11 standard.
+
+\subsection{Distributed Coordination Function (DCF)}
+
+The IEEE 802.11 MAC layer uses the Distributed Coordination Function (DCF)\footnote{IEEE 802.11-2020 Standard, Section 9.3.2} as its fundamental access method. DCF is based on Carrier Sense Multiple Access with Collision Avoidance (CSMA/CA), which operates as follows:
+
+\begin{enumerate}
+    \item \textbf{Carrier Sense:} Before transmitting, a station listens to the channel to determine if it is idle or busy.
+    \item \textbf{Backoff mechanism:} If the channel is busy, the station defers transmission and enters a backoff procedure.
+    \item \textbf{Random backoff:} The station selects a random backoff counter from a contention window (CW) and decrements it while the channel is idle.
+    \item \textbf{Transmission:} When the backoff counter reaches zero, the station transmits its frame.
+\end{enumerate}
+
+\subsection{Contention Window and Binary Exponential Backoff}
+
+The contention window (CW) determines the range from which the random backoff value is selected. In standard 802.11:
+
+\begin{itemize}
+    \item Initial CW: $\text{CW}_{\min} = 15$ (for 802.11b/g/n in 2.4 GHz)
+    \item After each collision: $\text{CW} = \min(2 \times \text{CW} + 1, \text{CW}_{\max})$
+    \item Maximum CW: $\text{CW}_{\max} = 1023$
+    \item After successful transmission: CW resets to $\text{CW}_{\min}$
+\end{itemize}
+
+The backoff time is calculated as:
+$$T_{\text{backoff}} = \text{Random}(0, \text{CW}) \times \text{SlotTime}$$
+
+where SlotTime = 20 $\mu$s for 802.11b and 9 $\mu$s for 802.11g/n in 2.4 GHz.
+
+\subsection{Broadcast Transmission and Acknowledgments}
+
+A critical distinction in Wi-Fi is the handling of unicast versus broadcast frames:
+
+\begin{itemize}
+    \item \textbf{Unicast:} When a station transmits a unicast frame, the receiver sends an acknowledgment (ACK). If no ACK is received, the sender assumes collision and retransmits with an increased contention window.
+    \item \textbf{Broadcast:} Broadcast frames are \textbf{never acknowledged}. The sender has no feedback about delivery success and cannot detect collisions.
+\end{itemize}
+
+For broadcast-based proximity detection, this means:
+
+\begin{itemize}
+    \item Senders cannot use the binary exponential backoff mechanism to adapt to collisions.
+    \item The contention window remains at $\text{CW}_{\min}$ for all broadcasts.
+    \item Hidden terminal problems and simultaneous transmissions lead to silent failures.
+\end{itemize}
+
+\subsection{The Hidden Terminal Problem}
+
+The hidden terminal problem\footnote{Tobagi, F.A., and Kleinrock, L. "Packet Switching in Radio Channels: Part II—The Hidden Terminal Problem in Carrier Sense Multiple-Access and the Busy-Tone Solution." IEEE Transactions on Communications, 1975.} occurs when two stations are out of range of each other but both within range of a common receiver. Both stations may sense the channel as idle and transmit simultaneously, causing a collision at the receiver.
+
+In infrastructure mode, Wi-Fi mitigates this using RTS/CTS (Request to Send/Clear to Send) handshaking. However, RTS/CTS cannot be used for broadcast frames, making hidden terminals particularly problematic for infrastructure-free proximity detection.
+
+\subsection{Collision Probability in Dense Networks}
+
+As the number of active nodes increases, the probability of collision grows rapidly. For $n$ nodes, each attempting to transmit with probability $p$ in a given time slot, the probability that a transmission succeeds (no collision) is approximately:
+
+$$P_{\text{success}} = n \cdot p \cdot (1-p)^{n-1}$$
+
+This is maximized when $p = 1/n$, giving $P_{\text{success}} \approx 1/e \approx 0.37$ as $n \to \infty$. In practice, with fixed contention parameters, $p$ does not adapt optimally, and performance degrades as density increases.
+
+\section{Beaconing Strategies in Wireless Networks}
+
+Periodic beaconing is a fundamental communication pattern in wireless networks, used for neighbor discovery, routing maintenance, and awareness dissemination.
+
+\subsection{Static Beaconing}
+
+Static (or fixed-interval) beaconing is the simplest approach: each node transmits a beacon at regular, predetermined intervals, regardless of network conditions. For example, a node might transmit every 1 second.
+
+\textbf{Advantages:}
+\begin{itemize}
+    \item Simple to implement
+    \item Predictable behavior
+    \item No computational overhead
+\end{itemize}
+
+\textbf{Disadvantages:}
+\begin{itemize}
+    \item Poor scalability: Fixed intervals do not adapt to network density
+    \item High collision rate in dense scenarios
+    \item Inefficient in sparse scenarios (wastes energy with unnecessary frequent transmissions)
+    \item No mechanism to reduce congestion when many nodes are present
+\end{itemize}
+
+\subsection{Adaptive Beaconing}
+
+Adaptive beaconing strategies adjust transmission intervals based on local conditions to improve efficiency and reliability. Various adaptation mechanisms have been proposed in the literature for ad-hoc and vehicular networks:
+
+\begin{itemize}
+    \item \textbf{Density-based:} Increase intervals when many neighbors are detected to reduce congestion\footnote{Takai, M., et al. "Directional virtual carrier sensing for directional antennas in mobile ad hoc networks." ACM MobiHoc, 2002.}
+    \item \textbf{Mobility-based:} Adjust intervals based on relative velocity to neighboring nodes\footnote{Ghandour, A.J., et al. "Adaptive beaconing for collision avoidance in vehicular networks." IEEE VTC, 2010.}
+    \item \textbf{Context-aware:} Consider multiple factors such as density, mobility, and application requirements\footnote{Sommer, C., et al. "Adaptive beaconing for delay-sensitive and congestion-aware traffic information systems." IEEE VNC, 2010.}
+    \item \textbf{Backoff adaptation:} Adjust MAC-layer contention parameters rather than beacon intervals
+\end{itemize}
+
+For proximity detection in maritime environments, the key challenge is maintaining reliability (ensuring beacons reach nearby nodes) while reducing collisions in dense areas.
+
+\subsection{Adaptive Dynamic Adjustment of Backoff (ADAB)}
+
+The Adaptive Dynamic Adjustment of Backoff (ADAB) protocol is a backoff adaptation mechanism designed for density-aware beaconing. Rather than modifying beacon intervals, ADAB adjusts the MAC-layer backoff parameters based on local density estimates.
+
+The key idea is:
+\begin{itemize}
+    \item In low-density scenarios: Use shorter backoff intervals to reduce latency
+    \item In high-density scenarios: Use longer backoff intervals to reduce collision probability
+\end{itemize}
+
+ADAB achieves this by dynamically computing the backoff interval as a function of the number of neighbors observed. A higher neighbor count indicates higher local density, triggering a longer backoff to spread transmissions over time and reduce the collision probability.
+
+The density score is computed as:
+$$\text{density\_score} = \min\left(1.0, \frac{n_{\text{neighbors}}}{N_{\text{threshold}}}\right)$$
+
+where $N_{\text{threshold}}$ is a tunable parameter (e.g., 15 neighbors). The backoff interval is then calculated as:
+
+$$BI = BI_{\min} + (\text{density\_score})^2 \times (BI_{\max} - BI_{\min})$$
+
+with added random jitter to prevent synchronization. This approach provides smooth adaptation to changing density conditions without requiring global coordination or infrastructure support.
+
+\section{Simulation in Wireless Network Research}
+
+Simulation plays a crucial role in wireless network protocol development and evaluation. Physical experiments with many nodes are expensive, time-consuming, and difficult to control for reproducibility.
+
+\subsection{Role of Network Simulators}
+
+Network simulators enable researchers to:
+
+\begin{itemize}
+    \item \textbf{Explore scalability:} Test protocols with varying numbers of nodes without physical deployment
+    \item \textbf{Control environment:} Precisely define network topology, mobility patterns, and channel conditions
+    \item \textbf{Reproduce experiments:} Repeat experiments with identical conditions for statistical analysis
+    \item \textbf{Rapid prototyping:} Test multiple protocol variants quickly before physical implementation
+    \item \textbf{Measure internal state:} Observe protocol behavior that is difficult or impossible to measure in real systems
+\end{itemize}
+
+\subsection{Common Wireless Network Simulators}
+
+Several well-established simulators are widely used in wireless network research:
+
+\begin{itemize}
+    \item \textbf{ns-3}\footnote{\url{https://www.nsnam.org/}}: A discrete-event network simulator with detailed models of TCP/IP, wireless protocols (802.11, LTE, 5G), and mobility patterns. Widely used in academic research but has a steep learning curve.
+    \item \textbf{OMNeT++}\footnote{\url{https://omnetpp.org/}}: A modular discrete-event simulator with extensive libraries for network simulation (INET framework). Highly flexible but requires significant configuration.
+    \item \textbf{OPNET}\footnote{Now discontinued, succeeded by Riverbed Modeler}: A commercial simulator with comprehensive protocol libraries and GUI-based modeling.
+\end{itemize}
+
+\subsection{Limitations of Generic Simulators}
+
+While these simulators are powerful and comprehensive, they present challenges for specialized research scenarios:
+
+\begin{itemize}
+    \item \textbf{Complexity:} General-purpose simulators include vast protocol stacks and configuration options, much of which is irrelevant for specific research questions.
+    \item \textbf{Learning curve:} Significant time investment is required to master the simulator's architecture, APIs, and configuration systems.
+    \item \textbf{Customization overhead:} Implementing custom protocols or non-standard behaviors requires deep understanding of the simulator's internals and may involve working around assumptions built into the framework.
+    \item \textbf{Performance:} General-purpose simulators carry overhead from features not needed for specific experiments.
+    \item \textbf{Reproducibility concerns:} Complex simulators have many configuration options and internal states that can affect results in subtle ways, making exact reproduction difficult across different simulator versions.
+\end{itemize}
+
+\subsection{The Case for Custom Simulators}
+
+For focused research questions—such as evaluating MAC-layer adaptations for broadcast-based proximity detection—a custom simulator offers advantages:
+
+\begin{itemize}
+    \item \textbf{Focused scope:} Include only the components needed for the research question, reducing complexity and development time.
+    \item \textbf{Transparency:} Complete control over all aspects of the simulation model enables understanding and validation of behavior.
+    \item \textbf{Flexibility:} Easily modify protocol logic and channel models without navigating complex framework constraints.
+    \item \textbf{Reproducibility:} Simpler codebase with fewer dependencies makes results easier to reproduce and verify.
+    \item \textbf{Performance:} Streamlined implementation can be more efficient for specific scenarios.
+\end{itemize}
+
+The key trade-off is that custom simulators require validation to ensure that simplified models accurately capture the phenomena of interest. However, for research focused on specific protocol mechanisms rather than comprehensive system evaluation, this approach is often more practical and scientifically sound.
+
+\section{Related Work}
+
+This section reviews prior research relevant to the problem of infrastructure-free proximity detection in coastal environments, examining work in three key areas: Wi-Fi-based proximity detection systems, maritime communication architectures, and adaptive beaconing protocols.
+
+\subsection{Wi-Fi-Based Proximity Detection}
+
+Prior work on short-range proximity detection using Wi-Fi has largely focused on urban and mobile environments rather than maritime settings. Wi-Fi-based systems for device discovery and passive tracking have been proposed using both infrastructure-based and peer-to-peer models.
+
+Goel and Patel~\cite{goel2020wifi} demonstrate the feasibility of passive Wi-Fi monitoring for real-time user localization using mobile phones in wild (uncontrolled) environments. Their work shows that Wi-Fi signals can be reliably used for proximity estimation in urban settings where infrastructure is available. However, their approach assumes the presence of access points and stable power sources, which are not available in coastal waters.
+
+Similarly, device-to-device beaconing has been explored in applications ranging from mobile social discovery to vehicular safety systems~\cite{zhao2019adaptive, chen2018beacon}. These systems leverage periodic beaconing to announce presence and enable proximity-aware applications. Zhao et al.~\cite{zhao2019adaptive} propose an adaptive beaconing strategy for vehicular networks based on local topology and channel status, demonstrating that context-aware adaptation can improve reliability in mobile scenarios.
+
+However, these approaches typically assume:
+\begin{itemize}
+    \item Stable or rechargeable power sources (vehicles, plugged-in devices)
+    \item Dense device deployments with frequent connectivity
+    \item The presence of infrastructure (access points, roadside units)
+    \item Bidirectional communication with acknowledgment mechanisms
+\end{itemize}
+
+In contrast, proximity detection for maritime safety must operate in infrastructure-less environments with passive reception, intermittent connectivity, and energy-constrained battery-powered nodes. Moreover, instead of focusing on precise localization or high-throughput communication, the primary goal is reliable and low-latency detection of presence within a safety-critical range (50-100 meters).
+
+\subsection{Communication Systems in Marine and Coastal Settings}
+
+In the maritime domain, existing research has explored communication architectures primarily for environmental monitoring, oceanographic data collection, and long-range offshore connectivity rather than proximity-based safety.
+
+Most maritime communication proposals rely on satellite, cellular, or long-range radio technologies~\cite{huang2019maritime, lee2021design}. Huang et al.~\cite{huang2019maritime} survey maritime communication networking for the Ocean Internet of Things, identifying challenges and opportunities for connecting offshore sensors and monitoring systems. Their focus is on long-range data collection rather than short-range collision avoidance.
+
+Lee et al.~\cite{lee2021design} describe the design and implementation of an IoT-enabled real-time marine environmental monitoring system. These systems typically employ cellular or satellite links for data transmission to shore-based servers. While appropriate for periodic data collection and telemetry, such architectures introduce significant latency, require continuous connectivity to remote infrastructure, and consume substantial power—all characteristics that make them unsuitable for real-time, short-range alerting in low-power wearable devices.
+
+Internet-of-Things (IoT) buoys have been developed for ocean sensing applications, but these systems typically assume:
+\begin{itemize}
+    \item Fixed or semi-permanent deployments at specific monitoring locations
+    \item High-latency data transfers (minutes to hours)
+    \item Connection to shore-based infrastructure for data processing
+    \item Large form factors with solar panels or substantial battery capacity
+\end{itemize}
+
+The ProSafe approach differs fundamentally by focusing on discovery of mobile, low-latency opportunistic devices in short range (50-100 meters) using unmodified Wi-Fi radios in ad-hoc mode. The emphasis is on proximity-based safety in dynamic and user-driven environments—swimmers, kayakers, and recreational users—rather than stationary environmental monitoring or broadband connectivity for data collection.
+
+\subsection{Adaptive Beaconing and MAC-Level Control}
+
+Beaconing strategies in ad-hoc and vehicular networks have been extensively studied, particularly in the context of VANETs (Vehicular Ad-Hoc Networks) where periodic beaconing is essential for cooperative awareness and collision avoidance.
+
+Chen and Zhuang~\cite{chen2018beacon} provide a comprehensive survey of beacon scheduling for device discovery in wireless networks, reviewing various strategies including fixed-interval, randomized, and adaptive approaches. They identify that adaptive schemes can significantly improve network efficiency by responding to changing conditions such as node density, mobility patterns, and channel quality.
+
+Conti et al.~\cite{conti2016energy} propose energy-aware beaconing mechanisms for mobile ad-hoc networks that balance discovery latency with energy consumption. Their work demonstrates that adaptive interval selection based on local context can reduce overall network energy expenditure while maintaining connectivity.
+
+Zhao et al.~\cite{zhao2019adaptive} present an adaptive beaconing strategy for VANETs based on local topology and channel status. Their approach adjusts beacon intervals dynamically using feedback from channel measurements and neighbor information, showing improved reliability in high-density vehicular scenarios.
+
+However, these adaptive strategies are typically designed for more complex network environments and often assume:
+\begin{itemize}
+    \item Bidirectional communication with acknowledgments or feedback
+    \item Association between nodes or with infrastructure
+    \item Coordinated medium access or centralized scheduling
+    \item Complex protocol stacks with IP-level routing
+\end{itemize}
+
+The ADAB protocol employed in ProSafe builds on the conceptual foundation of density-aware adaptation but simplifies the approach for the unique constraints of maritime proximity detection. ADAB operates entirely at the MAC layer without requiring node association or coordination, uses only locally observable information (neighbor count), and functions in a pure one-way broadcast model without acknowledgments. This simplicity is essential for deployment on resource-constrained devices and for ensuring robustness in the challenging coastal radio environment.
+
+\subsection{Gap Analysis}
+
+The literature review reveals a clear gap: while Wi-Fi proximity detection has been studied in urban environments, maritime communication systems focus on long-range connectivity, and adaptive beaconing has been explored in vehicular networks, \textbf{no prior work addresses infrastructure-free, short-range, broadcast-based proximity detection for coastal safety with energy-constrained wearable devices}.
+
+This thesis contributes to filling this gap by developing a custom simulator specifically designed to evaluate MAC-layer adaptations for broadcast-based proximity detection in open-water environments, and by demonstrating the effectiveness of simple density-aware backoff mechanisms in this context.
+
+\section{Summary}
+
+This chapter has established the foundations for understanding the problem addressed in this thesis:
+
+\begin{itemize}
+    \item Existing maritime safety technologies (AIS, EPIRBs, PLBs, cellular) are unsuitable for continuous, short-range proximity detection due to cost, infrastructure requirements, or intended use cases.
+    \item Wi-Fi offers a promising alternative by leveraging ubiquitous hardware for infrastructure-free broadcast communication.
+    \item The IEEE 802.11 MAC layer uses CSMA/CA with fixed parameters that do not scale well to dense broadcast scenarios.
+    \item Broadcast frames lack acknowledgments, preventing standard collision detection and backoff adaptation mechanisms.
+    \item Adaptive beaconing strategies can improve scalability by adjusting transmission behavior based on local conditions.
+    \item Prior work has explored related concepts but not the specific combination of constraints present in coastal proximity detection.
+    \item Custom simulators provide a practical and scientifically valid approach for evaluating specific protocol mechanisms.
+\end{itemize}
+
+With this background in place, the next chapter will describe the ProSafe system and the ADAB protocol in detail, explaining how adaptive backoff addresses the scalability challenges identified here.
