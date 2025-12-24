@@ -1,62 +1,62 @@
 \chapter{The ProSafe System and ADAB Protocol}
 \label{chap:prosafe}
 
-This chapter presents the ProSafe system architecture and the Adaptive Density-Aware Beaconing (ADAB) protocol, which form the case study for evaluating the simulator developed in this thesis. We begin by describing the overall system design and its operational requirements, then detail the communication model and beacon structure, and finally present both the static baseline protocol and the adaptive ADAB mechanism.
+This chapter introduce the ProSafe system and the Adaptive Density-Aware Beaconing (ADAB) protocol, which form the case study for evaluating the simulator developed in this thesis. We begin by describing the overall system design and its requirements, then detail the communication model and beacon structure, and finally present both the static baseline protocol and the adaptive ADAB mechanism.
 
 \section{System Overview}
 
-ProSafe (Proximity-based Safety) is a minimalist, Wi-Fi-based safety network designed to enable vessels to detect people in the water through smart buoys that broadcast periodic, location-aware beacons. The system operates in a fully infrastructure-free manner within a local ad-hoc IEEE 802.11 domain, where all alerts are generated and handled locally without relying on central coordination or internet connectivity.
+ProSafe (Proximity-based Safety) is a minimalist, Wi-Fi-based safety network designed to enable vessels to detect people in the water through smart buoys that broadcast periodic, location aware beacons. The system operates in a fully infrastructure free manner within a local ad hoc IEEE 802.11~\cite{ieee802IEEE80211} domain, where all alerts are generated and handled locally without relying on central coordination or internet connectivity.
 
 \subsection{Design Principles}
 
-The ProSafe system is built around several key design principles that address the unique requirements of coastal safety applications:
+The ProSafe system is built around several design principles that address the unique requirements of coastal safety applications:
 
 \begin{enumerate}
-    \item \textbf{Infrastructure-free operation:} No access points, routers, or internet connectivity required. The system must function in remote coastal areas where no infrastructure exists.
+    \item \textbf{Infrastructure free operation:} No access points, routers, or internet connectivity required. The system must function in remote coastal areas where no infrastructure exists.
     
-    \item \textbf{Pure broadcast communication:} All beaconing operates at the MAC layer using broadcast data frames, avoiding the complexity and overhead of association, routing, and IP-level protocols.
+    \item \textbf{Pure broadcast communication:} All beaconing operates at the MAC layer using broadcast data frames, avoiding the complexity and overhead of IP level protocols.
     
-    \item \textbf{Passive vessel detection:} Vessels listen passively for buoy beacons without transmitting, maintaining simplicity and avoiding regulatory complications for receiving equipment.
+    \item \textbf{Passive vessel detection:} Vessels listen passively for buoy beacons without transmitting, maintaining simplicity and avoiding complications for receiving equipment.
     
-    \item \textbf{Low-cost commodity hardware:} Leverage widely available IEEE 802.11 chipsets and devices (smartphones, single-board computers) to minimize deployment cost and maximize accessibility.
+    \item \textbf{Low cost hardware:} Leverage widely available IEEE 802.11 chipsets and devices (smartphones, single-board computers) to minimize deployment cost and maximize accessibility.
     
-    \item \textbf{Energy efficiency:} Battery-powered buoys must operate for extended periods (hours) on limited energy, requiring careful management of transmission frequency and power consumption.
+    \item \textbf{Energy efficiency:} Battery-powered buoys must operate for extended periods (hours) on limited energy, requiring management of transmission frequency and power consumption.
 \end{enumerate}
 
 \subsection{System Components}
 
-The ProSafe architecture consists of two primary components, as illustrated in the paper:
+The ProSafe architecture consists of two primary components:
 
 \subsubsection{Smart User Buoys}
 
-Smart User Buoys are compact floating devices carried or worn by swimmers, snorkelers, kayakers, or divers. Each buoy serves both as a visible marker and as an electronic beacon that advertises its presence and position through periodic Wi-Fi broadcasts while being towed during water activities.
+Smart User Buoys are compact floating devices carried or worn by swimmers, snorkelers, kayakers, or divers. Each buoy serves both as a visible marker and as an electronic beacon that advertises its presence and position through periodic Wi-Fi broadcasts while being settled during water activities.
 
 A typical buoy integrates:
 \begin{itemize}
-    \item A single-board computer (e.g., Raspberry Pi) with Wi-Fi capability
+    \item A single board computer (e.g., Raspberry Pi~\cite{raspberrypiRaspberry}) with Wi-Fi capability
     \item A GPS module for position determination
     \item An Inertial Measurement Unit (IMU) for motion sensing
     \item A battery pack for autonomous operation
     \item A waterproof enclosure for marine environment protection
 \end{itemize}
 
-The buoy operates with a single Wi-Fi radio configured in ad-hoc mode, which both transmits beacons to announce its presence and listens for beacons from neighboring buoys. No internet connectivity or cellular network is required.
+The buoy operates with a single Wi-Fi radio configured in ad hoc mode, which both transmits beacons to announce its presence and listens for beacons from neighboring buoys. No internet connectivity or cellular network is required.
 
 Buoys support multiple beaconing modes:
 \begin{itemize}
-    \item \textbf{Static mode:} Fixed-interval beaconing with a predetermined constant interval
+    \item \textbf{Static mode:} Fixed interval beaconing with a predetermined constant interval
     \item \textbf{Adaptive mode (ADAB):} Dynamically adjusted intervals based on local node density
 \end{itemize}
 
 \subsubsection{Vessel Safety Unit}
 
-The Vessel Safety Unit is installed on boats and operates exclusively in passive listening mode. When a buoy beacon is received with a signal strength exceeding a configurable RSSI (Received Signal Strength Indicator) threshold, the unit issues audible and visual alerts to the vessel operator.
+The Vessel Safety Unit is installed on boats and operates exclusively in passive listening mode. When a buoy beacon is received with a signal strength exceeding a configurable RSSI (Received Signal Strength Indicator) threshold, the unit issues audible and visual alerts to the operator.
 
 The vessel unit can optionally display detected buoys on a map interface running on a tablet or smartphone connected to the unit, showing the estimated positions of swimmers in the vicinity. Because each beacon includes the sender's recent neighbor list, the vessel can also infer the presence of additional buoys indirectly, improving detection reliability when swimmers are intermittently obscured by waves or hull shadowing.
 
 \section{Communication Model}
 
-ProSafe performs proximity discovery entirely at the IEEE 802.11 MAC layer without requiring access points, association, or IP-level services.
+ProSafe performs proximity discovery entirely at the IEEE 802.11 MAC layer without requiring access points, association, or IP level services.
 
 \subsection{Beacon Frame Structure}
 
@@ -65,7 +65,7 @@ Beacons are short broadcast data frames (approximately 500 bytes) transmitted to
 \begin{itemize}
     \item \textbf{Buoy ID:} A unique identifier (UUID, 16 bytes) for the transmitting device
     \item \textbf{Role flag:} Indicates device type (mobile buoy, fixed buoy, vessel unit) (1 byte)
-    \item \textbf{Timestamp:} Transmission time for latency calculation (4 bytes)
+    \item \textbf{Timestamp:} Transmission time (4 bytes)
     \item \textbf{GPS coordinates:} Current position (latitude, longitude) (8 bytes)
     \item \textbf{Battery level:} Remaining energy percentage (4 bytes)
     \item \textbf{Neighbor list:} Recently heard neighbors with their timestamps and positions (28 bytes per neighbor)
@@ -77,7 +77,7 @@ The total beacon size varies with the number of neighbors included but typically
 
 \subsection{MAC Layer Operation}
 
-Channel access follows the standard IEEE 802.11 Distributed Coordination Function (DCF) mechanism described in Chapter~\ref{chap:background}:
+Channel access follows the standard IEEE 802.11 Distributed Coordination Function (DCF)~\cite{dcf} mechanism described in Chapter~\ref{chap:background}:
 
 \begin{enumerate}
     \item \textbf{Carrier sense:} Before transmitting, a buoy senses the channel to determine if it is idle or busy
@@ -86,7 +86,7 @@ Channel access follows the standard IEEE 802.11 Distributed Coordination Functio
     \item \textbf{Transmission:} When the backoff counter reaches zero and the channel remains idle, transmit the beacon frame
 \end{enumerate}
 
-Critically, \textbf{no RTS/CTS handshaking or acknowledgments} are used. This is appropriate for broadcast frames and keeps the protocol simple, but it also means that:
+\textbf{No RTS/CTS handshaking or acknowledgments} are used. This is appropriate for broadcast frames and keeps the protocol simple, but it also means that:
 \begin{itemize}
     \item Senders have no feedback about delivery success
     \item Collisions are not detected by the sender
@@ -98,7 +98,7 @@ These limitations motivate the need for adaptive mechanisms that can respond to 
 
 \subsection{Physical Layer Parameters}
 
-To maximize over-water range and reliability, ProSafe targets widely available 2.4 GHz IEEE 802.11b/g/n chipsets and uses a robust legacy data rate:
+To maximize over-water range and reliability, ProSafe targets widely available 2.4 GHz IEEE 802.11b/g/n~\cite{ieee802IEEE80211} chipsets:
 
 \begin{itemize}
     \item \textbf{Frequency band:} 2.4 GHz (802.11b/g/n)
@@ -106,11 +106,11 @@ To maximize over-water range and reliability, ProSafe targets widely available 2
     \item \textbf{Modulation:} DBPSK (Differential Binary Phase Shift Keying) for 1 Mbps
 \end{itemize}
 
-The choice of 1 Mbps, though slower than modern rates, provides maximum range and robustness against fading and interference in the challenging over-water radio environment. Higher data rates can be used with newer hardware (802.11ax/6E, 802.11be/7) but the MAC-layer logic remains unchanged.
+The choice of 1 Mbps, though slower than modern rates, provides maximum range and robustness against fading and interference in the challenging over water radio environment. Higher data rates can be used with newer hardware (802.11ax/6E, 802.11be/7) but the MAC-layer logic remains unchanged.
 
 \subsection{Network Topology}
 
-Buoys form a pure peer-to-peer ad-hoc domain (IBSS-style) with no access point, router, or DHCP server. The network is inherently dynamic:
+Buoys form a pure peer to peer ad hoc domain (IBSS style~\cite{ipciscoWirelessPrinciples}) with no access point, router, or DHCP server. The network is intrinsically dynamic:
 
 \begin{itemize}
     \item Nodes enter and leave the communication range continuously due to water currents, waves, and mobility
@@ -119,7 +119,9 @@ Buoys form a pure peer-to-peer ad-hoc domain (IBSS-style) with no access point, 
     \item Neighbor entries expire if no beacon is heard within a timeout period (typically 3-5 times the beacon interval)
 \end{itemize}
 
-Beacons are primarily one-hop transmissions. However, to extend coverage, the system can optionally enable single-hop re-broadcasting: upon receiving a beacon, a node may retransmit it exactly once (TTL=1) to extend awareness to nodes that did not hear the original transmission. This provides limited multi-hop reach while bounding channel load.
+\textbf{Here we can describe the multihop feature: forward vs append}
+
+% Beacons are primarily one-hop transmissions. However, to extend coverage, the system can optionally enable single-hop re-broadcasting: upon receiving a beacon, a node may retransmit it (TTL=1) to extend awareness to nodes that did not hear the original transmission. This provides limited multi-hop reach while bounding channel load.
 
 \section{Static Beaconing Protocol (SBP)}
 
@@ -127,7 +129,7 @@ The Static Beaconing Protocol (SBP) serves as a baseline for comparison. In SBP,
 
 \subsection{Protocol Operation}
 
-SBP operation is straightforward:
+SBP operation is simple and described as follows:
 
 \begin{enumerate}
     \item Initialize a timer with interval $BI_{\text{static}}$ (e.g., 1.0 second)
@@ -150,7 +152,6 @@ SBP uses standard DCF parameters:
     \item DIFS = 50 $\mu$s
     \item Slot time = 20 $\mu$s (for 802.11b)
     \item Contention window: CW = 16 (fixed, no exponential backoff since broadcasts are not acknowledged)
-    \item No RTS/CTS or ACK frames
 \end{itemize}
 
 The random backoff is selected uniformly from [0, 15] slots, yielding a backoff time between 0 and 300 $\mu$s.
@@ -162,7 +163,6 @@ The random backoff is selected uniformly from [0, 15] slots, yielding a backoff 
     \item Simple implementation with minimal computational overhead
     \item Predictable, deterministic behavior
     \item Discovery delay is bounded by $BI_{\text{static}}$
-    \item Well-understood performance characteristics
 \end{itemize}
 
 \textbf{Limitations:}
@@ -171,10 +171,7 @@ The random backoff is selected uniformly from [0, 15] slots, yielding a backoff 
     \item High collision rate in dense scenarios where many nodes transmit simultaneously
     \item No adaptation to changing network conditions
     \item Inefficient in sparse scenarios: Frequent transmissions waste energy when few neighbors are present
-    \item Fixed interval cannot balance the competing goals of low latency and low congestion
 \end{itemize}
-
-As demonstrated in the results presented in the paper, SBP's Broadcast Packet Delivery Ratio (B-PDR) degrades significantly as node density increases, dropping from approximately 95\% at 20 nodes to around 70\% at 300 nodes. This degradation motivates the need for adaptive mechanisms.
 
 \section{Adaptive Density-Aware Beaconing (ADAB)}
 

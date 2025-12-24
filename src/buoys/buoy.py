@@ -42,6 +42,7 @@ class Buoy:
         self.difs_time = cfg.get('csma', 'difs_time')
         self.slot_time = cfg.get('csma', 'slot_time')
         self.cw = cfg.get('csma', 'cw')
+        
         self.neighbor_timeout = cfg.get('scheduler', 'neighbor_timeout')
         self.world_width = cfg.get('world', 'width')
         self.world_height = cfg.get('world', 'height')

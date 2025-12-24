@@ -48,7 +48,6 @@ class ConfigHandler:
             'backoff_time_max': 0.016
         },
         'scheduler': {
-            'neighbor_timeout': 5.0,
             'beacon_min_interval': 1.0,
             'beacon_max_interval': 5.0,
             'static_interval': 1.0
@@ -75,4 +74,8 @@ class ConfigHandler:
                 yaml.dump(self.DEFAULT_CONFIG, f, default_flow_style=False, sort_keys=False)
     
     def get(self, section: str, key: str) -> Any:
+        # Special case: neighbor_timeout is calculated as 3 * static_interval
+        if section == 'scheduler' and key == 'neighbor_timeout':
+            static_interval = self._config.get('scheduler', {}).get('static_interval', 1.0)
+            return 3.0 * static_interval
         return self._config.get(section, {}).get(key)

@@ -3,57 +3,57 @@
 
 \section{Context and Motivation}
 
-Maritime safety in coastal and near-shore environments presents unique challenges for proximity detection systems. While large vessels are equipped with sophisticated technologies such as Automatic Identification System (AIS)\footnote{\url{https://www.imo.org/en/OurWork/Safety/Pages/AIS.aspx}} and radar systems, these solutions are ineffective for detecting swimmers, kayakers, divers, and other small watercraft. Cellular-based tracking applications require continuous network coverage, which is often unreliable or unavailable in coastal areas. This creates a critical safety gap where the most vulnerable maritime users remain invisible to larger vessels.
+Safety in coastal and near shore environments introduces challenges for proximity detection systems. Large ships are equipped with advanced technologies like Automatic Identification System (AIS)~\cite{imoTransponders} and radar systems. These systems are not built and designed for detecting swimmers, kayakers, divers, and other small craft. Cellular based tracking applications need continuous network coverage, which is often unstable or unavailable in these types of environment. This creates a critical safety gap where the most vulnerable maritime users remain invisible to larger craft.
 
-The need for infrastructure-free, short-range, low-cost proximity detection solutions is particularly pressing in busy coastal recreational areas. Traditional maritime safety systems are designed for large-scale navigation and ship-to-ship communication, leaving small craft and swimmers without adequate technological protection.
+Given that, there is a need for infrastructure free (e.g., not relying on cellular or satellite networks, peer to peer), short range, low cost, moneywise and energywise proximity detection solutions which is particularly important in busy coastal areas. Traditional maritime safety systems are designed for large scale navigation and ship to ship communication, leaving small craft and swimmers without safety and acceptable protection.
 
 \section{Wi-Fi Beaconing as a Solution}
 
-Wi-Fi technology, ubiquitous in modern smartphones and wearable devices, offers a promising yet underexplored approach to maritime proximity detection. By leveraging Wi-Fi's broadcast capabilities, devices can periodically transmit beacon frames to announce their presence without requiring any network infrastructure or internet connectivity. This approach aligns perfectly with the requirements of coastal safety: it is low-cost, widely available, and operates independently of cellular or satellite networks.
+Wi-Fi technology, found in every modern smartphones and wearable devices, offers a promising yet underexplored approach to maritime proximity detection. Using Wi-Fi's broadcast capabilities, devices can periodically transmit beacon frames to tell their presence without requiring any network infrastructure or internet connectivity. This approach fits very well with the demands of coastal safety: it is low costand and operates independently of cellular or satellite networks.
 
-However, Wi-Fi was not originally designed for safety-critical broadcast applications. The standard IEEE 802.11 protocol uses a Distributed Coordination Function (DCF) with fixed parameters that do not adapt to network conditions. When multiple nodes attempt to transmit simultaneously in a dense environment, the probability of collisions increases dramatically, leading to reduced reliability—a critical concern for safety applications.
+However, Wi-Fi was not originally designed for safety critical broadcast applications. The standard IEEE 802.11~\cite{ieee802IEEE80211} protocol uses a Distributed Coordination Function (DCF)~\cite{dcf}, which is a scheduling algorithm with constant parameters, that doesn't adapt to these particular conditions. When multiple nodes attempt to transmit simultaneously in a dense environment, the probability of collisions increases, reducing reliability.
 
 \section{The Scalability Challenge}
 
-The core technical challenge addressed in this thesis is the poor scalability of fixed-parameter beaconing protocols in high-density scenarios. In standard Wi-Fi, all stations contend for the medium using a Carrier Sense Multiple Access with Collision Avoidance (CSMA/CA) mechanism with predetermined backoff parameters. As the number of active nodes increases, the collision probability rises, and the effective broadcast delivery ratio deteriorates.
+The technical challenge described and addressed in this thesis is the scalability of fixed parameter protocols in high node density scenarios. In standard Wi-Fi, all nodes contend for the medium using a Carrier Sense Multiple Access with well known Collision Avoidance (CSMA/CA)~\cite{networkacademyCollisionAvoidance} mechanism with predefined backoff parameters. As the number of nodes increases, the collision probability increases, and the delivery ratio decline.
 
-For maritime safety applications, this degradation is unacceptable. A missed beacon could mean the difference between a timely alert and a collision. Therefore, adaptive mechanisms that can dynamically adjust transmission behavior based on local conditions are essential to maintain reliability as node density varies.
+For maritime safety applications, this degradation is unacceptable. A lost beacon could mean the difference between an alert and a collision. Therefore, adaptive mechanisms that can dynamically adjust transmission behavior are needed to maintain reliability as node density varies.
 
 \section{Thesis Contribution}
 
-This thesis presents the design and implementation of a custom event-driven simulator specifically developed for evaluating proximity-based Wi-Fi safety systems. The simulator enables controlled, reproducible evaluation of adaptive MAC-layer beaconing protocols under various network conditions and density scenarios.
+This thesis presents the design and implementation of a custom simulator specifically developed for evaluating proximity based Wi-Fi safety systems. The simulator enables controlled, reproducible evaluation of adaptive MAC layer beaconing protocols under various network conditions and density scenarios.
 
-The primary contribution is the simulator itself as a scientific artifact that allows researchers to:
+The primary contribution is the simulator itself that allows researchers to:
 
 \begin{itemize}
-    \item Model and analyze Wi-Fi broadcast behavior in infrastructure-free networks
-    \item Evaluate the impact of node density on broadcast reliability
-    \item Test adaptive MAC-layer protocols without requiring large-scale physical deployments
-    \item Conduct reproducible experiments with precise control over network parameters
+    \item Model and analyze Wi-Fi broadcast behavior in infrastructure free networks
+    \item Evaluate the influence of node density on broadcast reliability
+    \item Test adaptive MAC layer protocols without requiring physical deployments
+    \item Plan reproducible experiments with control over the network parameters
 \end{itemize}
 
-To demonstrate the simulator's capabilities and validate its design, this thesis uses ProSafe (Proximity Safety) and its Adaptive Dynamic Adjustment of Backoff (ADAB) protocol as a concrete case study. ProSafe is a maritime proximity detection system that employs adaptive beaconing to maintain reliable communication in varying density conditions. The simulator was instrumental in generating the experimental results that demonstrate ADAB's effectiveness in improving scalability compared to fixed-parameter approaches.
+To demonstrate the simulator's capabilities and validate its design, this thesis uses ProSafe (Proximity Safety) and its Adaptive Dynamic Adjustment of Backoff (ADAB) protocol as a case study. ProSafe is a maritime proximity detection system that employs adaptive beacon scheduling to maintain reliable communication in various density scenario. The simulator was helping in generating the experimental results that demonstrate ADAB's effectiveness in improving scalability compared to fixed parameter approaches. The protocols will be described in detail in Chapter~\ref{chap:prosafe}.
 
 \section{Research Questions}
 
-This thesis addresses the following research questions:
+This thesis addresses the following questions:
 
 \begin{enumerate}
-    \item How does node density affect broadcast reliability in infrastructure-free Wi-Fi safety networks?
-    \item Can simple, local adaptation mechanisms improve scalability without requiring global coordination or infrastructure?
-    \item What simulation methodology and tools are appropriate for evaluating MAC-layer adaptations in broadcast-based proximity detection systems?
+    \item How does the node density affect reliability in infrastructure free networks?
+    \item Can straightforward local adaptation mechanisms improve scalability without requiring global coordination or infrastructure?
+    \item What simulation methodology and tools are appropriate for evaluating MAC layer adaptations in broadcast based proximity detection systems?
 \end{enumerate}
 
 \section{Thesis Structure}
 
-The remainder of this thesis is organized as follows:
+The srtucture of this thesis is organized as follows:
 
-\textbf{Chapter~\ref{chap:background}} provides background information on Wi-Fi protocol fundamentals, maritime safety requirements, and related work in proximity detection and adaptive MAC protocols.
+\textbf{Chapter~\ref{chap:background}} gives background information on Wi-Fi protocol fundamentals, maritime safety requirements, and discusses the related work.
 
 \textbf{Chapter~\ref{chap:prosafe}} describes the ProSafe system and the ADAB protocol, explaining the problem domain and the adaptive solution approach.
 
-\textbf{Chapter~\ref{chap:implementation}} presents the detailed design and implementation of the custom event-driven simulator, including its architecture, models, and validation approach.
+\textbf{Chapter~\ref{chap:implementation}} presents the design and implementation of the simulator used for evaluating the protocols, detailing its architecture and features.
 
-\textbf{Chapter~\ref{chap:results}} reports the experimental results obtained using the simulator, demonstrating the impact of density on broadcast reliability and the effectiveness of adaptive mechanisms.
+\textbf{Chapter~\ref{chap:results}} reports the experimental results obtained using the simulator, demonstrating the impact of node density on broadcast reliability and the effectiveness of adaptive mechanisms.
 
-\textbf{Chapter~\ref{chap:conclusion}} concludes the thesis with a summary of contributions, limitations, and directions for future work.
+\textbf{Chapter~\ref{chap:conclusion}} gives a summary of the thesis and describes contributions, limitations, and directions for future work.

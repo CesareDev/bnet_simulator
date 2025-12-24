@@ -28,6 +28,7 @@ class Simulator:
         self.first_change = True
         self.next_buoy_change = 0
         self.duration = duration if duration is not None else cfg.get('simulation', 'duration')
+        
         self.neighbor_timeout = cfg.get('scheduler', 'neighbor_timeout')
         self.comm_range_max = cfg.get('network', 'communication_range_max')
 
