@@ -135,15 +135,18 @@ class Buoy:
             self.state = BuoyState.RECEIVING
             self.simulator.schedule_event(sim_time, EventType.CHANNEL_SENSE, self)
         else:
-            backoff_slots = random.randint(0, self.cw - 1)
-            backoff_time = backoff_slots * self.slot_time
+            # Only generate new random backoff if we don't have remaining backoff
+            if self.backoff_remaining <= 0:
+                backoff_slots = random.randint(0, self.cw - 1)
+                backoff_time = backoff_slots * self.slot_time
+                self.backoff_time = backoff_time
+                self.backoff_remaining = backoff_time
+            # Otherwise, use the remaining backoff from previous interruption
             
-            self.backoff_time = backoff_time
-            self.backoff_remaining = backoff_time
             self.state = BuoyState.BACKOFF
             
             self.simulator.schedule_event(
-                sim_time + backoff_time, 
+                sim_time + self.backoff_remaining, 
                 EventType.BACKOFF_COMPLETION, 
                 self,
                 {"backoff_start_time": sim_time}
@@ -154,15 +157,19 @@ class Buoy:
             return
             
         if self.channel.is_busy(self.position, sim_time):
-            backoff_start = event.data.get("backoff_start_time", sim_time - self.backoff_time)
-            waited = sim_time - backoff_start
-            self.backoff_remaining = max(0, self.backoff_time - waited)
+            # Calculate how much backoff time we actually consumed
+            backoff_start = event.data.get("backoff_start_time", sim_time - self.backoff_remaining)
+            elapsed = sim_time - backoff_start
+            self.backoff_remaining = max(0, self.backoff_remaining - elapsed)
             self.state = BuoyState.RECEIVING
             
+            # Wait for channel to become idle, then resume with DIFS (which will resume backoff)
             self.simulator.schedule_event(
-                sim_time, EventType.CHANNEL_SENSE, self
+                sim_time + 0.01, EventType.CHANNEL_SENSE, self
             )
         else:
+            # Backoff completed successfully, transmit
+            self.backoff_remaining = 0.0  # Reset for next transmission
             self.simulator.schedule_event(
                 sim_time, EventType.TRANSMISSION_START, self
             )
@@ -175,6 +182,7 @@ class Buoy:
         success = self.channel.broadcast(beacon, sim_time)
         
         self.want_to_send = False
+        self.backoff_remaining = 0.0  # Reset backoff for next transmission cycle
         self.state = BuoyState.RECEIVING
         
         # Don't clear discovered_nodes - they persist like neighbors

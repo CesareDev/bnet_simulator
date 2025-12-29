@@ -5,23 +5,31 @@ This chapter introduce the ProSafe system and the Adaptive Density-Aware Beaconi
 
 \section{System Overview}
 
-ProSafe (Proximity-based Safety) is a minimalist, Wi-Fi-based safety network designed to enable vessels to detect people in the water through smart buoys that broadcast periodic, location aware beacons. The system operates in a fully infrastructure free manner within a local ad hoc IEEE 802.11~\cite{ieee802IEEE80211} domain, where all alerts are generated and handled locally without relying on central coordination or internet connectivity.
+ProSafe (Proximity-based Safety) is a minimalist, Wi-Fi based safety network designed to enable vessels to detect people in the water through smart buoys that broadcast periodic, location aware beacons. The system operates in a fully infrastructure free manner within a local ad hoc IEEE 802.11~\cite{ieee802IEEE80211} domain, where all alerts are generated and handled locally without relying on central coordination or internet connectivity.
 
 \subsection{Design Principles}
 
 The ProSafe system is built around several design principles that address the unique requirements of coastal safety applications:
 
-\begin{enumerate}
-    \item \textbf{Infrastructure free operation:} No access points, routers, or internet connectivity required. The system must function in remote coastal areas where no infrastructure exists.
-    
-    \item \textbf{Pure broadcast communication:} All beaconing operates at the MAC layer using broadcast data frames, avoiding the complexity and overhead of IP level protocols.
-    
-    \item \textbf{Passive vessel detection:} Vessels listen passively for buoy beacons without transmitting, maintaining simplicity and avoiding complications for receiving equipment.
-    
-    \item \textbf{Low cost hardware:} Leverage widely available IEEE 802.11 chipsets and devices (smartphones, single-board computers) to minimize deployment cost and maximize accessibility.
-    
-    \item \textbf{Energy efficiency:} Battery-powered buoys must operate for extended periods (hours) on limited energy, requiring management of transmission frequency and power consumption.
-\end{enumerate}
+\subsubsection{Infrastructure free operation}
+
+No access points, routers, or internet connectivity are required. The system must function in remote coastal areas where no infrastructure exists.
+
+\subsubsection{Pure broadcast communication}
+
+All beaconing operates at the MAC layer using broadcast data frames, avoiding the complexity and overhead of IP level protocols.
+
+\subsubsection{Passive vessel detection}
+
+Vessels listen passively for buoy beacons without transmitting, maintaining simplicity and avoiding complications for receiving control and equipment.
+
+\subsubsection{Low cost hardware}
+
+Leverage widely available IEEE 802.11 chipsets and devices (smartphones, single board computers) to minimize deployment cost and maximize accessibility.
+
+\subsubsection{Energy efficiency}
+
+Battery powered buoys must operate for extended periods (hours) on limited energy, requiring management of transmission frequency and power consumption.
 
 \subsection{System Components}
 
@@ -68,58 +76,45 @@ Beacons are short broadcast data frames (approximately 500 bytes) transmitted to
     \item \textbf{Timestamp:} Transmission time (4 bytes)
     \item \textbf{GPS coordinates:} Current position (latitude, longitude) (8 bytes)
     \item \textbf{Battery level:} Remaining energy percentage (4 bytes)
-    \item \textbf{Neighbor list:} Recently heard neighbors with their timestamps and positions (28 bytes per neighbor)
+    \item \textbf{Neighbor list:} Recently heard neighbors with their timestamps  and positions (28 bytes per neighbor). The list is dynamic so its length can vary 
 \end{itemize}
 
-The neighbor list enables indirect discovery: when buoy A receives a beacon from buoy B containing C in its neighbor list, A learns about C's existence and approximate position even if A has not directly received C's transmissions. This multi-hop awareness extends the effective detection range without requiring explicit forwarding protocols.
+The neighbor list enables indirect discovery: when buoy A receives a beacon from buoy B containing C in its neighbor list, A learns about C's existence and approximate position even if A has not directly received C's transmissions. This awareness extends the effective network coverage without requiring explicit forwarding steps.
 
-The total beacon size varies with the number of neighbors included but typically ranges from 100-500 bytes depending on local density.
+The total beacon size varies with the number of neighbors included but typically ranges from 100 to 500 bytes depending on local density.
 
 \subsection{MAC Layer Operation}
 
 Channel access follows the standard IEEE 802.11 Distributed Coordination Function (DCF)~\cite{dcf} mechanism described in Chapter~\ref{chap:background}:
 
 \begin{enumerate}
-    \item \textbf{Carrier sense:} Before transmitting, a buoy senses the channel to determine if it is idle or busy
-    \item \textbf{DIFS wait:} If the channel is idle, wait for a DCF Interframe Space (DIFS) period ($50~\mu$s)
-    \item \textbf{Random backoff:} Select a random backoff counter from the contention window [0, CW-1] where CW = 16
-    \item \textbf{Transmission:} When the backoff counter reaches zero and the channel remains idle, transmit the beacon frame
+    \item Before transmitting, a buoy senses the channel to determine if it is idle or busy
+    \item If the channel is idle, wait for a DCF Interframe Space (DIFS) period ($50~\mu$s)
+    \item Select a random backoff counter from the contention window [0, CW-1] where CW = 16
+    \item When the backoff counter reaches zero and the channel remains idle, transmit the beacon frame
 \end{enumerate}
 
-\textbf{No RTS/CTS handshaking or acknowledgments} are used. This is appropriate for broadcast frames and keeps the protocol simple, but it also means that:
-\begin{itemize}
-    \item Senders have no feedback about delivery success
-    \item Collisions are not detected by the sender
-    \item The binary exponential backoff mechanism cannot adapt to collision events
-    \item Hidden terminal problems can cause silent failures
-\end{itemize}
+\textbf{No RTS/CTS handshaking or acknowledgments} are used. This is appropriate for broadcast frames and keeps the protocol simple avoiding additional overhead and complexity, but it also means that: senders have no feedback on delivery success, and collisions may go undetected. On top of that, the hidden terminal problem remains unresolved.
 
 These limitations motivate the need for adaptive mechanisms that can respond to changing network conditions without relying on explicit feedback.
 
 \subsection{Physical Layer Parameters}
 
-To maximize over-water range and reliability, ProSafe targets widely available 2.4 GHz IEEE 802.11b/g/n~\cite{ieee802IEEE80211} chipsets:
+To maximize over water range and reliability, ProSafe targets widely available 2.4 GHz IEEE 802.11b/g/n~\cite{ieee802IEEE80211} chipsets:
 
 \begin{itemize}
     \item \textbf{Frequency band:} 2.4 GHz (802.11b/g/n)
-    \item \textbf{Data rate:} 1 Mbps using Direct Sequence Spread Spectrum (DSSS)
+    \item \textbf{Data rate:} 1 Mbps using Direct Sequence Spread Spectrum (DSSS)~\cite{knowledgeshareKnowledgeShare}
     \item \textbf{Modulation:} DBPSK (Differential Binary Phase Shift Keying) for 1 Mbps
 \end{itemize}
 
-The choice of 1 Mbps, though slower than modern rates, provides maximum range and robustness against fading and interference in the challenging over water radio environment. Higher data rates can be used with newer hardware (802.11ax/6E, 802.11be/7) but the MAC-layer logic remains unchanged.
+The choice of 1 Mbps, though slower than modern rates, provides maximum range and robustness against fading and interference in the challenging over water radio environment. Higher data rates can be used with newer hardware (802.11ax/6E, 802.11be/7) but the MAC layer logic remains unchanged.
 
 \subsection{Network Topology}
 
-Buoys form a pure peer to peer ad hoc domain (IBSS style~\cite{ipciscoWirelessPrinciples}) with no access point, router, or DHCP server. The network is intrinsically dynamic:
+Buoys form a pure peer to peer ad hoc domain (IBSS style~\cite{ipciscoWirelessPrinciples}) with no access point, router, or DHCP server. The network is intrinsically dynamic because nodes can enter and leave the communication range at any time due to water currents, waves, and mobility, there are no persistent connections or associations. Each node maintains a local neighbor table based on recently received beacons and lastly the list is periodically updated to remove stale entries.
 
-\begin{itemize}
-    \item Nodes enter and leave the communication range continuously due to water currents, waves, and mobility
-    \item No persistent connections or associations are maintained
-    \item Each node maintains a local neighbor table based on recently received beacons
-    \item Neighbor entries expire if no beacon is heard within a timeout period (typically 3-5 times the beacon interval)
-\end{itemize}
-
-\textbf{Here we can describe the multihop feature: forward vs append}
+\textbf{?Multihop feature description: forward vs append?}
 
 % Beacons are primarily one-hop transmissions. However, to extend coverage, the system can optionally enable single-hop re-broadcasting: upon receiving a beacon, a node may retransmit it (TTL=1) to extend awareness to nodes that did not hear the original transmission. This provides limited multi-hop reach while bounding channel load.
 
@@ -158,20 +153,9 @@ The random backoff is selected uniformly from [0, 15] slots, yielding a backoff 
 
 \subsection{Advantages and Limitations}
 
-\textbf{Advantages:}
-\begin{itemize}
-    \item Simple implementation with minimal computational overhead
-    \item Predictable, deterministic behavior
-    \item Discovery delay is bounded by $BI_{\text{static}}$
-\end{itemize}
+There are several advantages and limitations to the SBP approach. The implementation is straightforward and requires minimal computational resources. The deterministic nature of this solution simplifies timing analysis and predictability.
 
-\textbf{Limitations:}
-\begin{itemize}
-    \item Poor scalability: Channel load grows linearly with the number of nodes
-    \item High collision rate in dense scenarios where many nodes transmit simultaneously
-    \item No adaptation to changing network conditions
-    \item Inefficient in sparse scenarios: Frequent transmissions waste energy when few neighbors are present
-\end{itemize}
+However, SBP suffers from significant limitations in scalability and efficiency: channel load increases linearly with the number of nodes, leading to high collision rates in dense scenarios. The fixed interval does not adapt to changing network conditions, resulting in inefficient operation in both sparse and dense environments.
 
 \section{Adaptive Density-Aware Beaconing (ADAB)}
 
@@ -182,12 +166,12 @@ The Adaptive Density-Aware Beaconing (ADAB) protocol addresses SBP's scalability
 The core insight behind ADAB is that beaconing frequency should respond to local conditions:
 
 \begin{itemize}
-    \item \textbf{In sparse scenarios:} When a buoy has few or no neighbors, it should beacon frequently to enable rapid discovery by vessels or other buoys entering its vicinity. The risk of collision is low, so aggressive beaconing is both safe and beneficial for safety-critical detection latency.
+    \item \textbf{In sparse scenarios:} When a buoy has few or no neighbors, it should beacon frequently to enable rapid discovery by vessels or other buoys entering its vicinity. The risk of collision is low, so aggressive beaconing is both safe and beneficial for safety critical detection latency.
     
     \item \textbf{In dense scenarios:} When many buoys are within communication range, each transmitting frequently creates high channel occupancy and collision probability. Nodes should reduce their transmission rate to lower contention and improve overall delivery reliability.
 \end{itemize}
 
-ADAB achieves this adaptation using only locally available information—the number of neighbors currently in the neighbor table—without requiring global coordination, infrastructure, or complex channel measurements.
+ADAB achieves this adaptation using only locally available information the number of neighbors currently in the neighbor table without requiring global coordination, infrastructure, or complex channel measurements.
 
 \subsection{Density Estimation}
 
@@ -216,12 +200,12 @@ The final interval is clamped to ensure $BI_{t+1} \in [BI_{\min}, BI_{\max}]$.
 
 \subsection{Quadratic Mapping Rationale}
 
-The quadratic mapping $f_t^2$ is chosen deliberately to create nonlinear adaptation:
+The quadratic mapping $f_t^2$ is chosen to create non linear adaptation. Other non linear functions were considered like the sigmoid and hyperbolic tangent, but during the testings, the quadratic provided a good balance of responsiveness and simplicity.
 
 \begin{itemize}
     \item At low density ($f_t < 0.5$), the interval remains close to $BI_{\min}$, maintaining rapid beaconing for quick discovery
     \item As density increases toward the threshold, the interval accelerates rapidly toward $BI_{\max}$
-    \item This aggressive throttling in high-density scenarios provides stronger collision mitigation than a linear mapping would
+    \item This aggressive throttling in high density scenarios provides stronger collision mitigation than a linear mapping would
 \end{itemize}
 
 For example, with the parameters above:
@@ -233,7 +217,7 @@ N_t = 15 \text{ neighbors} &\implies f_t = 1 \implies BI_{t+1} \approx 5.0 \text
 
 \subsection{Jitter and Desynchronization}
 
-The random jitter $\epsilon_t$ is essential to prevent beacon synchronization. Without jitter, nodes experiencing similar density conditions would compute identical intervals and could synchronize their transmissions, leading to periodic collision bursts. The $\pm 5\%$ jitter introduces sufficient randomness to desynchronize nodes while maintaining the overall density-driven adaptation.
+The random jitter $\epsilon_t$ is included to prevent beacon synchronization. Without jitter, nodes experiencing similar density conditions would compute identical intervals and could synchronize their transmissions, leading to periodic collisions. The $\pm 5\%$ jitter introduces randomness to desynchronize nodes while maintaining the overall density driven adaptation.
 
 \subsection{Protocol Operation}
 
@@ -253,7 +237,8 @@ ADAB operates as follows:
     \begin{enumerate}
         \item Extract sender information and neighbor list
         \item Add or update sender in local neighbor table
-        \item Discover additional nodes from the sender's neighbor list (indirect discovery)
+        % This will be included if we'll talk about the the multihop
+        % \item Discover additional nodes from the sender's neighbor list (indirect discovery)
     \end{enumerate}
 \end{enumerate}
 
@@ -261,52 +246,42 @@ ADAB operates as follows:
 
 ADAB operates entirely at the beaconing/application layer and does not modify the underlying CSMA/CA mechanism. The same DCF parameters (DIFS, slot time, CW) are used as in SBP. The adaptation affects only when beacons are generated, not how channel access is performed once a transmission is initiated.
 
-This clean separation means ADAB can be implemented on standard Wi-Fi hardware without requiring firmware modifications or low-level driver access.
+This clean separation means ADAB can be implemented on standard Wi-Fi hardware without requiring any other firmware modifications or low level driver access.
 
 \subsection{Comparison with Related Approaches}
 
-Unlike complex adaptive beaconing schemes proposed for VANETs that may consider multiple factors (mobility, channel quality, application priority), ADAB intentionally remains simple:
+Unlike complex adaptive beaconing schemes proposed for VANETs that may consider multiple factors (mobility, channel quality, application priority), ADAB intentionally remains simple: use only local neighbor count to adapt, requires no channel measurements, and operates without feedback. Furthermore the computational overhead is really minimal.
 
-\begin{itemize}
-    \item Uses only one observable metric: neighbor count
-    \item Requires no channel quality measurements or signal processing
-    \item Operates without feedback or acknowledgments
-    \item Involves minimal computation (suitable for resource-constrained devices)
-    \item Functions in pure broadcast mode without coordination
-\end{itemize}
-
-This simplicity is a strength for the maritime safety use case, where robustness, predictability, and ease of implementation are paramount.
-
-\section{Multi-hop Awareness (Optional)}
-
-While beacons are primarily one-hop transmissions, ProSafe can optionally extend awareness through two mechanisms:
-
-\subsection{Append Mode}
-
-In append mode, receiving nodes learn about additional nodes from the neighbor lists included in beacons. This provides two-hop visibility: if buoy A receives a beacon from B, and B's neighbor list includes C, then A becomes aware of C's existence without directly receiving C's beacons.
-
-This passive multi-hop awareness increases the effective detection radius without generating additional transmissions or channel load. Nodes discovered indirectly are stored in a separate "discovered nodes" list.
-
-\subsection{Forwarded Mode}
-
-In forwarded mode, nodes explicitly re-broadcast received beacons to extend range. Upon receiving a beacon with hop limit > 0, a node creates a forwarded beacon carrying the original sender's information and decrements the hop limit. The forwarded beacon is transmitted using the same CSMA/CA mechanism after a short random delay.
-
-To prevent infinite loops and duplicate forwarding:
-\begin{itemize}
-    \item Each beacon includes an origin ID and hop limit
-    \item Nodes track recently forwarded beacons and do not forward duplicates
-    \item Hop limit (TTL) is set to 1 or 2, bounding the forwarding depth
-\end{itemize}
-
-Forwarded mode increases channel load but can improve reliability when line-of-sight obstructions or wave interference create intermittent connectivity.
-
+%\section{Multi-hop Awareness (Optional)}
+%
+%While beacons are primarily one-hop transmissions, ProSafe can optionally extend awareness through two mechanisms:
+%
+%\subsection{Append Mode}
+%
+%In append mode, receiving nodes learn about additional nodes from the neighbor lists included in beacons. This provides two-hop visibility: if buoy A receives a beacon from B, and B's neighbor list includes C, then A becomes aware of C's existence without directly receiving C's beacons.
+%
+%This passive multi-hop awareness increases the effective detection radius without generating additional transmissions or channel load. Nodes discovered indirectly are stored in a separate "discovered nodes" list.
+%
+%\subsection{Forwarded Mode}
+%
+%In forwarded mode, nodes explicitly re-broadcast received beacons to extend range. Upon receiving a beacon with hop limit > 0, a node creates a forwarded beacon carrying the original sender's information and decrements the hop limit. The forwarded beacon is transmitted using the same CSMA/CA mechanism after a short random delay.
+%
+%To prevent infinite loops and duplicate forwarding:
+%\begin{itemize}
+%    \item Each beacon includes an origin ID and hop limit
+%    \item Nodes track recently forwarded beacons and do not forward duplicates
+%    \item Hop limit (TTL) is set to 1 or 2, bounding the forwarding depth
+%\end{itemize}
+%
+%Forwarded mode increases channel load but can improve reliability when line-of-sight obstructions or wave interference create intermittent connectivity.
+%
 \section{Energy Considerations}
 
-Energy efficiency is critical for battery-powered buoys. The primary energy cost is radio transmission, which can be analyzed as follows.
+Energy efficiency is critical for battery powered buoys. The primary energy cost is radio transmission, which can be analyzed as follows.
 
 \subsection{Transmission Energy}
 
-The energy consumed per beacon transmission depends on the airtime and transmit power. For a 500-byte beacon at 1 Mbps:
+The energy consumed per beacon transmission depends on the airtime and transmit power. For a 500 byte beacon at 1 Mbps:
 
 \begin{itemize}
     \item Data transmission time: $t_{\text{data}} = \frac{500 \times 8}{10^6} = 4.0$ ms
@@ -329,24 +304,39 @@ $$E_{\text{TX,h}} = 3600 \times r \times E_{\text{beacon}}$$
 For SBP with $BI_{\text{static}} = 0.25$ s:
 $$E_{\text{TX,h}}^{\text{SBP}} = 3600 \times 4 \times 4.4 \text{ mJ} \approx 63 \text{ J/h}$$
 
-For ADAB, the hourly consumption depends on local density. In sparse scenarios ($N = 0$), ADAB consumes the same energy as SBP. In dense scenarios ($N \geq 15$), the interval increases to 5.0 s:
-$$E_{\text{TX,h}}^{\text{ADAB}}(N \geq 15) = 3600 \times 0.2 \times 4.4 \text{ mJ} \approx 3.2 \text{ J/h}$$
+For ADAB, the hourly consumption depends on local density.
+$$BI(N)=BI_{\text{min}}+\left(\min\left\{1,\frac{N}{N_{\text{thr}}}\right\}\right)^2(BI_{\text{max}}-BI_{\text{min}})$$
+with $BI_{\text{min}} = 0.25$ s, $BI_{\text{max}} = 5$ s, and $N_{\text{thr}} = 10$. The
+corresponding rate is $r(N) = 1/{BI(N)}$, and
+$$E_{\text{TX,h}}^{\text{ADAB}}(N) = 3600E_{\text{beacon}}r(N)$$
 
-This represents a \textbf{20× reduction in transmission energy} in high-density scenarios compared to fixed-interval beaconing, extending battery life significantly while maintaining or improving reliability.
+Intuitively, when a buoy is alone or nearly so, $N$ is small and the interval remains close to 0.25s for fast discovery; as neighbours increase, the quadratic mapping pushes the interval rapidly towards 5s. For representative values observed in our runs:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\hline
+Neighbours $N$      & Rate $r$$(s^{-1})$ & $E_{\text{TX,h}}(J)$ \\ \hline
+0 (sparse)          & 4.00               & 63                   \\
+3                   & 1.48               & 23                   \\
+$\geq10$ (congested) & 0.20               & 3.2                  \\ \hline
+\\
+\end{tabular}
+\caption{ADAB hourly transmission energy vs neighbor count}
+\label{tab:adab_energy}
+\end{table}
+
+This represents, compared to the SBP solution, in a reduction $\sim$ 63\% in $N=3$ and $\sim$ 95\% when the network is congested ($N\geq10$), extending battery life significantly while maintaining or improving reliability.
 
 \section{Summary}
 
 This chapter has presented the ProSafe system architecture and the ADAB protocol:
 
 \begin{itemize}
-    \item ProSafe is an infrastructure-free Wi-Fi-based proximity detection system for coastal safety
-    \item Smart buoys periodically broadcast beacons containing position and neighbor information
-    \item Vessel units passively listen and alert when buoys are detected within range
-    \item Communication operates entirely at the MAC layer using broadcast frames without acknowledgments
-    \item Static Beaconing Protocol (SBP) provides a simple but non-scalable baseline
+    \item ProSafe is an infrastructure free Wi-Fi based proximity detection system for coastal safety
+    \item Static Beaconing Protocol (SBP) provides a simple but non scalable baseline
     \item Adaptive Density-Aware Beaconing (ADAB) adjusts intervals based on local neighbor count
-    \item ADAB uses a quadratic mapping to aggressively throttle transmissions in dense scenarios
-    \item Energy consumption scales inversely with beacon interval, providing significant savings in high-density environments
+    \item Energy consumption scales inversely with beacon interval, providing significant savings in high density environments
 \end{itemize}
 
 The next chapter will describe the custom simulator developed to evaluate these protocols under controlled, reproducible conditions and across a wide range of node densities.
