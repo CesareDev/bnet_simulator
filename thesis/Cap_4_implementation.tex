@@ -13,15 +13,73 @@ The simulator developed for this thesis focuses specifically on MAC layer broadc
 
 \section{Overall Architecture}
 
-The simulator is built around a discrete event simulation paradigm, where the system state evolves through a sequence of instantaneous events occurring at specific times.
+The simulator is built around a discrete event simulation paradigm, where the system state evolves through a sequence of instantaneous events occurring at specific times. The overall architecture is illustrated in the following in figure:
 
-% TODO: Add UML class diagram showing main components: Simulator, Event, Buoy, Channel, Metrics, BeaconScheduler
-
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\fbox{\textit{[Placeholder: UML class diagram of simulator architecture]}}
-\caption{High-level architecture of the simulator showing the main components and their relationships. The Simulator orchestrates event processing, Buoys represent network nodes, the Channel models wireless propagation and collisions, and Metrics collect performance data.}
+\includegraphics[width=1\textwidth]{img/uml_proj.png}
+\caption{UML diagram of the simulator.}
 \label{fig:simulator-architecture}
+\end{figure}
+
+\subsection{Classes Diagram}
+
+The main classes of the simulator are illustrated in the following UML diagrams:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{img/uml_beacon_class.png}
+\caption{UML diagram of the Beacon class.}
+\label{fig:beacon-class}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.3\textwidth]{img/uml_buoy_class.png}
+\caption{UML diagram of the Buoy class.}
+\label{fig:buoy-class}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.5\textwidth]{img/uml_channel_class.png}
+\caption{UML diagram of the Channel class.}
+\label{fig:channel-class}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{img/uml_scheduler_class.png}
+\caption{UML diagram of the Scheduler class.}
+\label{fig:scheduler-class}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.3\textwidth]{img/uml_event_class.png}
+\caption{UML diagram of the Event class.}
+\label{fig:event-class}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{img/uml_simulator_class.png}
+\caption{UML diagram of the Simulator class.}
+\label{fig:simulator-class}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{img/uml_config_class.png}
+\caption{UML diagram of the ConfigHandler class.}
+\label{fig:confighandler-class}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{img/uml_metrics_class.png}
+\caption{UML diagram of the Metrics class.}
+\label{fig:metrics-class}
 \end{figure}
 
 \subsection{Event Driven Design}
@@ -106,12 +164,10 @@ Each buoy maintains the following state:
 
 Buoy behavior follows a state machine that implements the IEEE 802.11 DCF~\cite{dcf} mechanism:
 
-% TODO: Add state diagram showing transitions: RECEIVING -> WAITING_DIFS -> BACKOFF -> TRANSMITTING -> RECEIVING
-
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\fbox{\textit{[Placeholder: State diagram of buoy transmission state machine]}}
-\caption{State machine for buoy transmission behavior implementing CSMA/CA. Transitions occur based on channel sensing, DIFS completion, backoff expiration, and transmission events.}
+\includegraphics[width=0.6\textwidth]{img/uml_buoy_state_machine.png}
+\caption{UML diagram of the buoy transmission state machine.}
 \label{fig:buoy-state-machine}
 \end{figure}
 
