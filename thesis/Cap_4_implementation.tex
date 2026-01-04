@@ -232,7 +232,7 @@ When a buoy broadcasts a beacon, the channel determines which other buoys are wi
     \item Calculate Euclidean distance between sender and receiver:
     $$d = \sqrt{(x_r - x_s)^2 + (y_r - y_s)^2}$$
     
-    \item Determine reception probability based on distance, \textbf{?Here we could insert the probabilistic model that consider also the size of the packet?}:
+    \item Determine reception probability based on distance:
     \begin{align*}
     P_{\text{rx}} = \begin{cases}
     0.9 & \text{if } d \leq 70 \text{ m (high-probability zone)} \\
@@ -291,7 +291,7 @@ The simulator supports two channel modes:
 \begin{itemize}
     \item \textbf{Ideal channel:} All transmissions within range are received unless they collide. $P_{\text{rx}} = 1$ for all $d \leq R_{\text{max}}$. Used to isolate the impact of MAC layer collisions from physical layer effects.
     
-    \item \textbf{Probabilistic channel:} Uses the calibrated distance based reception probabilities (\textbf{?Packet size?}). Models realistic over water propagation.
+    \item \textbf{Probabilistic channel:} Uses the calibrated distance based reception probabilities. Models realistic over water propagation.
 \end{itemize}
 
 Both modes use identical collision detection. The ideal channel provides an upper bound on performance, while the probabilistic channel reflects realistic conditions.
@@ -365,39 +365,6 @@ The scheduler maintains state across function calls:
     \item \texttt{next\_interval:} Computed interval for next transmission
 \end{itemize}
 
-
-\subsection{(ACAB)?}
-
-%The simulator also implements an alternative Adaptive Context-Aware Beaconing (ACAB) protocol that considers additional factors beyond density:
-%
-%\begin{verbatim}
-%def compute_interval_acab(self, velocity, neighbors, current_time):
-%    # Density component
-%    density_score = min(1.0, len(neighbors) / NEIGHBORS_THRESHOLD)
-%    
-%    # Contact recency component
-%    if neighbors:
-%        last_contact = max(ts for _, ts, _ in neighbors)
-%        delta = current_time - last_contact
-%        contact_score = max(0.0, 1.0 - delta / CONTACT_THRESHOLD)
-%    else:
-%        contact_score = 0.0
-%    
-%    # Mobility component
-%    speed = sqrt(vx**2 + vy**2)
-%    mobility_score = min(1.0, speed / DEFAULT_VELOCITY)
-%    
-%    # Weighted combination
-%    combined = (w_density * density_score + 
-%                w_contact * contact_score + 
-%                w_mobility * (1 - mobility_score))
-%    
-%    # Apply quadratic mapping and jitter as before
-%    ...
-%\end{verbatim}
-%
-%ACAB demonstrates the simulator's extensibility: new protocols can be implemented by adding methods to the scheduler class without modifying other components.
-
 \section{Metrics Collection}
 
 The \texttt{Metrics} class tracks performance data throughout simulation execution.
@@ -427,31 +394,6 @@ where for each transmission $i$:
 \end{itemize}
 
 In the class implementation the numerator is stored in the \texttt{actually\_received} variable and the denominator in the \texttt{potentially\_sent} variable.
-
-\subsection{Time Series Data?}
-
-%For temporal analysis, metrics are recorded in sliding windows:
-%
-%\begin{itemize}
-%    \item Window width: 10 seconds
-%    \item Advance step: 1 second
-%    \item Compute B-PDR, collision rate, average neighbors for each window
-%\end{itemize}
-%
-%This enables visualization of how performance evolves as node density changes during simulation.
-
-\subsection{Per Node Discovery Tracking (Multihop)}
-
-The simulator tracks unique nodes discovered by each buoy for calculating the actual coverage of each protocol:
-
-\begin{verbatim}
-unique_nodes_per_buoy[receiver_id] = set()
-# On reception, add:
-unique_nodes_per_buoy[receiver_id].add(sender_id)
-unique_nodes_per_buoy[receiver_id].update(beacon.neighbor_ids)
-\end{verbatim}
-
-This measures the effectiveness of multi hop awareness mechanisms in extending discovery range beyond direct one hop neighbors.
 
 \section{Dynamic Population Management}
 
@@ -486,18 +428,6 @@ Constraints maintain population bounds:
 \end{itemize}
 
 This creates a dynamic but bounded population that exercises the adaptive protocol's responsiveness to density changes.
-
-\subsection{Ramp Scenario?}
-
-%For controlled evaluation, the simulator also supports a deterministic ramp scenario where nodes are added gradually:
-%
-%\begin{itemize}
-%    \item Start with 2 active buoys
-%    \item Add one buoy every $\Delta t = T_{\text{total}} / (N_{\text{total}} - 2)$ seconds
-%    \item Observe steady-state behavior after each addition
-%\end{itemize}
-%
-%This enables clean measurement of performance degradation as density increases incrementally.
 
 \section{Configuration Management}
 

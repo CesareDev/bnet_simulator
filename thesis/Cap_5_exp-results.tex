@@ -1,11 +1,11 @@
 \chapter{Experimental Results}
 \label{chap:results}
 
-This chapter presents the experimental evaluation of the ProSafe system and the ADAB protocol conducted using the custom simulator described in Chapter~\ref{chap:implementation}. We begin by defining the performance metrics and experimental setup, then present results comparing static and adaptive beaconing under both ideal and realistic channel conditions. We analyze the relationship between node density, collision rates, and broadcast reliability, and conclude with a discussion of energy implications and the insights enabled by simulation-based evaluation.
+In this chapter we presents the experimental evaluation of ProSafe and the ADAB protocol, using the custom simulator described in Chapter~\ref{chap:implementation}. We begin by defining the metrics and experimental setup, then present results comparing static and adaptive beaconing under both ideal and realistic channel. We analyze the relationship between the node density, collision rates, and broadcast reliability, finally we discuss the energy implications and the insights enabled by simulation based evaluation.
 
 \section{Performance Metrics}
 
-The primary metric for evaluating broadcast-based proximity detection systems is the reliability of beacon dissemination across the network.
+The primary metric for evaluating broadcast based proximity detection systems is the reliability of beacon propagation across the network.
 
 \subsection{Broadcast Packet Delivery Ratio (B-PDR)}
 
@@ -20,13 +20,11 @@ The overall B-PDR across all $N_{\text{tx}}$ transmissions is:
 
 $$\text{B-PDR} = \frac{1}{N_{\text{tx}}} \sum_{i=1}^{N_{\text{tx}}} \frac{n_{\text{rcv},i}}{n_{\text{intended},i}}$$
 
-Equivalently, aggregating across all transmissions:
+Aggregating across all transmissions:
 
 $$\text{B-PDR} = \frac{\sum_{i=1}^{N_{\text{tx}}} n_{\text{rcv},i}}{\sum_{i=1}^{N_{\text{tx}}} n_{\text{intended},i}}$$
 
-B-PDR directly reflects the probability that a beacon reaches its intended receivers, which is the fundamental reliability requirement for proximity-based safety systems. A higher B-PDR means more reliable detection and reduced risk of missed proximity alerts.
-
-For time-series analysis, B-PDR is computed over sliding windows of width $W = 10$ seconds, advanced every 1 second, enabling observation of how reliability evolves as network conditions change during the simulation.
+B-PDR reflects the probability that a beacon reaches its intended receivers, which is the fundamental reliability requirement for proximity based safety systems. A higher B-PDR means more reliable detection and reduced risk of missed proximity alerts.
 
 \subsection{Collision Rate}
 
@@ -34,9 +32,9 @@ The collision rate measures the fraction of intended receptions that fail due to
 
 $$\text{Collision Rate} = \frac{n_{\text{collided}}}{\sum_{i=1}^{N_{\text{tx}}} n_{\text{intended},i}}$$
 
-where $n_{\text{collided}}$ is the total number of receptions lost due to collisions detected by the channel model.
+where $n_{\text{collided}}$ is the total number of receptions lost due to collisions detected by the channel.
 
-Collision rate directly indicates MAC-layer contention: higher rates signal that multiple nodes are attempting to transmit simultaneously, causing mutual interference. In broadcast networks without acknowledgments, collision is a primary cause of reliability degradation.
+Collision rate directly indicates MAC layer contention: higher rates signal that multiple nodes are attempting to transmit simultaneously, causing interference. In broadcast networks without acknowledgments, collisions are cause of reliability degradation.
 
 \subsection{Average Neighbor Count}
 
@@ -50,16 +48,16 @@ This metric provides context for interpreting B-PDR and collision rate: as avera
 
 \section{Experimental Setup}
 
-All experiments were conducted using the custom simulator with parameters calibrated from the sea trial measurements described in the paper.
+All experiments were conducted using the custom simulator with parameters calibrated from the sea trial measurements.
 
 \subsection{Simulation Parameters}
 
 \textbf{Network configuration:}
 \begin{itemize}
-    \item Simulation area: 800 × 800 meters
+    \item Simulation area: 800 $\times$ 800 meters
     \item Duration: 600 seconds (10 minutes)
-    \item PHY data rate: 1 Mbps (IEEE 802.11b DSSS)
-    \item Beacon size: Approximately 500 bytes (varies with neighbor list length)
+    \item PHY data rate: 1 Mbps (IEEE 802.11b DSSS~\cite{knowledgeshareKnowledgeShare})
+    \item Beacon size: Approximately 500 bytes (depends on the neighbor list length)
 \end{itemize}
 
 \textbf{Channel model:}
@@ -82,7 +80,7 @@ All experiments were conducted using the custom simulator with parameters calibr
 \begin{itemize}
     \item Static Beaconing Protocol (SBP): $BI_{\text{static}} = 0.25$ seconds
     \item ADAB: $BI_{\min} = 0.25$ s, $BI_{\max} = 5.0$ s, $N_{\text{thr}} = 10$ neighbors
-    \item Neighbor timeout: 5.0 seconds
+    \item Neighbor timeout: 3 $\times BI_{\text{static}}$
     \item Jitter: $\pm 5\%$ random variation
 \end{itemize}
 
@@ -95,11 +93,11 @@ The primary experiment varies the total number of buoys from 20 to 300 in steps 
 \begin{itemize}
     \item All buoys are randomly positioned within the simulation area
     \item A small percentage (20\%) are mobile with random velocities
-    \item Stochastic churn adds and removes nodes throughout the simulation to model dynamic arrivals and departures
+    \item Stochastic churn adds and removes buoys throughout the simulation to model dynamic arrivals and departures
     \item Each scenario is repeated 15 times with different random seeds
 \end{itemize}
 
-This range spans from sparse coastal scenarios (20 buoys over 640,000 m²) to crowded beach environments (300 buoys), enabling observation of protocol behavior across realistic density conditions.
+This range spans from sparse coastal scenarios (20 buoys over 640,000 $\text{m}^2$) to crowded environments (300 buoys), enabling observation of protocol behavior across various density conditions.
 
 \subsubsection{Churn Process}
 
@@ -112,8 +110,6 @@ To model realistic user dynamics, a stochastic churn process modifies the active
     \item Population is bounded: minimum = $\max(3, 0.2 \times N_{\text{total}})$, maximum = $N_{\text{total}}$
 \end{itemize}
 
-This creates a dynamic but bounded population that exercises the adaptive protocol's responsiveness to density changes.
-
 \subsection{Statistical Analysis}
 
 Each density level is simulated 15 times with different random seeds, producing 15 independent samples of B-PDR, collision rate, and other metrics. Results are reported as:
@@ -124,11 +120,9 @@ Each density level is simulated 15 times with different random seeds, producing 
     \item Statistical significance assessed by checking if error bar intervals overlap
 \end{itemize}
 
-This approach ensures that observed differences reflect genuine protocol behavior rather than random variation.
-
 \section{Results: Ideal Channel}
 
-We first present results under the ideal channel assumption (all transmissions within range succeed unless they collide), which isolates the impact of MAC-layer contention from physical-layer effects.
+We first present results under the ideal channel assumption (all transmissions within range succeed unless they collide), which isolates the impact of MAC layer contention from physical layer effects.
 
 \subsection{Broadcast Packet Delivery Ratio}
 
@@ -136,36 +130,14 @@ Figure~\ref{fig:bpdr-ideal} shows B-PDR versus total number of buoys for both St
 
 \begin{figure}[H]
 \centering
-\fbox{\textit{[Placeholder: Graph showing B-PDR vs. number of buoys (20-300)}}
-\textit{Blue bars: SBP (0.25s fixed interval), Green bars: ADAB (adaptive),}
-\textit{Red curve: average neighbor count. Error bars show $\pm 1\sigma$ over 15 runs.]}
-\caption{Broadcast packet delivery ratio (B-PDR) versus total number of buoys under ideal channel conditions. The static baseline shows steady decline from $\sim$0.95 at 20 nodes to $\sim$0.70 at 300 nodes, while ADAB remains essentially flat at 0.97-0.98 across the entire range.}
+\includegraphics[width=0.8\textwidth]{img/bpdr_ideal.png}
+\caption{Broadcast packet delivery ratio (B-PDR) versus total number of buoys under ideal channel conditions.}
 \label{fig:bpdr-ideal}
 \end{figure}
 
-\textbf{Key observations:}
+The SBP (blue bars) shows a monotonic decline in B-PDR from approximately 0.95 at 20 nodes to around 0.70 at 300 nodes. This represents a 25\% reduction in reliability, meaning roughly one in four intended beacon receptions fail in high density scenarios. In contrast, ADAB (green bars) maintains a nearly constant B-PDR of 0.97-0.98 across the entire density range.
 
-\begin{itemize}
-    \item \textbf{Static baseline degradation:} The SBP (blue bars) shows a monotonic decline in B-PDR from approximately 0.95 at 20 nodes to around 0.70 at 300 nodes. This represents a 25\% reduction in reliability, meaning roughly one in four intended beacon receptions fail in high-density scenarios.
-    
-    \item \textbf{ADAB stability:} In contrast, ADAB (green bars) maintains a nearly constant B-PDR of 0.97-0.98 across the entire density range. The reliability is both high and stable, showing no significant degradation as population increases.
-    
-    \item \textbf{Performance gap:} The advantage of ADAB widens with density. At 20 nodes, the difference is only a few percentage points. At 300 nodes, ADAB achieves B-PDR of 0.97 versus 0.70 for SBP—a gap of 0.27 absolute or approximately 38\% relative improvement.
-    
-    \item \textbf{Correlation with neighbor count:} The average neighbor count (red curve, right axis) increases almost linearly from $\sim$3 at 20 nodes to $\sim$19 at 300 nodes. The degradation of SBP tracks this growth, confirming that local contention drives the performance decline.
-    
-    \item \textbf{Statistical robustness:} Error bars are small at low density and widen slightly at high density, but the confidence intervals of SBP and ADAB do not overlap beyond approximately 160 nodes, indicating that the observed difference is statistically significant.
-\end{itemize}
-
-\textbf{Interpretation:}
-
-The results demonstrate that fixed-interval beaconing scales poorly to high-density scenarios. As more nodes transmit at the same fixed rate, total channel occupancy increases linearly, and the probability that multiple transmissions overlap in time grows rapidly. The collision probability follows approximately:
-
-$$P_{\text{collision}} \propto \frac{N \cdot t_{\text{airtime}}}{T_{\text{interval}}}$$
-
-where $N$ is the number of nodes, $t_{\text{airtime}}$ is the transmission duration, and $T_{\text{interval}}$ is the beacon interval. For fixed $T_{\text{interval}}$, collision probability scales linearly with $N$.
-
-ADAB compensates by increasing $T_{\text{interval}}$ as local density (neighbor count) increases, keeping the effective channel load per spatial region roughly constant. The quadratic mapping ensures aggressive throttling in high-density areas, preventing the collision probability from growing uncontrolled.
+The average neighbor count (red curve, right axis) increases almost linearly from $\sim$3 at 20 nodes to $\sim$19 at 300 nodes. The degradation of SBP tracks this growth, confirming that local contention drives the performance decline.
 
 \subsection{Collision Rate Analysis}
 
@@ -173,55 +145,18 @@ Figure~\ref{fig:collision-rate} shows how collision rate varies with node popula
 
 \begin{figure}[H]
 \centering
-\fbox{\textit{[Placeholder: Graph showing collision rate vs. number of buoys (20-300)}}
-\textit{Blue bars: SBP (fixed 0.25s interval), Green bars: ADAB (adaptive),}
-\textit{Red curve: average neighbor count. Error bars show $\pm 1\sigma$ over 15 runs.]}
-\caption{Collision rate versus total number of buoys under ideal channel conditions. Static beaconing shows nearly linear growth from $\sim$0.02 at 20 nodes to $\sim$0.31 at 300 nodes, while ADAB remains below 0.04 across all densities.}
+\includegraphics[width=0.8\textwidth]{img/collision_rate.png}
+\caption{Collision rate versus total number of buoys under ideal channel conditions.}
 \label{fig:collision-rate}
 \end{figure}
 
-\textbf{Key observations:}
+The collision rate for static beaconing increases almost linearly with population, from approximately 0.02 (2\% of receptions collide) at 20 nodes to 0.31 (31\%) at 300 nodes. ADAB maintains a collision rate below 0.04 (4\%) across the entire range. The collision rate remains nearly flat despite the increase in population. 
 
-\begin{itemize}
-    \item \textbf{Linear collision growth (SBP):} The collision rate for static beaconing increases almost linearly with population, from approximately 0.02 (2\% of receptions collide) at 20 nodes to 0.31 (31\%) at 300 nodes. This 15× increase tracks the growth in average neighbor count.
-    
-    \item \textbf{Bounded collisions (ADAB):} ADAB maintains a collision rate below 0.04 (4\%) across the entire range. The collision rate remains nearly flat despite the 10× increase in population.
-    
-    \item \textbf{Mechanism:} The collision rate directly explains the B-PDR results. SBP's rising collision rate accounts for its reliability degradation. ADAB's stable collision rate enables its consistent reliability.
-    
-    \item \textbf{Channel load stabilization:} By adaptively increasing beacon intervals in dense regions, ADAB bounds local airtime consumption. Each spatial region maintains roughly constant channel occupancy regardless of how many nodes are in the overall network.
-\end{itemize}
+The collision rate directly explains the B-PDR results. SBP's rising collision rate impacts its reliability. ADAB's stable collision rate enables its consistent reliability.
 
-\textbf{Interpretation:}
+\section{Results: Non Ideal Channel}
 
-The collision rate results validate the fundamental design principle of ADAB: using local density information to throttle transmission rate prevents the channel from becoming saturated. The relationship can be expressed as:
-
-$$\text{Local Airtime} = N_{\text{local}} \times \frac{t_{\text{airtime}}}{BI(N_{\text{local}})}$$
-
-For SBP, $BI$ is constant, so local airtime grows linearly with $N_{\text{local}}$. For ADAB, $BI(N_{\text{local}})$ increases with $N_{\text{local}}$, compensating for the larger node count and keeping local airtime approximately constant.
-
-\subsection{Time-Series Behavior}
-
-To illustrate the dynamic adaptation, we can examine B-PDR evolution over time in a single simulation run with churn.
-
-\begin{figure}[H]
-\centering
-\fbox{\textit{[Placeholder: Time series plot showing B-PDR and active node count over 600 seconds]}}
-\caption{Time-series evolution of B-PDR (left axis) and active node count (right axis) in a representative simulation run with stochastic churn. ADAB maintains stable B-PDR despite fluctuations in population, while SBP's reliability correlates inversely with node count.}
-\label{fig:bpdr-timeseries}
-\end{figure}
-
-This visualization would show that:
-\begin{itemize}
-    \item When population increases (churn adds nodes), SBP's B-PDR immediately drops
-    \item When population decreases (churn removes nodes), SBP's B-PDR recovers
-    \item ADAB maintains stable B-PDR throughout, adapting transparently to population changes
-    \item The adaptation occurs locally and immediately without global coordination
-\end{itemize}
-
-\section{Results: Non-Ideal Channel}
-
-To assess performance under realistic over-water conditions, we repeat the experiments with the probabilistic channel model calibrated from sea trial measurements.
+To assess performance under realistic conditions, we repeat the experiments with the probabilistic channel model calibrated from sea trial measurements.
 
 \subsection{Broadcast Packet Delivery Ratio with Path Loss}
 
@@ -229,250 +164,45 @@ Figure~\ref{fig:bpdr-realistic} shows B-PDR versus population under the non-idea
 
 \begin{figure}[H]
 \centering
-\fbox{\textit{[Placeholder: Graph showing B-PDR vs. number of buoys (20-300) with probabilistic channel}}
-\textit{Blue bars: SBP, Green bars: ADAB, Red curve: average neighbors.]}
-\caption{Broadcast packet delivery ratio under non-ideal channel calibrated from sea-trial measurements. Absolute B-PDR values decrease compared to ideal channel, but ADAB maintains consistent advantage, staying around 0.40-0.42 while SBP declines from 0.39 to 0.30.}
+\includegraphics[width=0.8\textwidth]{img/bpdr_non_ideal.png}
+\caption{Broadcast packet delivery ratio under non ideal channel.}
 \label{fig:bpdr-realistic}
 \end{figure}
 
-\textbf{Key observations:}
-
-\begin{itemize}
-    \item \textbf{Absolute performance reduction:} Both protocols achieve significantly lower B-PDR values than under ideal conditions. SBP ranges from approximately 0.39 at 16-20 nodes down to 0.30 at 296-300 nodes. ADAB maintains 0.40-0.42 across the range.
+Both protocols achieve significantly lower B-PDR values than under ideal conditions. SBP ranges from approximately 0.39 at 16-20 nodes down to 0.30 at 296-300 nodes. ADAB maintains 0.40-0.42 across the range. Despite lower absolute values, the relative benefit of ADAB remains clear. At high density, ADAB achieves about 0.10 absolute improvement (roughly 30\% relative) compared to SBP.
     
-    \item \textbf{Persistence of relative gains:} Despite lower absolute values, the relative benefit of ADAB remains clear. At high density, ADAB achieves about 0.10 absolute improvement (roughly 30\% relative) compared to SBP.
-    
-    \item \textbf{Additive effects:} The non-ideal channel introduces both collision losses (as before) and probabilistic losses (due to distance-dependent reception failure). These effects compound: a beacon that survives collision may still fail due to probabilistic loss, and vice versa.
-    
-    \item \textbf{Statistical significance:} Error bars widen at high density, reflecting increased variance from probabilistic effects, but ADAB's advantage remains statistically significant beyond approximately 160 nodes.
-\end{itemize}
-
-\textbf{Interpretation:}
-
-The non-ideal channel results demonstrate that ADAB's benefits persist under realistic propagation conditions. The probabilistic losses affect both protocols roughly equally (both experience the same distance-based reception model), so the MAC-layer adaptation provided by ADAB continues to offer substantial improvement.
-
-The compound effect of collisions and probabilistic loss can be modeled as:
-
-$$P_{\text{success}} = P_{\text{no-collision}} \times P_{\text{distance-reception}}$$
-
-Since ADAB primarily improves $P_{\text{no-collision}}$ by reducing contention, and both protocols experience the same $P_{\text{distance-reception}}$, ADAB maintains its advantage even when absolute success rates are lower.
-
-\subsection{Collision and Probabilistic Loss Decomposition}
-
-To understand the contribution of each failure mode, we can decompose total losses:
-
-\begin{table}[H]
-\centering
-\caption{Decomposition of beacon reception failures at 300 nodes (non-ideal channel)}
-\label{tab:loss-decomposition}
-\begin{tabular}{lccc}
-\hline
-Protocol & Collision Loss & Probabilistic Loss & Total Loss \\
-\hline
-SBP (0.25s) & $\sim$0.30 & $\sim$0.40 & $\sim$0.70 \\
-ADAB & $\sim$0.04 & $\sim$0.54 & $\sim$0.58 \\
-\hline
-\end{tabular}
-\end{table}
-
-\textbf{Observations:}
-
-\begin{itemize}
-    \item SBP suffers approximately 30\% collision loss and 40\% probabilistic loss
-    \item ADAB reduces collision loss to 4\%, but probabilistic loss increases slightly to 54\%
-    \item The increase in ADAB's probabilistic loss is due to longer intervals: beacons are sent less frequently, so receivers at marginal distances have fewer opportunities to successfully receive
-    \item Despite this trade-off, ADAB's total loss (58\%) is lower than SBP's (70\%)
-\end{itemize}
-
-This decomposition reveals an important insight: ADAB trades increased probabilistic loss (from longer intervals) for dramatically reduced collision loss. The net effect is positive because collision losses were the dominant failure mode in high-density scenarios.
-
-\section{Energy Consumption Analysis}
-
-Energy efficiency is a critical concern for battery-powered buoys. ADAB's dynamic interval adjustment has direct implications for energy consumption.
-
-\subsection{Transmission Energy Model}
-
-The energy consumed per beacon transmission depends on the airtime and transmit power. For a 500-byte beacon at 1 Mbps:
-
-\begin{align*}
-t_{\text{data}} &= \frac{500 \times 8}{10^6} = 4.0 \text{ ms} \\
-t_{\text{preamble}} &\approx 192~\mu\text{s} \\
-t_{\text{DIFS}} &= 50~\mu\text{s} \\
-t_{\text{backoff}} &\approx \frac{15}{2} \times 20~\mu\text{s} = 150~\mu\text{s} \\
-t_{\text{air}} &\approx 4.4 \text{ ms}
-\end{align*}
-
-With typical Wi-Fi transmit power $P_{\text{TX}} \approx 1$ W:
-
-$$E_{\text{beacon}} = t_{\text{air}} \times P_{\text{TX}} \approx 4.4 \text{ mJ}$$
-
-\subsection{Hourly Energy Budget}
-
-The hourly transmission energy depends on the beacon rate $r = 1/BI$:
-
-$$E_{\text{TX,h}} = 3600 \times r \times E_{\text{beacon}}$$
-
-\textbf{Static Beaconing Protocol (0.25s interval):}
-
-$$E_{\text{TX,h}}^{\text{SBP}} = 3600 \times 4 \times 4.4 \text{ mJ} \approx 63 \text{ J/h}$$
-
-This corresponds to a duty cycle of approximately 1.8\% (transmission active 4.4 ms every 250 ms).
-
-\textbf{ADAB (density-dependent):}
-
-The energy consumption varies with local density:
-
-\begin{table}[H]
-\centering
-\caption{ADAB energy consumption vs. neighbor count}
-\label{tab:adab-energy}
-\begin{tabular}{ccccc}
-\hline
-Neighbors $N$ & Interval $BI$ (s) & Rate $r$ (s$^{-1}$) & $E_{\text{TX,h}}$ (J/h) & Savings vs. SBP \\
-\hline
-0 (sparse) & 0.25 & 4.0 & 63 & 0\% \\
-3 & 0.68 & 1.48 & 23 & 63\% \\
-7 & 1.30 & 0.77 & 12 & 81\% \\
-10 & 2.38 & 0.42 & 6.7 & 89\% \\
-15+ (dense) & 5.0 & 0.2 & 3.2 & 95\% \\
-\hline
-\end{tabular}
-\end{table}
-
-\textbf{Key observations:}
-
-\begin{itemize}
-    \item In sparse scenarios (0 neighbors), ADAB consumes the same energy as SBP
-    \item At moderate density (7 neighbors), ADAB achieves 81\% energy savings
-    \item In high-density scenarios (15+ neighbors), ADAB reduces transmission energy by 95\%, from 63 J/h to just 3.2 J/h
-    \item The energy savings scale quadratically with density due to the $f^2$ mapping
-\end{itemize}
-
-\subsection{Battery Life Implications}
-
-Consider a typical buoy with:
-\begin{itemize}
-    \item Battery capacity: 10 Wh (36,000 J)
-    \item Idle power consumption: 0.5 W (GPS, CPU, sensors)
-    \item Transmission power: 1.0 W (active only during beacon transmission)
-\end{itemize}
-
-\textbf{Total hourly consumption:}
-
-$$E_{\text{total,h}} = E_{\text{idle,h}} + E_{\text{TX,h}} = 0.5 \times 3600 + E_{\text{TX,h}} = 1800 + E_{\text{TX,h}}$$
-
-\textbf{Battery lifetime:}
-
-\begin{align*}
-T_{\text{SBP}} &= \frac{36000}{1800 + 63} \approx 19.3 \text{ hours} \\
-T_{\text{ADAB}}(N=15) &= \frac{36000}{1800 + 3.2} \approx 20.0 \text{ hours}
-\end{align*}
-
-While the absolute lifetime extension is modest (3.6\% in this example), this is because transmission energy is only 3\% of total consumption. In scenarios with lower idle power or higher transmission rates, the relative benefit increases significantly.
-
-More importantly, the energy savings scale with density: ADAB automatically reduces energy consumption in precisely the scenarios (high density) where battery life is most stressed due to increased activity.
+The non ideal channel introduces both collision losses (as before) and probabilistic losses (due to distance reception failure) meaning: a beacon that survives collision may still fail due to probabilistic loss, and vice versa.
 
 \section{Discussion}
 
-The experimental results provide several insights into the effectiveness of density-aware adaptation and the role of simulation in protocol evaluation.
+The experimental results provide several insights into the effectiveness of density aware adaptation and the role of simulation in protocol evaluation.
 
 \subsection{Sufficiency of Local Information}
 
-A remarkable aspect of ADAB is its simplicity: it uses only the count of neighbors heard in recent beacons—a single, locally observable metric. Despite this simplicity, ADAB achieves substantial performance improvements across a wide range of densities.
+A remarkable aspect of ADAB is its simplicity: it uses only the count of neighbors heard in recent beacons as the only metric. Despite this simplicity, ADAB achieves substantial performance improvements across wide range of densities.
 
-This demonstrates that for broadcast-based proximity detection in infrastructure-free networks:
+This demonstrates that, for broadcast based proximity detection in infrastructure free networks: global coordination or centralized scheduling is not always mandatory and neighbor count alone provides sufficient information to adapt transmission behavior in an effective way.
 
-\begin{itemize}
-    \item Complex channel measurements or signal processing are unnecessary
-    \item Global coordination or centralized scheduling is not required
-    \item Neighbor count serves as a sufficient proxy for local congestion
-    \item Simple quadratic mapping provides effective adaptation
-\end{itemize}
+The success of this simple approach can be attributed to the direct relationship between neighbor count and collision probability in broadcast networks. More neighbors implies more potential simultaneous transmitters, which directly increases collision risk. By responding to this, ADAB implicitly adapts to the underlying congestion.
 
-The success of this simple approach can be attributed to the direct relationship between neighbor count and collision probability in broadcast networks. More neighbors implies more potential simultaneous transmitters, which directly increases collision risk. By responding to this local observable, ADAB implicitly adapts to the underlying congestion.
+\subsection{Trade offs: Latency vs. Reliability vs. Energy}
 
-\subsection{Trade-offs: Latency vs. Reliability vs. Energy}
+ADAB makes explicit trade offs between competing objectives: in sparse scenarios short intervals are prioritize for rapid discovery, accepting higher energy consumption. This is appropriate when collision risk is low and quick detection is safety critical. In a dense scenario long intervals prioritize reliability and energy efficiency, accepting higher latency. This is appropriate when collision risk is high but many other nodes are already providing awareness.
 
-ADAB makes explicit trade-offs between competing objectives:
-
-\begin{enumerate}
-    \item \textbf{In sparse scenarios:} Short intervals (0.25s) prioritize low latency for rapid discovery, accepting higher energy consumption. This is appropriate when collision risk is low and quick detection is safety-critical.
-    
-    \item \textbf{In dense scenarios:} Long intervals (up to 5.0s) prioritize reliability and energy efficiency, accepting higher latency. This is appropriate when collision risk is high and many other nodes are already providing awareness.
-\end{enumerate}
-
-The quadratic mapping creates a smooth, continuous transition between these extremes as density changes. The protocol automatically balances objectives based on local conditions without requiring manual configuration.
-
-Importantly, even the maximum interval (5.0s) remains within acceptable bounds for proximity safety: a vessel moving at 10 m/s covers only 50 meters in 5 seconds, well within the detection range. The increased latency is a reasonable trade-off for the reliability and energy benefits.
+Importantly, even the maximum interval (5.0s) remains within acceptable bounds for proximity safety: a vessel moving at 10 m/s covers only 50 meters in 5 seconds, well within the detection range. The increased latency is a reasonable trade off for the reliability and energy benefits.
 
 \subsection{Scalability Limits}
 
-While ADAB maintains high B-PDR across the tested range (20-300 nodes), there are practical limits:
+While ADAB maintains high B-PDR across the tested range (20-300 nodes), there are practical limits. Even with maximum intervals, if density becomes extremely high, total channel airtime will eventually approach 100\% and performance must degrade, very high neighbor counts increase beacon size that eventually impacts transmission time and collision risk.
 
-\begin{itemize}
-    \item \textbf{Airtime bound:} Even with maximum intervals, if density becomes extremely high, total channel airtime will eventually approach 100\% and performance must degrade.
-    
-    \item \textbf{Neighbor table capacity:} Very high neighbor counts increase beacon size (neighbor list), creating a positive feedback loop that worsens congestion.
-    
-    \item \textbf{Discovery latency:} At maximum intervals, new nodes take longer to be discovered, which may impact safety responsiveness.
-\end{itemize}
-
-For the coastal safety application, densities beyond 300 nodes in an 800×800m area (roughly one buoy per 2000 m²) are unlikely in realistic scenarios. However, the simulator enables exploration of these extreme cases to understand protocol limits.
+For the coastal safety application, densities beyond 300 nodes in an 800$\times$800m area are unlikely in realistic scenarios. However, the simulator enables exploration of these extreme cases to understand protocol limits.
 
 \subsection{The Value of Simulation}
 
-The experimental evaluation demonstrates the essential role of simulation in wireless protocol research:
+The experimental evaluation demonstrates the essential role of simulation in wireless protocol research: first of all physical experiments with 300 concurrent nodes are expensive and really complex to deploy and manage. Even if feasible, controlling and reproducing specific density scenarios would be challenging. Simulation enables exploration of a wide range of densities and conditions in a controlled, repeatable manner.
 
-\begin{itemize}
-    \item \textbf{Scale:} Physical experiments with 300 concurrent nodes are prohibitively expensive and logistically challenging
-    
-    \item \textbf{Control:} Simulation enables precise control over node positions, mobility patterns, and arrival/departure times
-    
-    \item \textbf{Reproducibility:} Identical scenarios can be repeated with different protocols or parameters for direct comparison
-    
-    \item \textbf{Observability:} Internal state (collision events, backoff timers, neighbor counts) can be observed directly
-    
-    \item \textbf{Parameter sweeps:} Wide ranges of densities, intervals, and channel conditions can be systematically explored
-\end{itemize}
-
-While the simulator's channel model is calibrated from real sea trial measurements (grounding it in physical reality), the controlled environment and scalability of simulation enable insights that would be infeasible to obtain through physical experiments alone.
-
-The simulator thus serves as a scientific instrument: it provides a reproducible, controlled platform for hypothesis testing and performance characterization across conditions that span from small pilot deployments to large-scale recreational beach scenarios.
-
-\subsection{Limitations and Future Work}
-
-The experimental evaluation has several limitations that suggest directions for future work:
-
-\begin{itemize}
-    \item \textbf{Limited mobility models:} The simple kinematic mobility model does not capture realistic swimmer behavior, ocean currents, or waves. More sophisticated mobility traces from GPS tracking of actual water activities would improve realism.
-    
-    \item \textbf{Homogeneous protocols:} All nodes run the same protocol. Mixed scenarios (some adaptive, some static) would reveal interaction effects and backward compatibility.
-    
-    \item \textbf{Single-hop evaluation:} While the simulator supports multi-hop modes, the presented results focus on direct one-hop communication. Multi-hop forwarding could extend range but at the cost of increased channel load.
-    
-    \item \textbf{Static parameter tuning:} ADAB uses fixed parameters ($N_{\text{thr}} = 15$, quadratic mapping). Self-tuning approaches that learn optimal parameters from local observations could further improve performance.
-    
-    \item \textbf{Energy model simplification:} The energy analysis considers only transmission energy. A complete model would include reception, idle listening, GPS, and computational costs.
-\end{itemize}
-
-Despite these limitations, the results clearly demonstrate that density-aware adaptation provides substantial benefits for broadcast reliability in infrastructure-free proximity detection networks, and that custom simulation enables rigorous evaluation of such protocols across realistic deployment scales.
+The simulator serves as a scientific instrument: it provides a reproducible, controlled platform for testing and performance evaluation across conditions that go from small  deployments to large scale recreational beach scenarios.
 
 \section{Summary}
 
-This chapter has presented comprehensive experimental results evaluating the ProSafe system and ADAB protocol:
-
-\begin{itemize}
-    \item Under ideal channel conditions, ADAB maintains B-PDR of 0.97-0.98 across 20-300 nodes, while static beaconing degrades from 0.95 to 0.70
-    
-    \item ADAB reduces collision rates from 31\% (static) to under 4\% at high density by dynamically throttling transmission rates
-    
-    \item The performance advantage persists under realistic over-water channel conditions, demonstrating robustness to physical-layer impairments
-    
-    \item Energy consumption analysis shows that ADAB achieves up to 95\% reduction in transmission energy at high density compared to fixed-interval beaconing
-    
-    \item Simple, local density-based adaptation proves sufficient for effective scalability without requiring complex measurements or global coordination
-    
-    \item The custom simulator enables systematic evaluation across density ranges and conditions that would be infeasible to study through physical experiments alone
-\end{itemize}
-
-These results validate both the effectiveness of the ADAB protocol for proximity-based safety applications and the utility of the simulator as a tool for protocol development and evaluation. The next chapter concludes the thesis with a summary of contributions, reflections on limitations, and directions for future research.
+This chapter has presented comprehensive experimental results evaluating the ProSafe system and ADAB protocol. These results validate both the effectiveness of the ADAB protocol for proximity based safety applications and the utility of the simulator as a tool for protocol development and evaluation. The next chapter concludes the thesis with a summary of contributions, reflections on limitations, and directions for future research.

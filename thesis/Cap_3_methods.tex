@@ -114,10 +114,6 @@ The choice of 1 Mbps, though slower than modern rates, provides maximum range an
 
 Buoys form a pure peer to peer ad hoc domain (IBSS style~\cite{ipciscoWirelessPrinciples}) with no access point, router, or DHCP server. The network is intrinsically dynamic because nodes can enter and leave the communication range at any time due to water currents, waves, and mobility, there are no persistent connections or associations. Each node maintains a local neighbor table based on recently received beacons and lastly the list is periodically updated to remove stale entries.
 
-\textbf{?Multihop feature description: forward vs append?}
-
-% Beacons are primarily one-hop transmissions. However, to extend coverage, the system can optionally enable single-hop re-broadcasting: upon receiving a beacon, a node may retransmit it (TTL=1) to extend awareness to nodes that did not hear the original transmission. This provides limited multi-hop reach while bounding channel load.
-
 \section{Static Beaconing Protocol (SBP)}
 
 The Static Beaconing Protocol (SBP) serves as a baseline for comparison. In SBP, each buoy transmits beacons at a fixed, predetermined interval $BI_{\text{static}}$ regardless of network conditions, density, or local environment.
