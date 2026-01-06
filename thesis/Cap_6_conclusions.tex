@@ -37,8 +37,6 @@ All simulation parameters are externalized in configuration files, code is modul
 
 \section{Scientific Insights}
 
-Beyond the specific contributions, the thesis work has yielded broader insights into wireless protocol design and evaluation.
-
 \subsection{Broadcast Scalability in Infrastructure Free Networks}
 
 The experimental results clearly demonstrate that fixed parameter protocols do not scale well to varying density conditions in infrastructure free broadcast networks. This creates a need for an adaptation mechanisms that use locally observable metrics. The success of ADAB's simple neighbor count based adaptation suggests that such proxies can be highly effective despite their simplicity.
@@ -63,7 +61,7 @@ This work has several limitations that should be acknowledged:
 
 The channel model uses a piecewise constant probability function based on distance, which captures average behavior but abstracts away many real world effects: short term signal fluctuations due to wave motion, reflections, and interference are not modeled explicitly, the ability of receivers to decode the stronger of two overlapping signals is not considered; all collisions result in complete packet loss. All transmissions use 1 Mbps regardless of distance or channel quality, while real systems might use rate adaptation
 
-These simplifications are justified for the thesis scope (evaluating MAC layer adaptation) but would need to be addressed for studies focused on physical layer phenomena.
+These simplifications are justified for the thesis scope, which is not focused on physical layer phenomena but rather on MAC layer adaptation, but would need to be addressed for studies focused on physical layer phenomena.
 
 \subsection{Mobility Modeling}
 
@@ -200,7 +198,7 @@ This thesis has presented a custom event driven simulator for infrastructure fre
     \item \textbf{As an application:} ProSafe addresses a real safety need in coastal environments using accessible, low cost technology
 \end{itemize}
 
-The key insight is that MAC layer broadcast scalability in infrastructure free networks can be significantly improved through simple adaptation. Global coordination, channel measurements, or cross layer optimization are not necessary for substantial gains.
+The key insight is that MAC layer broadcast scalability in infrastructure free networks can be significantly improved through rather simple adaptation. Global coordination, channel measurements, or cross layer optimization are not necessary for substantial gains.
 
 The simulator developed in this thesis is a tool applicable beyond ProSafe to any broadcast based proximity or discovery protocol. By providing controlled, reproducible evaluation at scales infeasible for physical experiments, it enables exploration of the various design choices and comparison of alternatives.
 
