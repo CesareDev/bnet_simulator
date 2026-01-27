@@ -127,7 +127,7 @@ The combined adaptation score is computed as:
 
 $$s_{\text{combined}} = 0.4 \cdot s_{\text{density}} + 0.3 \cdot s_{\text{contact}} + 0.3 \cdot (1 - s_{\text{mobility}})$$
 
-This weighted combination is then mapped quadratically to the interval range as in ADAB. Future work should systematically evaluate ACAB against ADAB to determine: whether the additional complexity (velocity tracking, contact time management) provides measurable benefits, how weight parameters (0.4, 0.3, 0.3 in the formula) should be tuned for different scenarios and the computational and energy overhead of the more complex interval calculation
+This weighted combination is then mapped quadratically to the interval range as in ADAB. Future work should systematically evaluate ACAB against ADAB to determine: whether the additional complexity (velocity tracking, contact time management) provides measurable benefits, how weight parameters (0.4, 0.3, 0.3 in the formula) should be tuned for different scenarios and the computational and energy overhead of the more complex interval calculation.
 
 \subsection{Multi Hop Awareness Mechanisms}
 
@@ -159,6 +159,42 @@ In forwarded mode, nodes explicitly retransmit received beacons to extend physic
 \end{itemize}
 
 Forwarded mode significantly increases channel load: each beacon can trigger multiple retransmissions. However, it extends effective range for scenarios where line of sight obstructions cause intermittent connectivity.
+
+\subsubsection{Comparison between Append mode and Forward mode}
+
+During the testing of these two modes, we observed what it was described in the previous subsections. The append mode is not impacting the channel load too much, since no additional transmissions are generated. However, the size of the beacons increases with the number of neighbors, which could impact the delivery ratio if a packet length dependent loss model is implemented. On the other hand, the forwarded mode increases significantly the channel load, since each beacon can generate multiple retransmissions. This could lead to higher collision rates in dense scenarios.
+
+Following three plots of the preliminary results obtained with the normal mode (without multihop) and the multihope ones. The metrics used is the average percentage of discovered nodes varying the number of nodes in the scenario. The configuration of the simulation are the same as described in Chapter~\ref{chap:results}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{img/discovered_none.png}
+    \caption{Normal Mode - Average Percentage of Discovered Nodes vs Number of Nodes}
+    \label{fig:normal_mode_discovery}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{img/discovered_forward.png}
+    \caption{Forward Mode - Average Percentage of Discovered Nodes vs Number of Nodes}
+    \label{fig:forward_mode_discovery}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{img/discovered_append.png}
+    \caption{Append Mode - Average Percentage of Discovered Nodes vs Number of Nodes}
+    \label{fig:append_mode_discovery}
+\end{figure}
+
+In the plots above is included also the new protcol ACAB described in the previous subsection which is still in development and needs further improvement. From the preliminary results we can see that with the forward mode (Figure~\ref{fig:forward_mode_discovery}) we have an improvement in the discovery rate with respect to the normal mode (Figure~\ref{fig:normal_mode_discovery}), but with the append mode (Figure~\ref{fig:append_mode_discovery}) the discovery rate is even higher. This probably comes from the fact that in the append mode there are no additional transmissions that could increase the collision rate, while in the forward mode the additional transmissions lead to more collisions, especially in dense scenarios as we can see in the following plot.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{img/collision_forward.png}
+    \caption{Forward Mode - Collision Rate vs Number of Nodes}
+    \label{fig:collision_rate_forward}
+\end{figure}
 
 \subsubsection{Future Multi Hop Research Directions}
 

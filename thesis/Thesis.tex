@@ -27,6 +27,8 @@
 \usepackage[linguistics]{forest}
 \usepackage{pgfplots}
 \usepackage{fancyvrb}
+\usepackage{graphicx}
+\usepackage{eso-pic}
 \pgfplotsset{compat=1.18}
 
 % Colors
@@ -118,6 +120,15 @@
 \newcommand{\citfig}[1]{\ap{\scriptsize\textrm{(\textit{F#1})}}}
 
 \begin{document}
+
+\AddToShipoutPicture*{%
+  \put(300,250){\includegraphics[width=0.25\textwidth]{img/Firma.png}}
+}
+
+\AddToShipoutPicture*{%
+  \put(300,200){\includegraphics[width=0.25\textwidth]{img/firma_prof.png}}
+}
+
 \maketitle
 \pagenumbering{roman}
 \renewcommand{\thepage}{\romannumeral\value{page}}
