@@ -14,7 +14,7 @@ wheels/
 
 # Metrics CSV / PNG
 *.csv
-.png
+*.png
 
 # JSON files
 *.json
