@@ -18,7 +18,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run the BNet Simulator")
     parser.add_argument(
         "--mode",
-        choices=["static", "dynamic_adab", "dynamic_acab", "rl"],
+        choices=["static", "dynamic_adab", "dynamic_acab"],
         default="static",
         help="Scheduler mode to use for the simulation (default: static)"
     )
