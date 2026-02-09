@@ -29,7 +29,7 @@ class BeaconScheduler:
     def should_send(self, battery, velocity, neighbors, current_time):
         if self.scheduler_type == "static":
             return self.should_send_static(current_time)
-        elif self.scheduler_type in ["dynamic_adab", "dynamic_acab"]:
+        elif self.scheduler_type in ["dynamic_adab", "dynamic_acab", "rl"]:
             return self.should_send_dynamic(battery, velocity, neighbors, current_time)
         else:
             raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
@@ -90,11 +90,13 @@ class BeaconScheduler:
             combined = (w_density * density_score + 
                        w_contact * contact_score + 
                        w_mobility * (1.0 - mobility_score))
-        else:
+        elif self.scheduler_type == "dynamic_adab":
             n_neighbors = len(neighbors)
             NEIGHBORS_THRESHOLD = 15
             density_score = min(1.0, n_neighbors / NEIGHBORS_THRESHOLD)
             combined = density_score
+        else:
+            comnbined =1 # Default for RL or unknown types
 
         fq = combined * combined
         bi_min = self.static_interval

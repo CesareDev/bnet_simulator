@@ -1,10 +1,11 @@
 simulation:
   schedulers:
   - static
-  - dynamic_adab
-  - dynamic_acab
+  #- dynamic_adab
+  #- dynamic_acab
+  - rl
   min_buoys: 10
-  max_buoys: 80
+  max_buoys: 40 #80
   step_buoys: 10
   intervals:
   - 1.0
