@@ -32,12 +32,13 @@ class Buoy:
         self.id = uuid.uuid4()
         self.position = position
         self.is_mobile = is_mobile
-        self.battery = battery if battery is not None else cfg.get('buoys', 'default_battery')
+        self.battery = battery if battery is not None else random.uniform(10.0, cfg.get('buoys', 'default_battery'))
         self.velocity = velocity
         self.neighbors = []  # Direct neighbors (1-hop, beacons we received directly)
         self.scheduler = BeaconScheduler()
         self.channel = channel
         self.state = BuoyState.RECEIVING
+        self.receiving_state_start_time = 0.0  # Track when buoy entered RECEIVING state (for idle listening)
         self.metrics = metrics
         self.simulator = None
 
@@ -61,7 +62,11 @@ class Buoy:
         self.reception_energy = cfg.get('energy', 'reception_energy')
         self.idle_listening_energy = cfg.get('energy', 'idle_listening_energy')
         self.min_battery_threshold = cfg.get('energy', 'min_battery_threshold')
-
+        """
+        # Log initial battery level
+        if self.enable_energy_model:
+            print(f"Buoy {str(self.id)[:6]} initialized with battery: {self.battery:.4f} J")
+        """
         # --- AIMD Congestion Tracking ---
         self.channel_busy_accum = 0.0  # Total busy time accumulated before sending
         self.channel_busy_count = 0     # Number of send attempts measured
@@ -180,6 +185,9 @@ class Buoy:
                     self.channel_busy_accum += busy_time
                     self.channel_busy_count += 1
                     self.last_channel_busy_start = None
+                # Consume idle listening energy for time spent in RECEIVING state
+                idle_time = sim_time - self.receiving_state_start_time
+                self._consume_energy(self.idle_listening_energy * idle_time)
                 self.state = BuoyState.WAITING_DIFS
                 self.simulator.schedule_event(
                     sim_time + self.difs_time, EventType.DIFS_COMPLETION, self
@@ -189,8 +197,12 @@ class Buoy:
         if not self.want_to_send or self.state != BuoyState.WAITING_DIFS:
             return
             
+        # Consume energy for DIFS time
+        self._consume_energy(self.transmission_energy * self.difs_time)
+            
         if self.channel.is_busy(self.position, sim_time):
             self.state = BuoyState.RECEIVING
+            self.receiving_state_start_time = sim_time
             self.simulator.schedule_event(sim_time, EventType.CHANNEL_SENSE, self)
         else:
             # Only generate new random backoff if we don't have remaining backoff
@@ -219,14 +231,18 @@ class Buoy:
             backoff_start = event.data.get("backoff_start_time", sim_time - self.backoff_remaining)
             elapsed = sim_time - backoff_start
             self.backoff_remaining = max(0, self.backoff_remaining - elapsed)
+            # Consume energy for the backoff time spent
+            self._consume_energy(self.transmission_energy * elapsed)
             self.state = BuoyState.RECEIVING
+            self.receiving_state_start_time = sim_time
             
             # Wait for channel to become idle, then resume with DIFS (which will resume backoff)
             self.simulator.schedule_event(
                 sim_time + 0.01, EventType.CHANNEL_SENSE, self
             )
         else:
-            # Backoff completed successfully, transmit
+            # Backoff completed successfully, consume energy for remaining backoff time and transmit
+            self._consume_energy(self.transmission_energy * self.backoff_remaining)
             self.backoff_remaining = 0.0  # Reset for next transmission
             self.simulator.schedule_event(
                 sim_time, EventType.TRANSMISSION_START, self
@@ -242,10 +258,14 @@ class Buoy:
         self.want_to_send = False
         self.backoff_remaining = 0.0  # Reset backoff for next transmission cycle
         self.state = BuoyState.RECEIVING
+        self.receiving_state_start_time = sim_time
         # Don't clear discovered_nodes - they persist like neighbors
         
-        # Consume transmission energy
-        self._consume_energy(self.transmission_energy)
+        # Consume transmission energy based on beacon air time (beacon size / bit rate)
+        cfg = ConfigHandler()
+        bit_rate = cfg.get('network', 'bit_rate')
+        transmission_time = beacon.size_bits() / bit_rate if bit_rate > 0 else 0.001
+        self._consume_energy(self.transmission_energy * transmission_time)
         
         if success and self.metrics:
             latency = sim_time - self.scheduler_decision_time

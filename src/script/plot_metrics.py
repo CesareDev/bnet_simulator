@@ -684,7 +684,221 @@ def main():
     plot_group_file = os.path.join(plot_dir, "b_pdr_grouped_by_buoy_count_ramp.png")
     plot_ramp_grouped_by_buoy_count(results_dir, plot_group_file)
 
+    print("Plotting energy consumption by density...")
+    plot_energy_consumption_by_density(results_dir, plot_dir, interval=interval)
+
+    print("Plotting dead nodes by density...")
+    plot_dead_nodes_by_density(results_dir, plot_dir, interval=interval)
+
     print("Plots saved to:", plot_dir)
+
+def plot_energy_consumption_by_density(results_dir, plot_dir, interval=None):
+    """Plot average energy consumption vs density for different schedulers with energy model enabled"""
+    files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
+    data = []
+    multihop_modes = set()
+    
+    # Extract data from CSV files
+    for f in files:
+        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+        if "Density" in df.index and "Total Energy Consumed (J)" in df.index:
+            density = float(df.loc["Density", "Value"])
+            energy = float(df.loc["Total Energy Consumed (J)", "Value"])
+            
+            # Extract multihop mode
+            if "Multihop Mode" in df.index:
+                mode = str(df.loc["Multihop Mode", "Value"]).lower()
+                multihop_modes.add(mode)
+            
+            # Determine scheduler type
+            if "Scheduler Type" in df.index:
+                sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
+            elif f.startswith("static_"):
+                sched_type = "static"
+            elif f.startswith("dynamic_acab_"):
+                sched_type = "dynamic_acab"
+            elif f.startswith("dynamic_adab_"):
+                sched_type = "dynamic_adab"
+            elif f.startswith("dynamic_aimd_"):
+                sched_type = "dynamic_aimd"
+            elif f.startswith("dynamic_"):
+                sched_type = "dynamic_adab"
+            else:
+                sched_type = "unknown"
+                
+            data.append((density, energy, sched_type))
+    
+    if not data:
+        print("No energy consumption data with density found.")
+        return
+    
+    # Determine mode string for title
+    mode_str = ""
+    if multihop_modes:
+        if len(multihop_modes) == 1:
+            mode = list(multihop_modes)[0]
+            if mode == "none":
+                mode_str = "Single-Hop"
+            elif mode == "append":
+                mode_str = "Append Mode"
+            elif mode == "forwarded":
+                mode_str = "Forward Mode"
+            else:
+                mode_str = mode.capitalize()
+        else:
+            mode_str = "Mixed Modes"
+    
+    # Create energy consumption by density plot
+    df = pd.DataFrame(data, columns=["Density", "Energy", "Scheduler"])
+    grouped = df.groupby(["Density", "Scheduler"]).mean().reset_index()
+    densities = sorted(df["Density"].unique())
+    schedulers = ["dynamic_acab", "dynamic_adab", "static", "dynamic_aimd"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_aimd": "AIMD"}
+    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green", "dynamic_aimd": "tab:red"}
+    bar_width = 0.25
+    x = np.arange(len(densities)) * 1.3
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    offset = -(len(schedulers) - 1) * bar_width / 2
+    for i, sched in enumerate(schedulers):
+        energies = []
+        for d in densities:
+            row = grouped[(grouped["Density"] == d) & (grouped["Scheduler"] == sched)]
+            energies.append(row["Energy"].values[0] if not row.empty else 0)
+        ax.bar(x + offset + i * bar_width, energies, bar_width, label=scheduler_labels[sched], color=color_map[sched])
+    
+    ax.set_xlabel("Total Buoys")
+    ax.set_ylabel("Total Energy Consumed (J)")
+    
+    # Update title to include mode
+    title_parts = ["Total Energy Consumed vs Buoy Count"]
+    if mode_str:
+        title_parts.append(f"({mode_str}")
+        if interval:
+            title_parts.append(f", Static Interval: {interval}s)")
+        else:
+            title_parts.append(")")
+    elif interval:
+        title_parts.append(f"(Static Interval: {interval}s)")
+    ax.set_title(" ".join(title_parts))
+    
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(int(d)) for d in densities])
+    ax.legend(loc='upper left')
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+    
+    plt.tight_layout()
+    
+    if interval:
+        plt.savefig(os.path.join(plot_dir, f"energy_consumption_interval{int(interval*10)}.png"))
+    else:
+        plt.savefig(os.path.join(plot_dir, "energy_consumption_by_density.png"))
+    plt.close()
+
+def plot_dead_nodes_by_density(results_dir, plot_dir, interval=None):
+    """Plot number of dead nodes vs density for different schedulers"""
+    files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
+    data = []
+    multihop_modes = set()
+    
+    # Extract data from CSV files
+    for f in files:
+        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+        if "Density" in df.index and "Dead Buoys" in df.index:
+            density = float(df.loc["Density", "Value"])
+            dead_buoys = int(df.loc["Dead Buoys", "Value"])
+            
+            # Extract multihop mode
+            if "Multihop Mode" in df.index:
+                mode = str(df.loc["Multihop Mode", "Value"]).lower()
+                multihop_modes.add(mode)
+            
+            # Determine scheduler type
+            if "Scheduler Type" in df.index:
+                sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
+            elif f.startswith("static_"):
+                sched_type = "static"
+            elif f.startswith("dynamic_acab_"):
+                sched_type = "dynamic_acab"
+            elif f.startswith("dynamic_adab_"):
+                sched_type = "dynamic_adab"
+            elif f.startswith("dynamic_aimd_"):
+                sched_type = "dynamic_aimd"
+            elif f.startswith("dynamic_"):
+                sched_type = "dynamic_adab"
+            else:
+                sched_type = "unknown"
+                
+            data.append((density, dead_buoys, sched_type))
+    
+    if not data:
+        print("No dead nodes data with density found.")
+        return
+    
+    # Determine mode string for title
+    mode_str = ""
+    if multihop_modes:
+        if len(multihop_modes) == 1:
+            mode = list(multihop_modes)[0]
+            if mode == "none":
+                mode_str = "Single-Hop"
+            elif mode == "append":
+                mode_str = "Append Mode"
+            elif mode == "forwarded":
+                mode_str = "Forward Mode"
+            else:
+                mode_str = mode.capitalize()
+        else:
+            mode_str = "Mixed Modes"
+    
+    # Create dead nodes by density plot
+    df = pd.DataFrame(data, columns=["Density", "DeadNodes", "Scheduler"])
+    grouped = df.groupby(["Density", "Scheduler"]).mean().reset_index()
+    densities = sorted(df["Density"].unique())
+    schedulers = ["dynamic_acab", "dynamic_adab", "static", "dynamic_aimd"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_aimd": "AIMD"}
+    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green", "dynamic_aimd": "tab:red"}
+    bar_width = 0.25
+    x = np.arange(len(densities)) * 1.3
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    offset = -(len(schedulers) - 1) * bar_width / 2
+    for i, sched in enumerate(schedulers):
+        dead_counts = []
+        for d in densities:
+            row = grouped[(grouped["Density"] == d) & (grouped["Scheduler"] == sched)]
+            dead_counts.append(row["DeadNodes"].values[0] if not row.empty else 0)
+        ax.bar(x + offset + i * bar_width, dead_counts, bar_width, label=scheduler_labels[sched], color=color_map[sched])
+    
+    ax.set_xlabel("Total Buoys")
+    ax.set_ylabel("Number of Dead Buoys")
+    
+    # Update title to include mode
+    title_parts = ["Dead Buoys vs Buoy Count"]
+    if mode_str:
+        title_parts.append(f"({mode_str}")
+        if interval:
+            title_parts.append(f", Static Interval: {interval}s)")
+        else:
+            title_parts.append(")")
+    elif interval:
+        title_parts.append(f"(Static Interval: {interval}s)")
+    ax.set_title(" ".join(title_parts))
+    
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(int(d)) for d in densities])
+    ax.legend(loc='upper left')
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+    
+    plt.tight_layout()
+    
+    if interval:
+        plt.savefig(os.path.join(plot_dir, f"dead_nodes_interval{int(interval*10)}.png"))
+    else:
+        plt.savefig(os.path.join(plot_dir, "dead_nodes_by_density.png"))
+    plt.close()
 
 if __name__ == "__main__":
     main()

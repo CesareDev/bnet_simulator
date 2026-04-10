@@ -146,7 +146,6 @@ def main():
             channel=channel,
             position=pos,
             is_mobile=True,
-            battery=default_battery,
             velocity=random_velocity(default_velocity),
             metrics=metrics,
             scheduler_type=args.mode
@@ -163,7 +162,6 @@ def main():
             channel=channel,
             position=pos,
             is_mobile=False,
-            battery=default_battery,
             metrics=metrics,
             scheduler_type=args.mode
         )

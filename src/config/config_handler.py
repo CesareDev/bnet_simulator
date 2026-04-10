@@ -29,7 +29,7 @@ class ConfigHandler:
         'buoys': {
             'mobile': True,
             'mobile_percentage': 1.0,
-            'default_battery': 100.0,
+            'default_battery': 1000.0,
             'default_velocity': 15.0,
         },
         'network': {

@@ -98,7 +98,7 @@ class BeaconScheduler:
             # Check the gap between the last two beacons recemeived from that neighbor
             last_gap = times[-1] - times[-2]
             # Compare that observed gap against our expected interval (not current time)
-            if last_gap > 2 * aimd_mult * expected_interval:
+            if last_gap > aimd_mult * (expected_interval + max(self.static_interval, expected_interval)):
                 missing_neighbors += 1
 
         # 3. My info in neighbor beacons (freshness)
@@ -107,7 +107,7 @@ class BeaconScheduler:
         for nid, (seen_time, my_info_ts) in buoy.my_info_in_neighbor.items():
             if my_info_ts is None:
                 outdated_count += 1  # No info 
-            elif buoy.my_beacon_timestamp - my_info_ts > 2 * aimd_mult * expected_interval:
+            elif buoy.my_beacon_timestamp - my_info_ts > aimd_mult * (expected_interval + max(self.static_interval, expected_interval)):
                 outdated_count += 1  # Info is stale
         # Congestion if any metric is above threshold 
         # TODO: think if we need 3 options inc dec and no action

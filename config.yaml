@@ -1,15 +1,15 @@
 simulation:
   schedulers:
   - static
-  - dynamic_adab
-  - dynamic_acab
-  - dynamic_aimd
+  #- dynamic_adab
+  #- dynamic_acab
+  #- dynamic_aimd
   #- rl
-  min_buoys: 10
-  max_buoys: 80
-  step_buoys: 10
+  min_buoys: 20
+  max_buoys: 300
+  step_buoys: 20
   intervals:
-  - 1.0
+  #- 1.0
   - 0.5
   - 0.25
   duration: 600
@@ -25,7 +25,7 @@ world:
   height: 800.0
 buoys:
   mobile_percentage: 0.2
-  default_battery: 100.0
+  default_battery: 1000.0
   default_velocity: 15.0
 network:
   bit_rate: 1000000
@@ -48,10 +48,10 @@ scheduler:
 
 energy:
   # Enable energy modeling for AIMD protocol
-  enable_for_protocols: ['dynamic_aimd']  # e.g., ['rl'] or empty list to disable for all
-  # Energy costs in Joules
-  transmission_energy: 0.0044  # 4.4 mJ per beacon (500 bytes at 1 Mbps with 4.4ms airtime, 1W TX power)
-  reception_energy: 0.000088  # 88 µJ per second of reception (typical for Wi-Fi receiver ~99 mW)
-  idle_listening_energy: 0.000088  # 88 µJ per second of idle listening
+  enable_for_protocols: ['dynamic_aimd','static', 'dynamic_adab', 'dynamic_acab']  # e.g., ['rl'] or empty list to disable for all
+  # Energy costs in Joules per second
+  transmission_energy: 1.0  # 1.0 J/s for 1W TX power (used for DIFS, backoff, and beacon transmission air time)
+  reception_energy: 0.099  # 99 mJ/s of reception (typical for Wi-Fi receiver ~99 mW)
+  idle_listening_energy: 0.099  # 99 mJ/s of idle listening (typical for Wi-Fi receiver ~99 mW)
   # When battery <= 0, buoy becomes inactive (cannot transmit or receive)
   min_battery_threshold: 0.0
