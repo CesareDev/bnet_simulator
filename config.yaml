@@ -2,18 +2,17 @@ simulation:
   schedulers:
   - static
   - dynamic_adab
-  - dynamic_acab
-  min_buoys: 10
-  max_buoys: 80
+  # - dynamic_acab
+  min_buoys: 270
+  max_buoys: 300
   step_buoys: 10
   intervals:
-  - 1.0
-  - 0.5
+  # - 1.0
+  # - 0.5
   - 0.25
   duration: 600
   num_processes: 4
-  ideal_channel: true
-  ramp_scenario: false
+  ideal_channel: false
   enable_metrics: true
   enable_logging: false
   multihop_mode: none  # Options: none, append, forwarded
@@ -22,7 +21,7 @@ world:
   width: 800.0
   height: 800.0
 buoys:
-  mobile_percentage: 0.2
+  mobile_percentage: 0.3
   default_battery: 100.0
   default_velocity: 15.0
 network:

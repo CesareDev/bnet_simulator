@@ -6,9 +6,11 @@ class Metrics:
     def __init__(self, density=None):
         self.beacons_sent = 0
         self.beacons_received = 0
+        self.receptions_total = 0
         self.beacons_lost = 0
         self.beacons_collided = 0
         self.total_latency = 0.0
+        self.total_reception_latency = 0.0
         self.discovery_times = {}
         self.reaction_latencies = []
         self.delivered_beacons = set()
@@ -48,6 +50,10 @@ class Metrics:
         self.beacons_sent += 1
 
     def log_received(self, sender_id, timestamp, receive_time, receiver_id=None):
+        # Track per-reception latency (one sample per successful receiver).
+        self.receptions_total += 1
+        self.total_reception_latency += receive_time - timestamp
+
         key = (sender_id, timestamp)
         if key not in self.delivered_beacons:
             self.beacons_received += 1
@@ -127,7 +133,7 @@ class Metrics:
         return sum(self.avg_neighbors_samples) / len(self.avg_neighbors_samples)
     
     def summary(self, sim_time: float):
-        avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
+        avg_latency = self.total_reception_latency / self.receptions_total if self.receptions_total else 0
         avg_unique_nodes = self.avg_unique_nodes_discovered()  # UPDATED: Use new method
         final_avg_neighbors = self.get_final_avg_neighbors()
         
@@ -139,7 +145,8 @@ class Metrics:
             "Fixed Buoys": self.fixed_buoy_count or 0,
             "Simulation Duration": self.simulation_duration or sim_time,
             "Sent": self.beacons_sent,
-            "Received": self.beacons_received,
+            "Received": self.receptions_total,
+            "Unique Received Beacons": self.beacons_received,
             "Lost": self.beacons_lost,
             "Collisions": self.beacons_collided,
             "Avg Latency": avg_latency,
@@ -151,7 +158,7 @@ class Metrics:
                 if self.reaction_latencies else 0
             ),
             "Throughput (beacons/sec)": (
-                self.beacons_received / sim_time
+                self.receptions_total / sim_time
                 if sim_time > 0 else 0
             ),
             "Potentially Sent": self.potentially_sent,
@@ -177,7 +184,9 @@ class Metrics:
             filepath = os.path.join(results_dir, filename)
         else:
             filepath = filename
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            output_dir = os.path.dirname(filepath)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
 
         with open(filepath, mode="w", newline="") as csvfile:
             writer = csv.writer(csvfile)
@@ -199,7 +208,9 @@ class Metrics:
             filepath = os.path.join(results_dir, filename)
         else:
             filepath = filename
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            output_dir = os.path.dirname(filepath)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
 
         df = pd.DataFrame(self.time_series)
         df.to_csv(filepath, index=False)

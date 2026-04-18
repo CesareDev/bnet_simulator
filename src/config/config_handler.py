@@ -16,7 +16,6 @@ class ConfigHandler:
             'duration': 600,
             'num_processes': 4,
             'ideal_channel': True,
-            'ramp_scenario': False,
             'enable_metrics': True,
             'enable_logging': False,
             'multihop_mode': 'none',  # Options: none, append, forwarded

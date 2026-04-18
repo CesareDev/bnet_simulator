@@ -17,13 +17,12 @@ class Event:
         self.data = data or {}
 
 class Simulator:
-    def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, ramp: bool = False, duration: float = None):
+    def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, duration: float = None):
         cfg = ConfigHandler()
         
         self.buoys = buoys
         self.channel = channel
         self.metrics = metrics
-        self.ramp = ramp
         self.all_buoys = buoys.copy()
         self.first_change = True
         self.next_buoy_change = 0
@@ -31,11 +30,6 @@ class Simulator:
         
         self.neighbor_timeout = cfg.get('scheduler', 'neighbor_timeout')
         self.comm_range_max = cfg.get('network', 'communication_range_max')
-
-        if ramp:
-            self.buoys = self.all_buoys[:2]
-        else:
-            self.buoys = buoys
 
         self.channel.set_buoys(self.buoys)
         self.channel.simulator = self
@@ -80,10 +74,7 @@ class Simulator:
         self.schedule_event(30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
 
     def update_buoy_array(self, event, sim_time: float):
-        if self.ramp:
-            self._update_buoy_array_ramp(sim_time)
-        else:
-            self._update_buoy_array_random(sim_time)
+        self._update_buoy_array_random(sim_time)
         
         # Recalculate avg_neighbors after buoy array changes
         self.calculate_and_record_avg_neighbors()
@@ -139,25 +130,6 @@ class Simulator:
         next_change_time = sim_time + random.uniform(15, 20)
         self.schedule_event(next_change_time, EventType.BUOY_ARRAY_UPDATE, self)
 
-    def _update_buoy_array_ramp(self, sim_time: float):
-        active_buoys = self.buoys.copy()
-        inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
-        current_count = len(active_buoys)
-        total_buoys = len(self.all_buoys)
-        buoys_to_add = total_buoys - 2
-        add_interval = self.duration / buoys_to_add if buoys_to_add > 0 else self.duration
-    
-        if current_count < total_buoys:
-            if inactive_buoys:
-                buoy = inactive_buoys[0]
-                self.buoys.append(buoy)
-                buoy.simulator = self
-                initial_offset = random.uniform(0, 0.01)
-                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-                self.schedule_event(sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
-            self.channel.set_buoys(self.buoys)
-            self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
-
     def handle_event(self, event, sim_time: float):
         if event.event_type == EventType.BUOY_ARRAY_UPDATE:
             self.update_buoy_array(event, sim_time)
@@ -192,10 +164,6 @@ class Simulator:
                         event.target_obj.handle_event(event, self.simulated_time)
                 except Exception as e:
                     logging.log_error(f"Error handling event {event}: {str(e)}")
-                
-                if self.ramp and int(self.simulated_time) % 5 == 0 and self.simulated_time > 0:
-                    avg_neighbors_sample = self.calculate_avg_neighbors()
-                    self.metrics.log_timepoint(self.simulated_time, len(self.buoys), avg_neighbors_sample)
 
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
