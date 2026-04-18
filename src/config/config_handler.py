@@ -11,7 +11,7 @@ class ConfigHandler:
             'schedulers': ['static', 'dynamic_adab', 'dynamic_acab'],
             'min_buoys': 20,
             'max_buoys': 30,
-            'step_buoys': 20,
+            'step_buoys': 10,
             'intervals': [1.0, 0.5, 0.25],
             'duration': 600,
             'num_processes': 4,
@@ -49,7 +49,6 @@ class ConfigHandler:
         'scheduler': {
             'beacon_min_interval': 1.0,
             'beacon_max_interval': 5.0,
-            'static_interval': 1.0
         }
     }
     

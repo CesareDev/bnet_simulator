@@ -83,7 +83,7 @@ def parse_args():
     parser.add_argument(
         "--static-interval",
         type=float,
-        default=cfg.get('scheduler', 'static_interval'),
+        default=0.25,
         help="Interval for static scheduler in seconds"
     )
     return parser.parse_args()
@@ -147,11 +147,10 @@ def main():
             is_mobile=True,
             battery=default_battery,
             velocity=random_velocity(default_velocity),
+            scheduler_mode=args.mode,
+            scheduler_static_interval=args.static_interval,
             metrics=metrics
         )
-        buoy.scheduler.scheduler_type = args.mode
-        buoy.scheduler.static_interval = args.static_interval
-        buoy.scheduler.min_interval = args.static_interval
         mobile_buoys.append(buoy)
 
     static_buoys = []
@@ -163,11 +162,10 @@ def main():
             position=pos,
             is_mobile=False,
             battery=default_battery,
+            scheduler_mode=args.mode,
+            scheduler_static_interval=args.static_interval,
             metrics=metrics
         )
-        buoy.scheduler.scheduler_type = args.mode
-        buoy.scheduler.static_interval = args.static_interval
-        buoy.scheduler.min_interval = args.static_interval
         static_buoys.append(buoy)
 
     buoys = mobile_buoys + static_buoys

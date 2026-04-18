@@ -5,13 +5,13 @@ from typing import Tuple, List
 from config.config_handler import ConfigHandler
 
 class BeaconScheduler:
-    def __init__(self):
+    def __init__(self, mode, static_interval):
         cfg = ConfigHandler()
         
         self.min_interval = cfg.get('scheduler', 'beacon_min_interval')
         self.max_interval = cfg.get('scheduler', 'beacon_max_interval')
-        self.static_interval = cfg.get('scheduler', 'static_interval')
-        self.scheduler_type = None
+        self.static_interval = static_interval
+        self.scheduler_type = mode
         self.default_velocity = cfg.get('buoys', 'default_velocity')
         
         self.last_static_send_time = -random.uniform(0, self.static_interval)

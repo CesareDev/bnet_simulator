@@ -23,6 +23,8 @@ class Buoy:
         is_mobile: bool = False,
         battery: float = None,
         velocity: Tuple[float, float] = (0.0, 0.0),
+        scheduler_mode: str = "static",
+        scheduler_static_interval: float = 0.25,
         metrics = None
     ):
         cfg = ConfigHandler()
@@ -33,7 +35,7 @@ class Buoy:
         self.battery = battery if battery is not None else cfg.get('buoys', 'default_battery')
         self.velocity = velocity
         self.neighbors = []  # Direct neighbors (1-hop, beacons we received directly)
-        self.scheduler = BeaconScheduler()
+        self.scheduler = BeaconScheduler(scheduler_mode, scheduler_static_interval)
         self.channel = channel
         self.state = BuoyState.RECEIVING
         self.metrics = metrics
