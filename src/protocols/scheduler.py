@@ -1,9 +1,12 @@
 import random
 import uuid
 import math
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Dict
 from config.config_handler import ConfigHandler
 from utils import logging
+from rl.rl_model import ContextualBanditAgent, ActionSpace
+from rl.context import ContextVector, RewardCalculator
+from rl.replay_buffer import ReplayBuffer, Transition
 
 class BeaconScheduler:
     def __init__(self):
@@ -20,6 +23,31 @@ class BeaconScheduler:
         
         self.next_static_interval = self.static_interval
         self.next_dynamic_interval = None
+        
+        # RL Agent initialization
+        self.rl_agent: Optional[ContextualBanditAgent] = None
+        self.rl_replay_buffer: Optional[ReplayBuffer] = None
+        self.rl_reward_calculator: Optional[RewardCalculator] = None
+        self.last_rl_context: Optional[ContextVector] = None
+        self.last_rl_action: Optional[int] = None
+        
+        # Tracking for reward computation
+        self.beacon_window_start_time: float = 0.0
+        self.beacons_received_in_window: int = 0
+        self.neighbors_sent_in_window: set = set()
+        self.energy_consumed_in_interval: float = 0.0
+    
+    def initialize_rl_agent(self, seed: int = 42):
+        """Initialize RL agent for this scheduler."""
+        action_space = ActionSpace()  # 19 actions: 0.25 to 5.0 seconds
+        self.rl_agent = ContextualBanditAgent(
+            action_space=action_space,
+            context_dim=6,
+            learning_rate=0.01,
+            seed=seed,
+        )
+        self.rl_replay_buffer = ReplayBuffer(max_size=10000)
+        self.rl_reward_calculator = RewardCalculator()
     
     def get_next_check_interval(self) -> float:
         if self.scheduler_type == "static":
@@ -34,6 +62,8 @@ class BeaconScheduler:
             return self.should_send_dynamic(battery, velocity, neighbors, current_time)
         elif self.scheduler_type == "dynamic_aimd":
             return self.should_send_dynamic_aimd(buoy, current_time)
+        elif self.scheduler_type == "rl":
+            return self.should_send_rl(buoy, battery, velocity, neighbors, current_time)
         else:
             raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
@@ -137,33 +167,110 @@ class BeaconScheduler:
 
     def should_send_dynamic_rl(
         self,
+        buoy,
         battery,
         velocity: Tuple[float, float],
         neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
-        collision_rate: float,
         current_time: float,
-    )-> bool:
-        context_vector = self.build_context_vector(battery, velocity, neighbors, collision_rate)
-        next_interval = self.rl_model.predict(context_vector)
-
-        reward = self.calculate_reward(
-            energy_level = battery,
-            collision_rate = collision_rate,
-            network_discovery = len(neighbors),
-            interval = next_interval,
-            max_energy = 100.0,
-            min_energy = 0.1,
-            max_discovery = 80,
+    ) -> bool:
+        """
+        RL-based scheduler using contextual multi-armed bandit.
+        
+        Args:
+            buoy: Buoy instance with full state
+            battery: Battery level [0, max]
+            velocity: (vx, vy) velocity tuple
+            neighbors: List of (neighbor_id, last_seen_time, position)
+            current_time: Current simulation time
+        
+        Returns:
+            True if should transmit beacon now, False otherwise
+        """
+        if self.rl_agent is None:
+            self.initialize_rl_agent()
+        
+        # Initialize beacon window on first call
+        if self.beacon_window_start_time == 0.0:
+            self.beacon_window_start_time = current_time
+        
+        # Extract context vector from current buoy state
+        context = ContextVector.from_buoy_state(
+            buoy,
+            default_velocity=self.default_velocity,
+            max_neighbors=60,
+            beacon_window_size=10,
         )
-
-        self.rl_model.update(context_vector, next_interval, reward)
-
-        #check if it's time to send
+        
+        # Select action (send interval) using Thompson Sampling
+        action_idx = self.rl_agent.select_action(context, exploration=True)
+        next_interval = self.rl_agent.get_action_interval(action_idx)
+        
+        # Store for reward computation
+        self.last_rl_context = context
+        self.last_rl_action = action_idx
+        
+        # Check if it's time to send
         time_since_last = current_time - self.last_dynamic_send_time
+        
         if time_since_last >= next_interval:
+            # Time to send beacon
             self.last_dynamic_send_time = current_time
+            
+            # Compute reward for the interval that just completed
+            window_duration = current_time - self.beacon_window_start_time
+            reward = self.rl_reward_calculator.compute_reward(
+                beacons_received_count=self.beacons_received_in_window,
+                neighbors_sending=len(self.neighbors_sent_in_window),
+                beacons_in_window=self.beacons_received_in_window + len(self.neighbors_sent_in_window),
+                window_duration=max(window_duration, 0.01),  # Avoid division by zero
+                energy_consumed=self.energy_consumed_in_interval,
+                battery_percent=battery / 1000.0,  # Assuming max battery 1000
+                ideal_neighbors=5,
+            )
+            
+            # Update agent with reward
+            self.rl_agent.receive_reward(reward)
+            
+            # Store transition in replay buffer
+            if self.last_rl_context is not None:
+                transition = Transition(
+                    context=self.last_rl_context,
+                    action=self.last_rl_action,
+                    reward=reward,
+                    next_context=context,
+                    terminated=False,
+                )
+                self.rl_replay_buffer.add(transition)
+            
+            # Reset window for next interval
+            self.beacon_window_start_time = current_time
+            self.beacons_received_in_window = 0
+            self.neighbors_sent_in_window = set()
+            self.energy_consumed_in_interval = 0.0
+            
             return True
+        
         return False
+    
+    def should_send_rl(
+        self,
+        buoy,
+        battery,
+        velocity: Tuple[float, float],
+        neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
+        current_time: float,
+    ) -> bool:
+        """Alias for should_send_dynamic_rl for consistency."""
+        return self.should_send_dynamic_rl(buoy, battery, velocity, neighbors, current_time)
+    
+    def record_beacon_reception(self, neighbor_id: uuid.UUID):
+        """Called when a beacon is received to update statistics."""
+        self.beacons_received_in_window += 1
+        self.neighbors_sent_in_window.add(neighbor_id)
+    
+    def record_energy_consumption(self, energy: float):
+        """Called to record energy spent on transmission."""
+        self.energy_consumed_in_interval += energy
 
 
 
