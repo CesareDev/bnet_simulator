@@ -572,10 +572,6 @@ def main():
     plot_file = os.path.join(plot_dir, "avg_unique_nodes_vs_time_ramp.png")
     plot_unique_nodes_vs_time(results_dir, plot_file, interval=interval)
 
-    print("Plotting B-PDR grouped by buoy count for ramp scenario...")
-    plot_group_file = os.path.join(plot_dir, "b_pdr_grouped_by_buoy_count_ramp.png")
-    plot_ramp_grouped_by_buoy_count(results_dir, plot_group_file)
-
     print("Plotting energy consumption by density...")
     plot_energy_consumption_by_density(results_dir, plot_dir, interval=interval)
 

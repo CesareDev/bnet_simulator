@@ -2,25 +2,19 @@ simulation:
   schedulers:
   - static
   - dynamic_adab
-  # - dynamic_acab
-  min_buoys: 300
+  - dynamic_acab
+  - dynamic_aimd
+  # - rl
+  min_buoys: 280
   max_buoys: 300
   step_buoys: 10
-  #- dynamic_adab
-  #- dynamic_acab
-  #- dynamic_aimd
-  #- rl
-  min_buoys: 20
-  max_buoys: 300
-  step_buoys: 20
   intervals:
-  #- 1.0
+  - 1.0
   - 0.5
   - 0.25
   duration: 600
   num_processes: 4
   ideal_channel: false
-  ramp_scenario: false
   enable_metrics: true
   enable_logging: false
   multihop_mode: none  # Options: none, append, forwarded
@@ -48,8 +42,6 @@ csma:
 scheduler:
   beacon_min_interval: 1.0
   beacon_max_interval: 5.0
-
-
 energy:
   # Enable energy modeling for AIMD protocol
   enable_for_protocols: ['dynamic_aimd','static', 'dynamic_adab', 'dynamic_acab']  # e.g., ['rl'] or empty list to disable for all
