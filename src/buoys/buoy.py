@@ -24,8 +24,9 @@ class Buoy:
         is_mobile: bool = False,
         battery: float = None,
         velocity: Tuple[float, float] = (0.0, 0.0),
-        metrics = None,
-        scheduler_type: str = None
+        scheduler_mode: str = "static",
+        scheduler_static_interval: float = 0.25,
+        metrics = None
     ):
         cfg = ConfigHandler()
         
@@ -35,7 +36,7 @@ class Buoy:
         self.battery = battery if battery is not None else random.uniform(10.0, cfg.get('buoys', 'default_battery'))
         self.velocity = velocity
         self.neighbors = []  # Direct neighbors (1-hop, beacons we received directly)
-        self.scheduler = BeaconScheduler()
+        self.scheduler = BeaconScheduler(scheduler_mode, scheduler_static_interval)
         self.channel = channel
         self.state = BuoyState.RECEIVING
         self.receiving_state_start_time = 0.0  # Track when buoy entered RECEIVING state (for idle listening)
@@ -54,7 +55,7 @@ class Buoy:
 
         # --- Energy Model ---
         energy_enabled_for = cfg.get('energy', 'enable_for_protocols') or []
-        self.enable_energy_model = scheduler_type in energy_enabled_for
+        self.enable_energy_model = scheduler_mode in energy_enabled_for
         self.initial_battery = self.battery
         self.total_energy_consumed = 0.0
         self.is_dead = False
@@ -416,7 +417,7 @@ class Buoy:
                     sender_id=beacon.sender_id,
                     timestamp=beacon.timestamp,
                     receive_time=sim_time,
-                    receiver_id=None
+                    receiver_id=self.id
                 )
                 
                 # Track for delivery ratio

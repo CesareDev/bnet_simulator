@@ -10,7 +10,6 @@ import random
 import time
 import argparse
 import json
-import math
 
 def parse_args():
     cfg = ConfigHandler()
@@ -84,13 +83,8 @@ def parse_args():
     parser.add_argument(
         "--static-interval",
         type=float,
-        default=cfg.get('scheduler', 'static_interval'),
+        default=0.25,
         help="Interval for static scheduler in seconds"
-    )
-    parser.add_argument(
-        "--ramp",
-        action='store_true',
-        help="Use ramp scenario"
     )
     return parser.parse_args()
 
@@ -118,6 +112,11 @@ def main():
     if args.positions_file:
         with open(args.positions_file, "r") as f:
             positions = json.load(f)
+        required_positions = args.mobile_buoy_count + args.fixed_buoy_count
+        if len(positions) < required_positions:
+            raise ValueError(
+                f"positions_file has {len(positions)} positions but {required_positions} are required"
+            )
 
     if cfg.get('simulation', 'enable_metrics'):
         metrics = Metrics(density=args.density)
@@ -147,41 +146,36 @@ def main():
             position=pos,
             is_mobile=True,
             velocity=random_velocity(default_velocity),
-            metrics=metrics,
-            scheduler_type=args.mode
+            scheduler_mode=args.mode,
+            scheduler_static_interval=args.static_interval,
+            metrics=metrics
         )
-        buoy.scheduler.scheduler_type = args.mode
-        buoy.scheduler.static_interval = args.static_interval
-        buoy.scheduler.min_interval = args.static_interval
         mobile_buoys.append(buoy)
 
     static_buoys = []
     for i in range(args.fixed_buoy_count):
-        pos = positions[i] if positions else random_position(args.world_width, args.world_height)
+        pos_index = args.mobile_buoy_count + i
+        pos = positions[pos_index] if positions else random_position(args.world_width, args.world_height)
         buoy = Buoy(
             channel=channel,
             position=pos,
             is_mobile=False,
-            metrics=metrics,
-            scheduler_type=args.mode
+            battery=default_battery,
+            scheduler_mode=args.mode,
+            scheduler_static_interval=args.static_interval,
+            metrics=metrics
         )
-        buoy.scheduler.scheduler_type = args.mode
-        buoy.scheduler.static_interval = args.static_interval
-        buoy.scheduler.min_interval = args.static_interval
         static_buoys.append(buoy)
 
     buoys = mobile_buoys + static_buoys
     channel.set_buoys(buoys)
 
-    simulator = Simulator(buoys, channel, metrics, args.ramp, args.duration)
+    simulator = Simulator(buoys, channel, metrics, args.duration)
     simulator.start()
 
-    if metrics and not args.ramp:
+    if metrics:
         summary = metrics.summary(simulator.simulated_time)
         metrics.export_metrics_to_csv(summary, filename=args.result_file)
-
-    if args.ramp:
-        metrics.export_time_series(args.result_file)
 
 if __name__ == "__main__":
     main()

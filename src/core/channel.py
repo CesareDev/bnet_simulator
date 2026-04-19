@@ -55,16 +55,6 @@ class Channel:
         for i, (beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
             if end + grace_period <= sim_time:
                 expired_indices.append(i)
-                
-                if self.ideal_channel:
-                    beacon_key = (beacon.sender_id, beacon.timestamp)
-                    if beacon_key not in self.collision_beacons:
-                        unprocessed = potential_count - processed_count
-                        if unprocessed > 0:
-                            for _ in range(unprocessed):
-                                if self.metrics:
-                                    self.metrics.log_actually_received(beacon.sender_id)
-                                    logging.log_info(f"Ideal channel: marking {unprocessed} unreached as received for {str(beacon.sender_id)[:6]}")
 
         for idx in sorted(expired_indices, reverse=True):
             self.active_transmissions.pop(idx)

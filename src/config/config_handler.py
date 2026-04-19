@@ -11,12 +11,11 @@ class ConfigHandler:
             'schedulers': ['static', 'dynamic_adab', 'dynamic_acab','dynamic_aimd','rl'],
             'min_buoys': 20,
             'max_buoys': 30,
-            'step_buoys': 20,
+            'step_buoys': 10,
             'intervals': [1.0, 0.5, 0.25],
             'duration': 600,
             'num_processes': 4,
             'ideal_channel': True,
-            'ramp_scenario': False,
             'enable_metrics': True,
             'enable_logging': False,
             'multihop_mode': 'none',  # Options: none, append, forwarded

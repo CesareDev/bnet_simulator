@@ -1,6 +1,11 @@
 simulation:
   schedulers:
   - static
+  - dynamic_adab
+  # - dynamic_acab
+  min_buoys: 300
+  max_buoys: 300
+  step_buoys: 10
   #- dynamic_adab
   #- dynamic_acab
   #- dynamic_aimd
@@ -24,8 +29,8 @@ world:
   width: 800.0
   height: 800.0
 buoys:
-  mobile_percentage: 0.2
-  default_battery: 1000.0
+  mobile_percentage: 0.3
+  default_battery: 100.0
   default_velocity: 15.0
 network:
   bit_rate: 1000000
@@ -43,7 +48,6 @@ csma:
 scheduler:
   beacon_min_interval: 1.0
   beacon_max_interval: 5.0
-  static_interval: 1.0
 
 
 energy:
