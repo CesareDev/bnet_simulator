@@ -311,8 +311,7 @@ class BeaconScheduler:
             combined = density_score
 
         fq = combined * combined
-        bi_min = self.static_interval
-        bi = bi_min + fq * (self.max_interval - bi_min)
+        bi = self.min_interval + fq * (self.max_interval - self.min_interval)
 
         jitter = random.uniform(-0.5, 0.5)
         bi_final = bi * (1 + jitter)
