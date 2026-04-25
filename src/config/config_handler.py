@@ -47,7 +47,7 @@ class ConfigHandler:
             'backoff_time_max': 0.016
         },
         'scheduler': {
-            'beacon_min_interval': 1.0,
+            'beacon_min_interval': 0.25,
             'beacon_max_interval': 5.0,
         }
     }
